@@ -21,12 +21,16 @@ import { JournalEntry } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import { RootStackParamList } from '../../navigation/types';
 import { logger } from '../../utils/logger';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user } = useAuth();
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   
   // Extract first name for greeting
   const getFirstName = () => {
@@ -115,7 +119,7 @@ const HomeScreen = () => {
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7D4CDB" testID="loading-indicator" />
+        <ActivityIndicator size="large" color={theme.colors.primary} testID="loading-indicator" />
       </View>
     );
   }
@@ -124,7 +128,7 @@ const HomeScreen = () => {
     <ScrollView 
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />
       }
     >
       <View style={styles.header}>
@@ -162,7 +166,7 @@ const HomeScreen = () => {
         ))
       ) : (
         <View style={styles.emptyContainer}>
-          <Ionicons name="book-outline" size={48} color="#ccc" />
+          <Ionicons name="book-outline" size={theme.spacing.xxl} color={theme.colors.disabled} />
           <Text style={styles.emptyText}>No journal entries yet</Text>
           <TouchableOpacity 
             style={styles.startButton}
@@ -176,100 +180,114 @@ const HomeScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 10,
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
   },
   greeting: {
-    fontSize: 24,
+    fontSize: theme.typography.fontSizes.xxl,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   date: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
   },
   statCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 10,
-    padding: 15,
+    padding: theme.spacing.md,
     alignItems: 'center',
     width: '30%',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    elevation: theme.isDarkMode ? 1 : 2,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
+    shadowOpacity: theme.isDarkMode ? 0.15 : 0.05,
+    shadowRadius: theme.isDarkMode ? 2 : 3,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 1 : 0,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: theme.typography.fontSizes.xxl,
     fontWeight: 'bold',
-    color: '#7D4CDB',
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.sm,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: theme.typography.fontSizes.xl,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   seeAllText: {
-    fontSize: 16,
-    color: '#7D4CDB',
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   emptyContainer: {
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 20,
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    marginTop: theme.spacing.xxl,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 12,
-    marginBottom: 20,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   startButton: {
-    backgroundColor: '#7D4CDB',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: 25,
+    marginTop: theme.spacing.md,
   },
   startButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    color: theme.isDarkMode ? theme.colors.background : theme.colors.white,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamilies.bold,
   },
 });
 

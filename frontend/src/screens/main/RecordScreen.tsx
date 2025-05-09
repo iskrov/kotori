@@ -29,11 +29,13 @@ import { getLanguageName } from '../../config/languageConfig';
 
 // Utils
 import logger from '../../utils/logger';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 
 // Define colors directly in the file instead of importing
-const colors = {
-  primary: '#7D4CDB',
-};
+// const colors = {
+//   primary: '#7D4CDB',
+// };
 
 // Type definitions for navigation and route
 type RecordScreenRouteProp = RouteProp<{ Record: RecordScreenParams | undefined }, 'Record'>;
@@ -41,6 +43,8 @@ type RecordScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'
 
 const RecordScreen = () => {
   logger.info('RecordScreen instance created/rendered.');
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   
   // Navigation and route
   const navigation = useNavigation<RecordScreenNavigationProp>();
@@ -249,61 +253,64 @@ const RecordScreen = () => {
         <Modal
           visible={showRecorder}
           animationType="slide"
-          transparent={true}
           onRequestClose={handleRecorderCancelOrDone}
         >
-          <View style={styles.recorderModalOverlay}>
-            <AudioRecorder 
-              onTranscriptionComplete={handleTranscriptionComplete}
-              onCancel={handleRecorderCancelOrDone}
-            />
-          </View>
+          <AudioRecorder
+            onTranscriptionComplete={handleTranscriptionComplete}
+            onCancel={handleRecorderCancelOrDone}
+          />
         </Modal>
       )}
       
-      {isSaving && (
-        <View style={styles.savingOverlay}>
-          <ActivityIndicator size="large" color={colors.primary} />
+      {(isSaving || isAutoSaving || isLoading) && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={theme.colors.white} />
+          <Text style={styles.loadingText}>
+            {isSaving ? 'Saving...' : isAutoSaving ? 'Auto-saving...' : 'Loading...'}
+          </Text>
         </View>
       )}
     </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: theme.spacing.lg,
   },
   header: {
-    padding: 20,
-    paddingBottom: 10,
-    backgroundColor: '#fff',
+    padding: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: theme.typography.fontSizes.lg,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
+    textAlign: 'center',
+    fontFamily: theme.typography.fontFamilies.bold,
   },
-  recorderModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  savingOverlay: {
+  loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: theme.isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
+  },
+  loadingText: {
+    marginTop: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.white,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
 });
 

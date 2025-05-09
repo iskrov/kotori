@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { useAppTheme } from '../contexts/ThemeContext';
 
 import HomeScreen from '../screens/main/HomeScreen';
 import JournalScreen from '../screens/main/JournalScreen';
@@ -37,8 +38,20 @@ const Stack = createStackNavigator<JournalStackParamList>();
 
 // Journal stack for nested navigation
 const JournalStack = () => {
+  const { theme } = useAppTheme();
+
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.colors.card,
+        },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: {
+          color: theme.colors.text,
+        },
+      }}
+    >
       <Stack.Screen 
         name="JournalList" 
         component={JournalScreen} 
@@ -68,9 +81,18 @@ const JournalStack = () => {
 };
 
 const MainNavigator = () => {
+  const { theme } = useAppTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
+        headerStyle: {
+          backgroundColor: theme.colors.card,
+        },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: {
+          color: theme.colors.text,
+        },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap | undefined;
           
@@ -88,8 +110,12 @@ const MainNavigator = () => {
           
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#7D4CDB',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textDisabled,
+        tabBarStyle: {
+          backgroundColor: theme.colors.card,
+          borderTopColor: theme.colors.border,
+        },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
@@ -111,10 +137,10 @@ const MainNavigator = () => {
               height: 60, 
               width: 60, 
               borderRadius: 30, 
-              backgroundColor: '#7D4CDB', 
+              backgroundColor: theme.colors.primary,
               justifyContent: 'center', 
               alignItems: 'center',
-              shadowColor: '#000',
+              shadowColor: theme.colors.shadow,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.25,
               shadowRadius: 3.84,
@@ -123,7 +149,7 @@ const MainNavigator = () => {
               <Ionicons 
                 name={'mic'}
                 size={size * 1.2} 
-                color="#fff"
+                color={theme.colors.onPrimary}
               />
             </View>
           )

@@ -8,6 +8,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { AppTheme } from '../config/theme';
 
 interface TagInputProps {
   tags: string[];
@@ -22,27 +24,19 @@ const TagInput: React.FC<TagInputProps> = ({
   maxTags = 10,
   placeholder = "Add tag..."
 }) => {
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   const [inputValue, setInputValue] = useState('');
 
   const handleAddTag = () => {
     if (!inputValue.trim()) {
       return;
     }
-
-    // Normalize tag (lowercase, trim)
     const newTag = inputValue.trim().toLowerCase();
-    
-    // Don't add if it already exists
-    if (tags.includes(newTag)) {
+    if (tags.includes(newTag) || tags.length >= maxTags) {
       setInputValue('');
       return;
     }
-    
-    // Don't add if we've reached the max
-    if (tags.length >= maxTags) {
-      return;
-    }
-    
     onChangeTags([...tags, newTag]);
     setInputValue('');
   };
@@ -62,27 +56,29 @@ const TagInput: React.FC<TagInputProps> = ({
 
   return (
     <View style={styles.container} testID="tag-input-container">
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.tagsScrollView}
-        contentContainerStyle={styles.tagsContainer}
-        testID="tags-scroll-view"
-      >
-        {tags.map((tag, index) => (
-          <View key={index} style={styles.tag} testID={`tag-item-${index}`}>
-            <Text style={styles.tagText} testID={`tag-text-${index}`}>#{tag}</Text>
-            <TouchableOpacity
-              style={styles.tagRemoveButton}
-              onPress={() => handleRemoveTag(index)}
-              testID={`tag-delete-button`}
-              accessibilityLabel={`Delete tag ${tag}`}
-            >
-              <Ionicons name="close-circle" size={16} color="#666" />
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
+      {tags.length > 0 && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.tagsScrollView}
+          contentContainerStyle={styles.tagsContainer}
+          testID="tags-scroll-view"
+        >
+          {tags.map((tag, index) => (
+            <View key={index} style={styles.tag} testID={`tag-item-${index}`}>
+              <Text style={styles.tagText} testID={`tag-text-${index}`}>#{tag}</Text>
+              <TouchableOpacity
+                style={styles.tagRemoveButton}
+                onPress={() => handleRemoveTag(index)}
+                testID={`tag-delete-button-${index}`}
+                accessibilityLabel={`Delete tag ${tag}`}
+              >
+                <Ionicons name="close-circle" size={16} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+      )}
       
       <View style={styles.inputContainer} testID="tag-input-field-container">
         <TextInput
@@ -92,9 +88,10 @@ const TagInput: React.FC<TagInputProps> = ({
           onSubmitEditing={handleAddTag}
           onKeyPress={handleKeyPress}
           placeholder={tags.length >= maxTags ? `Maximum ${maxTags} tags` : placeholder}
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textSecondary}
           returnKeyType="done"
           testID="tag-input-field"
+          editable={tags.length < maxTags}
         />
         <TouchableOpacity
           style={[
@@ -106,77 +103,84 @@ const TagInput: React.FC<TagInputProps> = ({
           testID="add-tag-button"
           accessibilityLabel="Add tag"
         >
-          <Ionicons name="add" size={20} color="#fff" />
+          <Ionicons name="add" size={20} color={theme.isDarkMode ? theme.colors.background : theme.colors.white} />
         </TouchableOpacity>
       </View>
       
-      <Text style={styles.helpText} testID="tag-input-help-text">
-        Press space, comma, or tap + to add a tag
-      </Text>
+      {tags.length < maxTags && (
+        <Text style={styles.helpText} testID="tag-input-help-text">
+          Press space, comma, or tap + to add a tag
+        </Text>
+      )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
   },
   tagsScrollView: {
     maxHeight: 80,
+    marginBottom: theme.spacing.sm,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: theme.spacing.xs,
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0ebff',
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    marginRight: theme.spacing.sm,
   },
   tagText: {
-    color: '#7D4CDB',
-    fontSize: 14,
-    marginRight: 4,
+    color: theme.isDarkMode ? theme.colors.text : theme.colors.primary,
+    fontSize: theme.typography.fontSizes.sm,
+    marginRight: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   tagRemoveButton: {
-    marginLeft: 2,
+    marginLeft: theme.spacing.xs,
   },
   inputContainer: {
     flexDirection: 'row',
-    marginTop: 8,
+    marginTop: theme.spacing.xs,
   },
   input: {
     flex: 1,
     height: 40,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: '#333',
+    paddingHorizontal: theme.spacing.md,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   addButton: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#7D4CDB',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: theme.spacing.sm,
   },
   disabledButton: {
-    backgroundColor: '#bdc3c7',
+    backgroundColor: theme.colors.disabled,
   },
   helpText: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
 });
 

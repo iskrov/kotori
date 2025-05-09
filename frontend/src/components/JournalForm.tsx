@@ -10,6 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import TagInput from './TagInput';
 import useAudioPlayback from '../hooks/useAudioPlayback';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { AppTheme } from '../config/theme';
 
 interface JournalFormProps {
   title: string;
@@ -40,11 +42,12 @@ const JournalForm: React.FC<JournalFormProps> = ({
   isAutoSaving,
   isLoading,
 }) => {
-  // Use our audio playback hook for handling audio playback
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
+  
   const {
     isPlaying,
     togglePlayback,
-    error: playbackError
   } = useAudioPlayback();
 
   const handlePlayRecording = async () => {
@@ -52,6 +55,9 @@ const JournalForm: React.FC<JournalFormProps> = ({
       await togglePlayback(audioUri);
     }
   };
+
+  const recordButtonIconColor = (isLoading || isSaving) ? theme.colors.disabled : theme.colors.primary;
+  const playButtonIconColor = (isPlaying || isLoading || isSaving) ? theme.colors.disabled : theme.colors.primary;
 
   return (
     <View style={styles.form}>
@@ -61,7 +67,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
         value={title}
         onChangeText={onChangeTitle}
         placeholder="Enter a title (optional)"
-        placeholderTextColor="#999"
+        placeholderTextColor={theme.colors.textSecondary}
         maxLength={100}
       />
       
@@ -72,7 +78,7 @@ const JournalForm: React.FC<JournalFormProps> = ({
           value={content}
           onChangeText={onChangeContent}
           placeholder="Start typing or tap below to record your thoughts..."
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textSecondary}
           multiline
           scrollEnabled={false}
         />
@@ -83,22 +89,22 @@ const JournalForm: React.FC<JournalFormProps> = ({
             onPress={onShowRecorder}
             disabled={isLoading || isSaving}
           >
-            <Ionicons name="mic" size={20} color={(isLoading || isSaving) ? '#aaa' : '#7D4CDB'} style={styles.recordIcon} />
-            <Text style={[styles.recordButtonText, (isLoading || isSaving) && styles.disabledButtonTextInline]}>Record Audio</Text>
+            <Ionicons name="mic" size={20} color={recordButtonIconColor} style={styles.recordIcon} />
+            <Text style={[styles.recordButtonText, (isLoading || isSaving) && styles.disabledButtonText]}>Record Audio</Text>
           </TouchableOpacity>
           
           {audioUri && (
             <TouchableOpacity
-              style={[styles.contentActionButton, isPlaying && styles.disabledButtonInline]}
+              style={[styles.contentActionButton, (isPlaying || isLoading || isSaving) && styles.disabledButtonInline]}
               onPress={handlePlayRecording}
               disabled={isPlaying || isLoading || isSaving}
             >
               <Ionicons 
                 name={isPlaying ? "pause-circle" : "play-circle"} 
                 size={24} 
-                color={isPlaying || isLoading || isSaving ? '#aaa' : '#7D4CDB'} 
+                color={playButtonIconColor} 
               />
-              <Text style={[styles.contentActionText, isPlaying || isLoading || isSaving ? styles.disabledButtonTextInline : {}]}>
+              <Text style={[styles.contentActionText, (isPlaying || isLoading || isSaving) && styles.disabledButtonText]}>
                 {isPlaying ? "Playing..." : "Play Recording"}
               </Text>
             </TouchableOpacity>
@@ -122,10 +128,10 @@ const JournalForm: React.FC<JournalFormProps> = ({
         disabled={isSaving || isLoading || isAutoSaving}
       >
         {isSaving || isAutoSaving ? (
-          <ActivityIndicator size="small" color="#fff" />
+          <ActivityIndicator size="small" color={theme.isDarkMode ? theme.colors.background : theme.colors.white} />
         ) : (
           <>
-            <Ionicons name="save-outline" size={20} color="#fff" />
+            <Ionicons name="save-outline" size={20} color={theme.isDarkMode ? theme.colors.background : theme.colors.white} />
             <Text style={styles.saveButtonText}>Save Entry</Text>
           </>
         )}
@@ -135,120 +141,121 @@ const JournalForm: React.FC<JournalFormProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   form: {
-    padding: 20,
+    padding: theme.spacing.md,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#444',
-    marginBottom: 8,
-    marginTop: 16,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   titleInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    marginBottom: 10,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   contentContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingTop: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
+    paddingTop: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
     textAlignVertical: 'top',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
+    paddingHorizontal: theme.spacing.md,
   },
   contentInput: {
     minHeight: 150,
-    marginBottom: 0,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderBottomWidth: 0,
   },
   contentActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: '#ddd',
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    backgroundColor: '#fff',
+    padding: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   recordButtonInline: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#E9E5F6',
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
     borderRadius: 20,
   },
   recordIcon: {
-    marginRight: 6,
+    marginRight: theme.spacing.xs,
   },
   recordButtonText: {
-    color: '#7D4CDB',
+    color: theme.colors.primary,
     fontWeight: '500',
-    fontSize: 14,
+    fontSize: theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   contentActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
   },
   contentActionText: {
-    marginLeft: 6,
-    color: '#7D4CDB',
+    marginLeft: theme.spacing.xs,
+    color: theme.colors.primary,
     fontWeight: '500',
-    fontSize: 14,
+    fontSize: theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   disabledButtonInline: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
   },
-  disabledButtonTextInline: {
-    color: '#aaa',
+  disabledButtonText: {
+    color: theme.colors.disabled,
   },
   saveButton: {
     flexDirection: 'row',
-    backgroundColor: '#7D4CDB',
-    paddingVertical: 14,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-    shadowColor: '#000',
+    marginTop: theme.spacing.lg,
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 2,
   },
   saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: theme.isDarkMode ? theme.colors.background : theme.colors.white,
+    fontSize: theme.typography.fontSizes.md,
     fontWeight: 'bold',
-    marginLeft: 8,
+    marginLeft: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   saveButtonDisabled: {
-    backgroundColor: '#B0A9C8',
+    backgroundColor: theme.colors.disabled,
   },
   autoSaveIndicator: {
     textAlign: 'center',
-    fontSize: 12,
-    color: '#888',
-    marginTop: 8,
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
 });
 

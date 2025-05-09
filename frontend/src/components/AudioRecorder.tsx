@@ -8,6 +8,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import speechToTextService from '../services/speechToText';
@@ -24,6 +25,8 @@ import useWebSocketTranscription, { WebSocketStatus } from '../hooks/useWebSocke
 
 // Import config
 import { getInitialLanguageOptions, LanguageOption, MAX_LANGUAGE_SELECTION } from '../config/languageConfig';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { AppTheme } from '../config/theme';
 
 interface AudioRecorderProps {
   onTranscriptionComplete: (text: string, audioUri?: string, detectedLanguage?: string) => void;
@@ -34,6 +37,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onTranscriptionComplete,
   onCancel,
 }) => {
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
+
   // Audio recording hook
   const {
     isRecording,
@@ -64,6 +70,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   // WebSocket handlers
   const handleWebSocketError = useCallback((errorMessage: string) => {
     logger.error('WebSocket Transcription Error:', errorMessage);
+    if (isMountedRef.current) setIsProcessing(false);
   }, []);
 
   const handleInterimTranscript = useCallback((text: string) => {
@@ -111,7 +118,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       // NOTE: Using audioUri directly in cleanup is tricky because it captures the value at the time the effect runs.
       // It's better if cleanupRecordingFile can handle null or if useAudioRecording handles its own cleanup.
       // For now, assume cleanupRecordingFile is robust.
-      if (audioUri) { // This accesses the state value when cleanup runs
+      if (audioUri && !hasTranscribedAudio) { // Only cleanup if URI exists and wasn't successfully sent
          logger.info(`[AudioRecorder Cleanup] Attempting to clean up URI: ${audioUri}`);
          cleanupRecordingFile(audioUri).catch(err =>
            logger.error('Error cleaning up recording file during unmount', err)
@@ -119,7 +126,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
        }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array: runs only once
+  }, [audioUri, cleanupRecordingFile, disconnectWebSocket, hasTranscribedAudio]);
 
   // Effect 2: Handle WebSocket connection based on permission (runs when permissionGranted changes)
   useEffect(() => {
@@ -138,11 +145,23 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         stopRecording().catch(err => 
           logger.error('Error stopping recording during handleDone', err)
         );
+      } else if (audioUri && !hasTranscribedAudio && !callbackCalledRef.current && !isProcessing) {
+        // If stopped, URI exists, but not yet processed (e.g., user clicks done quickly after stop)
+        // trigger processing. The useEffect on audioUri will handle it.
+        // However, if already processing, let it finish.
+        logger.info('handleDone: audioUri present, but not yet processed. Relying on useEffect to process.');
+      } else if (!audioUri && !isProcessing && currentFullTranscript.trim()) {
+          // If using WebSocket and got transcript but no URI (e.g. continuous streaming without explicit stop/start file saving)
+          // and user clicks done, pass the transcript.
+          if (!callbackCalledRef.current) {
+            callbackCalledRef.current = true;
+            setHasTranscribedAudio(true); // Mark as done
+            onTranscriptionComplete(currentFullTranscript.trim(), undefined, languageOptions.find(l => l.selected)?.code || languageOptions[0]?.code);
+          }
       }
-      // Use the passed onCancel prop to signal closure
-      onCancel(); 
+      onCancel(); // Always call onCancel to close the modal
     }
-  }, [isRecording, stopRecording, onCancel]);
+  }, [isRecording, stopRecording, onCancel, audioUri, hasTranscribedAudio, isProcessing, currentFullTranscript, languageOptions, onTranscriptionComplete]);
 
   // Handle recording actions
   const handleStartRecording = async () => {
@@ -173,12 +192,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   // Process the recording once audioUri is available
   useEffect(() => {
     // Skip if no URI, already processing, callback already called, or not mounted
-    if (!audioUri || isProcessing || callbackCalledRef.current || !isMountedRef.current) {
-      return;
-    }
-    
-    if (processedUris.has(audioUri)) {
-      logger.info(`URI ${audioUri} has already been processed. Skipping.`);
+    if (!audioUri || isProcessing || callbackCalledRef.current || !isMountedRef.current || processedUris.has(audioUri)) {
       return;
     }
     
@@ -186,14 +200,14 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       if (!isMountedRef.current) return;
       
       setIsProcessing(true);
-      setProcessedUris(prev => new Set(prev).add(audioUri)); // Mark URI as processed
+      setProcessedUris(prev => new Set(prev).add(audioUri!)); // Mark URI as processed
       
       try {
         const selectedLanguageCodes = languageOptions.filter(l => l.selected).map(l => l.code);
         if (selectedLanguageCodes.length === 0) selectedLanguageCodes.push('en-US');
 
         logger.info(`Processing recording from URI: ${audioUri} with languages: ${selectedLanguageCodes.join(', ')}`);
-        const result = await speechToTextService.transcribeAudio(audioUri, { languageCode: selectedLanguageCodes[0] });
+        const result = await speechToTextService.transcribeAudio(audioUri!, { languageCode: selectedLanguageCodes[0] });
 
         if (!isMountedRef.current) {
           logger.warn('Component unmounted during transcription processing');
@@ -235,7 +249,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     processAndCallback();
   // Depend only on audioUri - the effect reads other necessary values via props/state/refs.
   // This prevents the effect from running unnecessarily due to changes in languageOptions, etc.
-  }, [audioUri]); 
+  }, [audioUri, isProcessing, languageOptions, onTranscriptionComplete, processedUris]); 
 
   // Language selection handler
   const toggleLanguageSelection = (code: string) => {
@@ -273,62 +287,54 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     return null;
   };
 
+  // Determine current status text
+  let statusText = "Tap the mic to start recording";
+  if (isRecording) statusText = "Recording your thoughts...";
+  else if (isProcessing) statusText = "Processing audio...";
+  else if (audioUri && !hasTranscribedAudio && !isProcessing) statusText = "Processing audio..."; // After stop, before processing starts
+  else if (hasTranscribedAudio) statusText = "Transcription complete. Tap Done.";
+  else if (recordingError) statusText = `Error: ${recordingError}`;
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Voice Recording</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={handleDone} disabled={isProcessing}>
-          <Ionicons name="close" size={24} color={isProcessing ? '#ccc' : '#333'} />
+      <View style={styles.headerBar}>
+        <TouchableOpacity onPress={onCancel} style={styles.cancelButtonContainer}>
+          <Ionicons name="close" size={28} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Voice Recorder</Text>
+        <TouchableOpacity onPress={handleDone} style={styles.doneButtonContainer} disabled={isProcessing && !hasTranscribedAudio}>
+          <Text style={[styles.doneButtonText, (isProcessing && !hasTranscribedAudio) && styles.disabledText]}>Done</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
-        {isProcessing ? (
-          <View style={styles.processingContainer}>
-            <ActivityIndicator size="large" color="#7D4CDB" />
-            <Text style={styles.processingText}>Processing your recording...</Text>
-          </View>
-        ) : (
-          <>
-            <RecordingStatus 
-              isRecording={isRecording}
-              duration={recordingDuration}
-              hasTranscript={!!currentFullTranscript}
-              transcriptPreview={currentFullTranscript}
-            />
+      <View style={styles.mainContent}>
+        <RecordingStatus 
+          statusText={statusText} 
+          duration={recordingDuration} 
+          isRecording={isRecording} 
+          isProcessing={isProcessing} 
+        />
 
-            {renderDebugInfo()}
+        <View style={styles.transcriptPreviewContainer}>
+          <Text style={styles.transcriptLabel}>Transcript Preview:</Text>
+          <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContentContainer}>
+            <Text style={styles.transcriptText}>{currentFullTranscript || "Your transcribed text will appear here..."}</Text>
+          </ScrollView>
+        </View>
 
-            <RecordingButton
-              isRecording={isRecording}
-              onPress={isRecording ? handleStopRecording : handleStartRecording}
-              disabled={!permissionGranted || isProcessing || (hasTranscribedAudio && !isRecording)}
-              size="medium"
-            />
-            
-            {!permissionGranted && <Text style={styles.permissionText}>Microphone permission needed.</Text>}
+        <RecordingButton
+          isRecording={isRecording}
+          onStartRecording={handleStartRecording}
+          onStopRecording={handleStopRecording}
+          disabled={isProcessing}
+        />
+      </View>
 
-            <TouchableOpacity
-              style={[styles.languageButton, (isProcessing || hasTranscribedAudio) ? styles.disabledButton : {}]}
-              onPress={() => setShowLanguageSelector(true)}
-              disabled={isProcessing || hasTranscribedAudio}
-            >
-              <Ionicons name="language" size={20} color={(isProcessing || hasTranscribedAudio) ? '#ccc' : '#7D4CDB'} />
-              <Text style={[styles.languageButtonText, (isProcessing || hasTranscribedAudio) ? styles.disabledButtonText : {}]}>
-                {selectedLanguageNames || 'Select Language'} ({languageOptions.filter(l => l.selected).length})
-              </Text>
-            </TouchableOpacity>
-
-            {hasTranscribedAudio && (
-              <TouchableOpacity 
-                style={styles.doneButton}
-                onPress={handleDone}
-              >
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
+      <View style={styles.footerControls}>
+        <TouchableOpacity onPress={() => setShowLanguageSelector(true)} style={styles.languageButton}>
+          <Ionicons name="language-outline" size={24} color={theme.colors.textSecondary} />
+          <Text style={styles.languageButtonText}>{selectedLanguageNames || 'Select Language'} ({languageOptions.filter(l => l.selected).length})</Text>
+        </TouchableOpacity>
       </View>
 
       <LanguageSelectorModal
@@ -339,87 +345,118 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         onClose={() => setShowLanguageSelector(false)}
         maxSelection={MAX_LANGUAGE_SELECTION}
       />
+      
+      {(isProcessing) && (
+        <View style={styles.processingOverlay}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.processingText}>Processing...</Text>
+        </View>
+      )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    marginHorizontal: Platform.select({web: 32, default: 16}),
-    marginVertical: Platform.select({web: 32, default: 24}),
-    maxHeight: Dimensions.get('window').height * Platform.select({web: 0.8, default: 0.7}),
-    minHeight: 450,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    backgroundColor: theme.colors.background,
     justifyContent: 'space-between',
   },
-  header: {
+  headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+  cancelButtonContainer: {
+    padding: theme.spacing.sm,
   },
-  closeButton: {
-    padding: 4,
+  doneButtonContainer: {
+    padding: theme.spacing.sm,
   },
-  content: {
+  doneButtonText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.bold,
+  },
+  disabledText: {
+    color: theme.colors.disabled,
+  },
+  headerTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+  },
+  mainContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: theme.spacing.lg,
   },
-  processingContainer: {
-    justifyContent: 'center',
+  transcriptPreviewContainer: {
+    height: 150,
+    width: '100%',
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
+  },
+  transcriptLabel: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  transcriptScroll: {
+    flex: 1,
+  },
+  transcriptContentContainer: {
+    paddingBottom: theme.spacing.sm,
+  },
+  transcriptText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
+  },
+  footerControls: {
+    padding: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
     alignItems: 'center',
-  },
-  processingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#555',
-  },
-  permissionText: {
-    fontSize: 12,
-    color: '#dc3545',
-    marginBottom: 10,
   },
   languageButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: '#f0e9ff',
-    borderRadius: 20,
-    marginBottom: 10,
+    padding: theme.spacing.sm,
+    borderRadius: 8,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
   },
   languageButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#7D4CDB',
-    fontWeight: '500',
+    marginLeft: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
-  disabledButton: {
-    backgroundColor: '#e9ecef',
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
-  disabledButtonText: {
-    color: '#adb5bd',
-  },
-  wsStatusText: {
-    fontSize: 12,
-    color: '#6c757d',
-    marginTop: 5,
+  processingText: {
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   debugContainer: {
     marginVertical: 5,
@@ -430,18 +467,6 @@ const styles = StyleSheet.create({
   debugText: {
     fontSize: 10,
     color: '#666',
-  },
-  doneButton: {
-    marginTop: 16,
-    backgroundColor: '#7D4CDB',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-  },
-  doneButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-    fontSize: 14,
   },
 });
 

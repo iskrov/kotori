@@ -14,7 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 
 import { JournalAPI } from '../../services/api';
-import { JournalEntry, JournalStackParamList } from '../../types';
+import { JournalEntry, JournalStackParamList, Tag } from '../../types';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 
 // Define the type for the route params
 type JournalEntryDetailRouteProp = RouteProp<JournalStackParamList, 'JournalEntryDetail'>;
@@ -25,6 +27,8 @@ type JournalEntryDetailNavigationProp = StackNavigationProp<JournalStackParamLis
 const JournalEntryDetailScreen = () => {
   const navigation = useNavigation<JournalEntryDetailNavigationProp>();
   const route = useRoute<JournalEntryDetailRouteProp>();
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   const { entryId } = route.params;
   
   const [entry, setEntry] = useState<JournalEntry | null>(null);
@@ -78,7 +82,7 @@ const JournalEntryDetailScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7D4CDB" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -86,7 +90,7 @@ const JournalEntryDetailScreen = () => {
   if (!entry) {
     return (
       <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={64} color="#f44336" />
+        <Ionicons name="alert-circle-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.error} />
         <Text style={styles.errorText}>Entry not found</Text>
         <TouchableOpacity 
           style={styles.backButton}
@@ -133,11 +137,10 @@ const JournalEntryDetailScreen = () => {
           
           {entry.tags && entry.tags.length > 0 && (
             <View style={styles.tagsContainer}>
-              <Ionicons name="pricetag-outline" size={20} color="#666" />
+              <Ionicons name="pricetag-outline" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
               <View style={styles.tagsList}>
-                {entry.tags.map((tag, index) => (
-                  <View key={index} style={styles.tag}>
-                    {/* Render tag name */}
+                {entry.tags.map((tag: Tag) => (
+                  <View key={tag.id} style={styles.tag}>
                     <Text style={styles.tagText}>{tag.name}</Text>
                   </View>
                 ))}
@@ -152,7 +155,7 @@ const JournalEntryDetailScreen = () => {
           style={styles.actionButton} 
           onPress={handleEdit}
         >
-          <Ionicons name="create-outline" size={24} color="#7D4CDB" />
+          <Ionicons name="create-outline" size={theme.typography.fontSizes.xxl} color={theme.colors.primary} />
           <Text style={styles.actionText}>Edit</Text>
         </TouchableOpacity>
         
@@ -160,137 +163,157 @@ const JournalEntryDetailScreen = () => {
           style={styles.actionButton} 
           onPress={handleDelete}
         >
-          <Ionicons name="trash-outline" size={24} color="#f44336" />
-          <Text style={[styles.actionText, { color: '#f44336' }]}>Delete</Text>
+          <Ionicons name="trash-outline" size={theme.typography.fontSizes.xxl} color={theme.colors.error} />
+          <Text style={[styles.actionText, { color: theme.colors.error }]}>Delete</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
-    padding: 20,
+    padding: theme.spacing.lg,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   dateText: {
-    fontSize: 20,
+    fontSize: theme.typography.fontSizes.xl,
     fontWeight: 'bold',
-    color: '#333',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   timeText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   content: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: theme.colors.card,
+    borderRadius: 8,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
+    shadowOpacity: theme.isDarkMode ? 0.2 : 0.1,
+    shadowRadius: theme.isDarkMode ? 2 : 4,
+    elevation: theme.isDarkMode ? 2 : 3,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 0.5 : 0,
   },
   entryText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
+    fontSize: theme.typography.fontSizes.md,
+    lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   metadataContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: theme.colors.card,
+    borderRadius: 8,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
+    shadowOpacity: theme.isDarkMode ? 0.2 : 0.1,
+    shadowRadius: theme.isDarkMode ? 2 : 4,
+    elevation: theme.isDarkMode ? 2 : 3,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 0.5 : 0,
   },
   metadataItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: theme.spacing.sm,
   },
   metadataText: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#666',
+    marginLeft: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   tagsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginTop: theme.spacing.sm,
   },
   tagsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginLeft: 10,
+    marginLeft: theme.spacing.sm,
+    flex: 1,
   },
   tag: {
-    backgroundColor: '#e0e0e0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 8,
+    backgroundColor: theme.colors.gray200,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: 15,
+    marginRight: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   tagText: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   actionBar: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: theme.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: '#fff',
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
   },
   actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 15,
+    padding: theme.spacing.sm,
   },
   actionText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#7D4CDB',
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.primary,
+    marginTop: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
   },
   errorText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 20,
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.error,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    textAlign: 'center',
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   backButton: {
-    backgroundColor: '#7D4CDB',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
     borderRadius: 5,
   },
   backButtonText: {
-    color: '#fff',
-    fontWeight: '500',
+    color: theme.colors.white,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
 });
 

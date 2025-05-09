@@ -1,5 +1,5 @@
 import React, { useEffect, useState, ReactNode } from 'react';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar, StatusBarStyle } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -9,6 +9,7 @@ import Constants from 'expo-constants';
 import { AuthProvider } from './src/contexts/AuthContext';
 import Navigation from './src/navigation';
 import logger from './src/utils/logger';
+import { ThemeProvider, useAppTheme } from './src/contexts/ThemeContext';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -56,10 +57,11 @@ LogBox.ignoreLogs([
   // Add any other warnings you want to suppress
 ]);
 
-export default function App() {
+// This component will now use the theme context
+const AppContent = () => {
+  const { theme } = useAppTheme(); // Get theme from context
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Log environment info for debugging
   useEffect(() => {
     if (__DEV__) {
       logger.info('Running in development mode', {
@@ -71,58 +73,87 @@ export default function App() {
     setIsInitialized(true);
   }, []);
 
+  // Map theme.colors.statusBar to StatusBarStyle
+  let statusBarStyle: StatusBarStyle = 'auto';
+  if (theme.colors.statusBar === 'dark-content') {
+    statusBarStyle = 'dark';
+  } else if (theme.colors.statusBar === 'light-content') {
+    statusBarStyle = 'light';
+  }
+
   if (!isInitialized) {
+    // Use StyleSheet for initial loading to avoid theme dependency before provider
+    const initialStyles = StyleSheet.create({
+        loadingContainer: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#FFFFFF', // Default light background before theme loads
+        }
+    });
     return (
-      <View style={styles.loadingContainer}>
+      <View style={initialStyles.loadingContainer}>
         <Text>Initializing app...</Text>
       </View>
     );
   }
 
   return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer
+          onStateChange={() => {
+            if (__DEV__) {
+              logger.debug('Navigation state changed');
+            }
+          }}
+          fallback={
+            // Use StyleSheet for initial loading
+            <View style={styles.loadingContainer}> 
+              <Text>Loading navigation...</Text>
+            </View>
+          }
+        >
+          <Navigation />
+          <StatusBar style={statusBarStyle} /> {/* Use mapped style */}
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+};
+
+export default function App() {
+  return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <AuthProvider>
-            <NavigationContainer
-              onStateChange={() => {
-                if (__DEV__) {
-                  logger.debug('Navigation state changed');
-                }
-              }}
-              fallback={
-                <View style={styles.loadingContainer}>
-                  <Text>Loading navigation...</Text>
-                </View>
-              }
-            >
-              <Navigation />
-              <StatusBar style="auto" />
-            </NavigationContainer>
-          </AuthProvider>
-        </SafeAreaProvider>
+        <ThemeProvider>
+          <AppContent /> {/* Render AppContent which uses the theme provider */} 
+        </ThemeProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }
 
+// styles in App.tsx can remain for ErrorBoundary or truly global styles not covered by theme provider initially
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    // backgroundColor will be set by theme once AppContent loads,
+    // or use a default like in AppContent's initial loading state.
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8f9fa', // This could also become theme.colors.background if ErrorBoundary is themed
   },
   errorTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#e74c3c',
+    color: '#e74c3c', // This could also become theme.colors.error
     marginBottom: 16,
   },
   errorMessage: {

@@ -17,21 +17,21 @@ import { format } from 'date-fns';
 
 import { JournalAPI, TagsAPI } from '../../services/api';
 import JournalCard from '../../components/JournalCard';
+import { JournalEntry, Tag, MainTabParamList, JournalStackParamList, RootStackParamList } from '../../types';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 
-// Journal entry interface
-interface JournalEntry {
-  id: string;
-  title: string;
-  content: string;
-  entry_date: string;
-  audio_url: string | null;
-  tags: string[];
-  created_at: string;
-  updated_at: string;
-}
+// Define navigation prop types correctly
+type JournalScreenNavigationProp = StackNavigationProp<JournalStackParamList, 'JournalList'>;
+// If JournalScreen is used in a context where it can navigate to MainTab screens:
+type AppNavigationProp = StackNavigationProp<RootStackParamList>; // Assuming RootStackParamList has MainTabParamList
 
 const JournalScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<JournalScreenNavigationProp>();
+  const appNavigation = useNavigation<AppNavigationProp>(); // For navigating to other tabs like Record
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   
   // State
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -75,7 +75,7 @@ const JournalScreen = () => {
   const fetchTags = async () => {
     try {
       const response = await TagsAPI.getTags();
-      setAvailableTags(response.data.map((tag: any) => tag.name));
+      setAvailableTags(response.data.map((tag: Tag) => tag.name));
     } catch (error) {
       console.error('Error fetching tags', error);
     }
@@ -100,10 +100,12 @@ const JournalScreen = () => {
       );
     }
     
-    // Filter by selected tags
+    // Filter by selected tags (now entry.tags is Tag[])
     if (selectedTags.length > 0) {
       filtered = filtered.filter(entry => 
-        selectedTags.every(tag => entry.tags.includes(tag))
+        selectedTags.every(selectedTagName => 
+          entry.tags.some(tagObject => tagObject.name === selectedTagName)
+        )
       );
     }
     
@@ -121,11 +123,15 @@ const JournalScreen = () => {
   
   // Navigate to entry creation screen
   const handleCreateEntry = () => {
-    navigation.navigate('Record');
+    // Navigate to the 'Record' screen, assuming it's in the 'Main' tab navigator
+    // If 'Record' is a top-level screen in RootStackParamList, this might differ.
+    // This assumes 'Record' is part of MainTabParamList which is a screen in RootStackParamList called 'Main'
+    appNavigation.navigate('Main', { screen: 'Record', params: undefined } as any); // Use 'as any' to bypass complex type check for now, ensure types are aligned
   };
   
   // Navigate to entry detail screen
   const handleEntryPress = (entry: JournalEntry) => {
+    // navigation here is JournalScreenNavigationProp, which should be able to navigate to JournalEntryDetail
     navigation.navigate('JournalEntryDetail', { entryId: entry.id });
   };
   
@@ -165,7 +171,7 @@ const JournalScreen = () => {
       <FlatList
         data={item.entries}
         renderItem={renderItem}
-        keyExtractor={item => item.id}
+        keyExtractor={entry => entry.id}
         scrollEnabled={false}
       />
     </View>
@@ -180,23 +186,23 @@ const JournalScreen = () => {
           style={styles.addButton}
           onPress={handleCreateEntry}
         >
-          <Ionicons name="add" size={24} color="#fff" />
+          <Ionicons name="add" size={theme.typography.fontSizes.xxl} color={theme.isDarkMode ? theme.colors.background : theme.colors.white} />
         </TouchableOpacity>
       </View>
       
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <Ionicons name="search" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search entries..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textSecondary}
           />
           {searchQuery ? (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#999" />
+              <Ionicons name="close-circle" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -230,13 +236,13 @@ const JournalScreen = () => {
       
       {isLoading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#7D4CDB" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
         <>
           {filteredEntries.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="journal-outline" size={64} color="#ddd" />
+              <Ionicons name="journal-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
               <Text style={styles.emptyText}>No journal entries found</Text>
               <Text style={styles.emptySubtext}>
                 {searchQuery || selectedTags.length > 0
@@ -254,7 +260,8 @@ const JournalScreen = () => {
                 <RefreshControl
                   refreshing={isRefreshing}
                   onRefresh={onRefresh}
-                  colors={['#7D4CDB']}
+                  colors={[theme.colors.primary]}
+                  tintColor={theme.colors.primary}
                 />
               }
             />
@@ -265,112 +272,133 @@ const JournalScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: theme.typography.fontSizes.xxl,
+    fontFamily: theme.typography.fontFamilies.bold,
+    color: theme.colors.text,
   },
   addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#7D4CDB',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.spacing.xxl,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
   searchContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 15,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 46,
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: theme.colors.border,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: theme.spacing.sm,
   },
   searchInput: {
     flex: 1,
-    height: 46,
-    fontSize: 16,
-    color: '#333',
+    paddingVertical: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   tagsContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 15,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+    backgroundColor: theme.colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   tagChip: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
+    marginRight: theme.spacing.sm,
   },
   tagChipSelected: {
-    backgroundColor: '#7D4CDB',
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   tagText: {
-    color: '#666',
-    fontSize: 14,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   tagTextSelected: {
-    color: '#fff',
+    color: theme.colors.onPrimary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    padding: theme.spacing.lg,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 16,
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.md,
+    textAlign: 'center',
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
     textAlign: 'center',
-    marginTop: 8,
+    paddingHorizontal: theme.spacing.xl,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: theme.spacing.lg,
   },
   monthSection: {
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
   },
   monthTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: '#f0f0f0',
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.gray100,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
 });
 

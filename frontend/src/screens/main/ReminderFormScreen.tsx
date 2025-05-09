@@ -16,10 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, addHours, parseISO } from 'date-fns';
 
 import api from '../../services/api';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 
 const ReminderFormScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   const { reminderId } = route.params as { reminderId?: string };
   
   const [title, setTitle] = useState('');
@@ -111,7 +115,7 @@ const ReminderFormScreen = () => {
   if (isFetchingReminder) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7D4CDB" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -121,6 +125,7 @@ const ReminderFormScreen = () => {
       <ScrollView 
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.formGroup}>
           <Text style={styles.label}>Title</Text>
@@ -129,6 +134,7 @@ const ReminderFormScreen = () => {
             placeholder="Reminder title"
             value={title}
             onChangeText={setTitle}
+            placeholderTextColor={theme.colors.textSecondary}
           />
         </View>
         
@@ -142,6 +148,7 @@ const ReminderFormScreen = () => {
             value={note}
             onChangeText={setNote}
             textAlignVertical="top"
+            placeholderTextColor={theme.colors.textSecondary}
           />
         </View>
         
@@ -163,7 +170,7 @@ const ReminderFormScreen = () => {
                 style={styles.controlButton}
                 onPress={subtractOneDay}
               >
-                <Ionicons name="remove" size={20} color="#666" />
+                <Ionicons name="remove" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
               </TouchableOpacity>
               
               <Text style={styles.controlLabel}>Date</Text>
@@ -172,7 +179,7 @@ const ReminderFormScreen = () => {
                 style={styles.controlButton}
                 onPress={addOneDay}
               >
-                <Ionicons name="add" size={20} color="#666" />
+                <Ionicons name="add" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
             
@@ -181,7 +188,7 @@ const ReminderFormScreen = () => {
                 style={styles.controlButton}
                 onPress={subtractOneHour}
               >
-                <Ionicons name="remove" size={20} color="#666" />
+                <Ionicons name="remove" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
               </TouchableOpacity>
               
               <Text style={styles.controlLabel}>Time</Text>
@@ -190,7 +197,7 @@ const ReminderFormScreen = () => {
                 style={styles.controlButton}
                 onPress={addOneHour}
               >
-                <Ionicons name="add" size={20} color="#666" />
+                <Ionicons name="add" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -199,8 +206,9 @@ const ReminderFormScreen = () => {
         <View style={styles.switchContainer}>
           <Text style={styles.label}>Enable Reminder</Text>
           <Switch
-            trackColor={{ false: '#e0e0e0', true: '#a387e2' }}
-            thumbColor={isEnabled ? '#7D4CDB' : '#f4f3f4'}
+            trackColor={{ false: theme.colors.gray300, true: theme.colors.primary }}
+            thumbColor={isEnabled ? (theme.isDarkMode ? theme.colors.background : theme.colors.white) : theme.colors.gray100}
+            ios_backgroundColor={theme.colors.gray300}
             onValueChange={setIsEnabled}
             value={isEnabled}
           />
@@ -226,7 +234,7 @@ const ReminderFormScreen = () => {
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={theme.isDarkMode ? theme.colors.background : theme.colors.white} />
           ) : (
             <Text style={styles.saveButtonText}>Save</Text>
           )}
@@ -236,138 +244,145 @@ const ReminderFormScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   scrollContainer: {
     flex: 1,
+    paddingBottom: theme.spacing.md,
   },
   scrollContent: {
-    padding: 20,
+    padding: theme.spacing.lg,
   },
   formGroup: {
-    marginBottom: 20,
+    marginBottom: theme.spacing.lg,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 12,
-    fontSize: 16,
+    borderColor: theme.colors.border,
+    borderRadius: 5,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   textArea: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 12,
-    fontSize: 16,
+    borderColor: theme.colors.border,
+    borderRadius: 5,
+    padding: theme.spacing.md,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
     minHeight: 100,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   dateDisplayContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 15,
-    marginBottom: 10,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
+    padding: theme.spacing.md,
+    borderRadius: 5,
+    marginBottom: theme.spacing.md,
+    alignItems: 'center',
   },
   dateText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   timeText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   dateControlsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    marginBottom: theme.spacing.md,
   },
   dateControls: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '48%',
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
+    padding: theme.spacing.sm,
+    borderRadius: 5,
   },
   controlButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: theme.spacing.sm,
   },
   controlLabel: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
+    marginHorizontal: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 16,
-    marginBottom: 20,
+    paddingVertical: theme.spacing.md,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xs,
   },
   buttonContainer: {
     flexDirection: 'row',
-    padding: 20,
+    justifyContent: 'space-around',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: '#fff',
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
+    borderRadius: 5,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
     alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f5f5f5',
-    marginRight: 10,
+    justifyContent: 'center',
+    minWidth: 120,
   },
   saveButton: {
-    backgroundColor: '#7D4CDB',
-    marginLeft: 10,
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
+    backgroundColor: theme.colors.primary,
   },
   saveButtonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '500',
+    color: theme.isDarkMode ? theme.colors.background : theme.colors.white,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: 'bold',
+    fontFamily: theme.typography.fontFamilies.bold,
+  },
+  cancelButton: {
+    backgroundColor: theme.colors.gray200,
+  },
+  cancelButtonText: {
+    color: theme.isDarkMode ? theme.colors.text : theme.colors.textSecondary,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  disabledButton: {
+    backgroundColor: theme.colors.disabled,
   },
 });
 

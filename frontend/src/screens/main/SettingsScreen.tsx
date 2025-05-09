@@ -19,9 +19,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserAPI } from '../../services/api';
 import logger from '../../utils/logger';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 
 const SettingsScreen = () => {
   const { user, logout, updateUser } = useAuth();
+  const { theme, toggleTheme, isSystemTheme, setUseSystemTheme } = useAppTheme();
   
   // User profile state
   const [name, setName] = useState(user?.full_name || '');
@@ -32,39 +35,12 @@ const SettingsScreen = () => {
   const [profileImage, setProfileImage] = useState(user?.profile_picture || null);
 
   // App settings state
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [isProfileEditing, setIsProfileEditing] = useState(false);
   const [isPasswordChanging, setIsPasswordChanging] = useState(false);
-
-  // Load saved settings
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const darkMode = await AsyncStorage.getItem('darkMode');
-        const pushNotifs = await AsyncStorage.getItem('pushNotifications');
-        
-        setIsDarkMode(darkMode === 'true');
-        setPushNotifications(pushNotifs !== 'false');
-      } catch (error) {
-        logger.error('Failed to load settings', error);
-      }
-    };
-    
-    loadSettings();
-  }, []);
-
-  // Save setting when changed
-  const saveSetting = async (key: string, value: boolean) => {
-    try {
-      await AsyncStorage.setItem(key, value.toString());
-    } catch (error) {
-      logger.error(`Failed to save setting: ${key}`, error);
-    }
-  };
 
   // Profile image picker
   const pickImage = async () => {
@@ -182,11 +158,36 @@ const SettingsScreen = () => {
     await performLogout();
   };
 
+  // Load push notification settings (theme settings are now handled by ThemeProvider)
+  useEffect(() => {
+    const loadPushSettings = async () => {
+      try {
+        const pushNotifs = await AsyncStorage.getItem('pushNotifications');
+        setPushNotifications(pushNotifs !== 'false'); // Default to true if not set or error
+      } catch (error) {
+        logger.error('Failed to load push notification settings', error);
+        setPushNotifications(true); // Fallback
+      }
+    };
+    loadPushSettings();
+  }, []);
+
+  // Save push notification setting
+  const savePushSetting = async (value: boolean) => {
+    try {
+      await AsyncStorage.setItem('pushNotifications', value.toString());
+    } catch (error) {
+      logger.error(`Failed to save setting: pushNotifications`, error);
+    }
+  };
+
+  const styles = getStyles(theme); // Generate styles with the current theme
+
   return (
     <ScrollView style={styles.container}>
       {isLoading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#007bff" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       )}
       
@@ -200,11 +201,11 @@ const SettingsScreen = () => {
               <Image source={{ uri: profileImage }} style={styles.profileImage} />
             ) : (
               <View style={styles.profileImagePlaceholder}>
-                <Ionicons name="person" size={40} color="#999" />
+                <Ionicons name="person" size={theme.spacing.xxl} color={theme.colors.textSecondary} />
               </View>
             )}
             <View style={styles.imageEditIcon}>
-              <Ionicons name="camera" size={18} color="#fff" />
+              <Ionicons name="camera" size={theme.typography.fontSizes.lg} color={theme.colors.white} />
             </View>
           </TouchableOpacity>
           
@@ -219,7 +220,7 @@ const SettingsScreen = () => {
             style={styles.editButton}
             onPress={() => setIsProfileEditing(true)}
           >
-            <Ionicons name="create-outline" size={18} color="#007bff" />
+            <Ionicons name="create-outline" size={theme.typography.fontSizes.lg} color={theme.colors.primary} />
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
         ) : (
@@ -230,6 +231,7 @@ const SettingsScreen = () => {
               value={name}
               onChangeText={setName}
               placeholder="Your full name"
+              placeholderTextColor={theme.colors.textSecondary}
             />
             
             <Text style={styles.inputLabel}>Email</Text>
@@ -240,6 +242,7 @@ const SettingsScreen = () => {
               placeholder="Your email"
               keyboardType="email-address"
               autoCapitalize="none"
+              placeholderTextColor={theme.colors.textSecondary}
             />
             
             <View style={styles.buttonRow}>
@@ -269,7 +272,7 @@ const SettingsScreen = () => {
             style={styles.passwordButton}
             onPress={() => setIsPasswordChanging(true)}
           >
-            <Ionicons name="lock-closed-outline" size={18} color="#007bff" />
+            <Ionicons name="lock-closed-outline" size={theme.typography.fontSizes.lg} color={theme.colors.primary} />
             <Text style={styles.passwordButtonText}>Change Password</Text>
           </TouchableOpacity>
         ) : (
@@ -281,6 +284,7 @@ const SettingsScreen = () => {
               onChangeText={setCurrentPassword}
               placeholder="Enter current password"
               secureTextEntry
+              placeholderTextColor={theme.colors.textSecondary}
             />
             
             <Text style={styles.inputLabel}>New Password</Text>
@@ -290,6 +294,7 @@ const SettingsScreen = () => {
               onChangeText={setNewPassword}
               placeholder="Enter new password"
               secureTextEntry
+              placeholderTextColor={theme.colors.textSecondary}
             />
             
             <Text style={styles.inputLabel}>Confirm New Password</Text>
@@ -299,6 +304,7 @@ const SettingsScreen = () => {
               onChangeText={setConfirmPassword}
               placeholder="Confirm new password"
               secureTextEntry
+              placeholderTextColor={theme.colors.textSecondary}
             />
             
             <View style={styles.buttonRow}>
@@ -330,34 +336,42 @@ const SettingsScreen = () => {
         <Text style={styles.sectionTitle}>App Settings</Text>
         
         <View style={styles.settingItem}>
-          <View style={styles.settingTextContainer}>
-            <Text style={styles.settingText}>Dark Mode</Text>
-            <Text style={styles.settingDescription}>Switch to dark theme</Text>
-          </View>
+          <Text style={styles.settingText}>Dark Mode</Text>
           <Switch
-            value={isDarkMode}
-            onValueChange={(value) => {
-              setIsDarkMode(value);
-              saveSetting('darkMode', value);
+            trackColor={{ false: theme.colors.gray300, true: theme.colors.primary }}
+            thumbColor={theme.isDarkMode ? theme.colors.white : theme.colors.gray100}
+            ios_backgroundColor={theme.colors.gray300}
+            onValueChange={() => {
+              if (isSystemTheme) setUseSystemTheme(false);
+              toggleTheme();
             }}
-            trackColor={{ false: '#d9d9d9', true: '#007bff' }}
-            thumbColor={Platform.OS === 'ios' ? '#fff' : isDarkMode ? '#fff' : '#f4f3f4'}
+            value={theme.isDarkMode}
+            disabled={isSystemTheme}
           />
         </View>
         
         <View style={styles.settingItem}>
-          <View style={styles.settingTextContainer}>
-            <Text style={styles.settingText}>Push Notifications</Text>
-            <Text style={styles.settingDescription}>Allow push notifications</Text>
-          </View>
+          <Text style={styles.settingText}>Use System Theme</Text>
           <Switch
-            value={pushNotifications}
+            trackColor={{ false: theme.colors.gray300, true: theme.colors.primary }}
+            thumbColor={isSystemTheme ? theme.colors.white : theme.colors.gray100}
+            ios_backgroundColor={theme.colors.gray300}
+            onValueChange={setUseSystemTheme}
+            value={isSystemTheme}
+          />
+        </View>
+        
+        <View style={styles.settingItem}>
+          <Text style={styles.settingText}>Enable Push Notifications</Text>
+          <Switch
+            trackColor={{ false: theme.colors.gray300, true: theme.colors.primary }}
+            thumbColor={pushNotifications ? theme.colors.white : theme.colors.gray100}
+            ios_backgroundColor={theme.colors.gray300}
             onValueChange={(value) => {
               setPushNotifications(value);
-              saveSetting('pushNotifications', value);
+              savePushSetting(value); // Use the new savePushSetting
             }}
-            trackColor={{ false: '#d9d9d9', true: '#007bff' }}
-            thumbColor={Platform.OS === 'ios' ? '#fff' : pushNotifications ? '#fff' : '#f4f3f4'}
+            value={pushNotifications}
           />
         </View>
       </View>
@@ -384,7 +398,7 @@ const SettingsScreen = () => {
         style={styles.logoutButton}
         onPress={handleLogout}
       >
-        <Ionicons name="log-out-outline" size={20} color="#fff" />
+        <Ionicons name="log-out-outline" size={theme.typography.fontSizes.lg} color={theme.colors.white} />
         <Text style={styles.logoutButtonText}>Logout</Text>
       </TouchableOpacity>
       
@@ -394,62 +408,53 @@ const SettingsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Function to generate styles based on the theme
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   section: {
-    backgroundColor: '#fff',
-    marginVertical: 8,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
+    fontSize: theme.typography.fontSizes.lg,
+    fontFamily: theme.typography.fontFamilies.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
   },
   profileImageContainer: {
+    marginRight: theme.spacing.md,
     position: 'relative',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 16,
   },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: theme.spacing.xxl * 1.5,
+    height: theme.spacing.xxl * 1.5,
+    borderRadius: theme.spacing.xxl * 0.75,
+    backgroundColor: theme.colors.border,
   },
   profileImagePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#e9ecef',
+    width: theme.spacing.xxl * 1.5,
+    height: theme.spacing.xxl * 1.5,
+    borderRadius: theme.spacing.xxl * 0.75,
+    backgroundColor: theme.colors.gray200,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -457,159 +462,157 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#007bff',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.xs,
+    borderRadius: theme.spacing.md,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: theme.colors.card,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: theme.typography.fontSizes.xl,
+    fontFamily: theme.typography.fontFamilies.bold,
+    color: theme.colors.text,
   },
   profileEmail: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
   },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#007bff',
-    borderRadius: 6,
-    marginBottom: 12,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.primary + '20',
+    borderRadius: theme.spacing.sm,
+    alignSelf: 'flex-start',
+    marginTop: theme.spacing.sm,
   },
   editButtonText: {
-    color: '#007bff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
+    marginLeft: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  editProfileForm: {
+    marginTop: theme.spacing.md,
+  },
+  inputLabel: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.regular,
+  },
+  input: {
+    backgroundColor: theme.colors.inputBackground,
+    color: theme.colors.text,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    fontSize: theme.typography.fontSizes.md,
+    marginBottom: theme.spacing.md,
+    fontFamily: theme.typography.fontFamilies.regular,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: theme.spacing.sm,
+  },
+  button: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.spacing.sm,
+    alignItems: 'center',
+    marginLeft: theme.spacing.sm,
+    minWidth: 100,
+  },
+  buttonText: {
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  saveButton: {
+    backgroundColor: theme.colors.primary,
+  },
+  saveButtonText: {
+    color: theme.colors.onPrimary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  cancelButton: {
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray200,
+  },
+  cancelButtonText: {
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   passwordButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#007bff',
-    borderRadius: 6,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.gray100,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+    marginTop: theme.spacing.md,
   },
   passwordButtonText: {
-    color: '#007bff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  editProfileForm: {
-    marginTop: 8,
+    marginLeft: theme.spacing.sm,
+    color: theme.colors.primary,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   passwordForm: {
-    marginTop: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    marginBottom: 16,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginRight: 8,
-  },
-  saveButton: {
-    backgroundColor: '#007bff',
-    marginLeft: 8,
-  },
-  cancelButtonText: {
-    color: '#555',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    marginTop: theme.spacing.md,
   },
   settingItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  settingTextContainer: {
-    flex: 1,
+    borderBottomColor: theme.colors.border,
   },
   settingText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    flex: 1,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
-  settingDescription: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 2,
+  subSettingText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    flex: 1,
+    fontFamily: theme.typography.fontFamilies.regular,
+    marginTop: theme.spacing.xs,
   },
   aboutItem: {
-    paddingVertical: 14,
+    paddingVertical: theme.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.colors.border,
   },
   aboutItemText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   logoutButton: {
-    flexDirection: 'row',
+    marginTop: theme.spacing.lg,
+    backgroundColor: theme.colors.error,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.spacing.sm,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#dc3545',
-    marginHorizontal: 16,
-    marginVertical: 20,
-    paddingVertical: 14,
-    borderRadius: 8,
   },
   logoutButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    color: theme.colors.white,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   footer: {
-    height: 30,
+    height: theme.spacing.xl,
   },
 });
 

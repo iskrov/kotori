@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { format, parseISO } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 
-// Use existing types and correct styles path
-import { JournalEntry } from '../types';
+import { JournalEntry, Tag } from '../types';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { AppTheme } from '../config/theme';
 
 interface JournalCardProps {
   entry: JournalEntry;
@@ -13,7 +14,9 @@ interface JournalCardProps {
 }
 
 const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
-  // Calculate preview text - truncate if needed
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
+
   const getPreviewText = (content: string, maxLength: number = 100) => {
     if (!content) return 'No content';
     if (content.length <= maxLength) return content;
@@ -40,7 +43,7 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
       <View style={styles.header}>
         <Text style={styles.date} testID="journal-date">{formattedDate}</Text>
         {entry.audio_url && (
-          <Ionicons name="musical-note" size={16} color="#7D4CDB" />
+          <Ionicons name="musical-notes" size={16} color={theme.colors.primary} />
         )}
       </View>
       
@@ -58,9 +61,9 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
       
       {entry.tags && entry.tags.length > 0 && (
         <View style={styles.tagsContainer} testID="tags-container">
-          {entry.tags.map((tag: any, index: number) => (
-            <View key={index} style={styles.tag} testID={`tag-${index}`}>
-              <Text style={styles.tagText}>{typeof tag === 'string' ? tag : tag.name}</Text>
+          {entry.tags.map((tag: Tag) => (
+            <View key={tag.id} style={styles.tag} testID={`tag-${tag.id}`}>
+              <Text style={styles.tagText}>{tag.name}</Text>
             </View>
           ))}
         </View>
@@ -69,53 +72,61 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    padding: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
+    elevation: theme.isDarkMode ? 1 : 3,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
+    shadowOpacity: theme.isDarkMode ? 0.2 : 0.15,
+    shadowRadius: theme.isDarkMode ? 2 : 2.5,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 0.5 : 0,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing.sm,
   },
   date: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   title: {
-    fontSize: 18,
+    fontSize: theme.typography.fontSizes.lg,
     fontWeight: 'bold',
-    marginRight: 8,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.bold,
   },
   content: {
-    fontSize: 14,
-    color: '#333333',
-    marginBottom: 12,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.md,
+    lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   tag: {
-    backgroundColor: '#f0ebff',
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
     borderRadius: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 8,
-    marginBottom: 8,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    marginRight: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
   },
   tagText: {
-    fontSize: 12,
-    color: '#7D4CDB',
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.isDarkMode ? theme.colors.text : theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
 });
 
