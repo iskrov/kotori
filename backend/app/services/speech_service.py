@@ -76,6 +76,7 @@ class SpeechService:
                 project_root_dir,
                 settings.GOOGLE_APPLICATION_CREDENTIALS,
             )
+            credentials_path = os.path.abspath(credentials_path) # Normalize and make absolute
             logger.info(
                 f"Attempting to load credentials from: {credentials_path}"
             )
