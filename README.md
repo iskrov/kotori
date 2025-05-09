@@ -48,29 +48,29 @@ This project utilizes scripts to simplify the setup and running process.
 1.  **Clone the Repository:**
     ```bash
     git clone <your-repository-url>
-    cd vibes # Navigate into the main project directory (contains backend/, frontend/, scripts/, etc.)
+    cd vibes # Navigate into the repository root
     ```
     *Note: The repository root contains the `.venv/` virtual environment and `logs/` directory (ignored by git) alongside the main `vibes/` source directory.*
 
 2.  **Run the Setup Script:**
     This script installs system dependencies (like `python3-dev`, `libpq-dev`, `postgresql`), Python dependencies for the backend (`pip install`), Node.js dependencies for the frontend (`npm install`), sets up the PostgreSQL database and user (you might be prompted for your `sudo` password), and runs database migrations.
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes/vibes)
-    chmod +x ./scripts/*.sh # Ensure scripts are executable
-    ./scripts/setup.sh
+    # From the project root (e.g., /home/ai/src/vibes)
+    chmod +x vibes/scripts/*.sh # Ensure scripts are executable
+    vibes/scripts/setup.sh
     ```
     *If the script fails, check the output for errors, ensure all prerequisites are met, and that the PostgreSQL service can be managed via `systemctl` or `service`.*
 
 3.  **Configure Environment Variables:**
     *   **Backend:** Copy the example and edit it:
         ```bash
-        cp backend/.env.example backend/.env
-        nano backend/.env # Add DB details, JWT secret, Google Cloud credentials/API key
+        cp vibes/backend/.env.example vibes/backend/.env
+        nano vibes/backend/.env # Add DB details, JWT secret, Google Cloud credentials/API key
         ```
     *   **Frontend:** Copy the example and edit it:
         ```bash
-        cp frontend/.env.example frontend/.env
-        nano frontend/.env # Add API URL (e.g., http://localhost:8001)
+        cp vibes/frontend/.env.example vibes/frontend/.env
+        nano vibes/frontend/.env # Add API URL (e.g., http://localhost:8001)
         ```
 
 ### Running the Application
@@ -78,8 +78,8 @@ This project utilizes scripts to simplify the setup and running process.
 1.  **Start the Application (Backend + Frontend):**
     This script activates the virtual environment, starts the backend FastAPI server, and starts the frontend Expo development server. Logs are stored in the `logs/` directory at the workspace root.
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes/vibes)
-    ./scripts/start.sh
+    # From the project root (e.g., /home/ai/src/vibes)
+    vibes/scripts/start.sh
     ```
     The script will output the URLs for the backend and frontend.
 
@@ -91,8 +91,8 @@ This project utilizes scripts to simplify the setup and running process.
 1.  **Stop All Services (Backend + Frontend):**
     This script stops the backend and frontend processes gracefully.
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes/vibes)
-    ./scripts/stop.sh
+    # From the project root (e.g., /home/ai/src/vibes)
+    vibes/scripts/stop.sh
     ```
 
 ### Database Management (Optional)
@@ -101,13 +101,13 @@ The `setup.sh` script handles the initial database service startup. If you need 
 
 *   **Start Database Service:**
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes/vibes)
-    sudo ./scripts/start_db.sh
+    # From the project root (e.g., /home/ai/src/vibes)
+    sudo vibes/scripts/start_db.sh
     ```
 *   **Stop Database Service:**
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes/vibes)
-    sudo ./scripts/stop_db.sh
+    # From the project root (e.g., /home/ai/src/vibes)
+    sudo vibes/scripts/stop_db.sh
     ```
 
 ### Development Notes
@@ -117,9 +117,10 @@ The `setup.sh` script handles the initial database service startup. If you need 
     # From the workspace root (/home/ai/src/vibes)
     source .venv/bin/activate
     ```
-*   **Database Migrations:** To create a new migration after changing SQLAlchemy models in `backend/app/models/`:
+*   **Database Migrations:** To create a new migration after changing SQLAlchemy models in `vibes/backend/app/models/`:
     ```bash
     # Make sure venv is active
+    # From the workspace root (/home/ai/src/vibes)
     cd vibes/backend # Navigate to backend directory
     alembic revision --autogenerate -m "Your migration message"
     # Review the generated migration script in backend/migrations/versions/
@@ -139,52 +140,54 @@ The `setup.sh` script handles the initial database service startup. If you need 
 ## Project Structure
 
 ```
-/home/ai/src/vibes/      # Workspace Root
+/home/ai/src/vibes/      # Workspace Root (Git Repository Root)
 ├── .venv/               # Python Virtual Environment (Ignored by Git)
 ├── logs/                # Runtime Logs (Ignored by Git)
 ├── .server.pid          # Backend PID File (Ignored by Git)
 ├── .frontend.pid        # Frontend PID File (Ignored by Git)
 ├── .gitignore
+├── docs/                # Project Documentation
+│   ├── todo.md
+│   ├── done.md
+│   ├── plan.md
+│   └── idea.md          # (Or other docs)
+├── vibes/               # Application Source Code
+│   ├── scripts/         # Setup, Start, Stop scripts
+│   │   ├── setup.sh
+│   │   ├── start.sh
+│   │   ├── stop.sh
+│   │   ├── start_db.sh
+│   │   └── stop_db.sh
+│   │
+│   ├── backend/         # FastAPI backend
+│   │   ├── app/
+│   │   │   ├── core/
+│   │   │   ├── models/
+│   │   │   ├── schemas/
+│   │   │   ├── api/
+│   │   │   ├── services/
+│   │   │   └── main.py
+│   │   ├── migrations/
+│   │   ├── requirements.txt
+│   │   ├── .env.example
+│   │   └── .gitignore
+│   │
+│   ├── frontend/        # React Native frontend
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   ├── contexts/
+│   │   │   ├── navigation/
+│   │   │   ├── screens/
+│   │   │   ├── services/
+│   │   │   └── types/
+│   │   ├── scripts/     # Frontend-specific utility scripts (JS)
+│   │   ├── package.json
+│   │   ├── .env.example
+│   │   └── .gitignore
+│   │
+│   └── README.md        # (Optional: App-specific README if one exists in vibes/vibes/)
 │
-└── vibes/               # Main Project Directory (Tracked by Git)
-    ├── scripts/         # Setup, Start, Stop scripts
-    │   ├── setup.sh
-    │   ├── start.sh
-    │   ├── stop.sh
-    │   ├── start_db.sh
-    │   └── stop_db.sh
-    │
-    ├── backend/         # FastAPI backend
-    │   ├── app/
-    │   │   ├── core/
-    │   │   ├── models/
-    │   │   ├── schemas/
-    │   │   ├── api/
-    │   │   ├── services/
-    │   │   └── main.py
-    │   ├── migrations/
-    │   ├── requirements.txt # Backend Python dependencies
-    │   ├── .env.example
-    │   └── .gitignore
-    │
-    ├── frontend/        # React Native frontend
-    │   ├── src/
-    │   │   ├── components/
-    │   │   ├── contexts/
-    │   │   ├── navigation/
-    │   │   ├── screens/
-    │   │   ├── services/
-    │   │   └── types/
-    │   ├── scripts/     # Frontend-specific utility scripts (JS)
-    │   ├── package.json # Frontend Node dependencies
-    │   ├── .env.example
-    │   └── .gitignore
-    │
-    ├── docs/            # Documentation (todo.md, done.md)
-    │   ├── todo.md
-    │   └── done.md
-    │
-    └── README.md        # This file
+└── README.md            # This file (Main Project README)
 ```
 
 ## Contributing
