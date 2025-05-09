@@ -56,21 +56,21 @@ This project utilizes scripts to simplify the setup and running process.
     This script installs system dependencies (like `python3-dev`, `libpq-dev`, `postgresql`), Python dependencies for the backend (`pip install`), Node.js dependencies for the frontend (`npm install`), sets up the PostgreSQL database and user (you might be prompted for your `sudo` password), and runs database migrations.
     ```bash
     # From the project root (e.g., /home/ai/src/vibes)
-    chmod +x vibes/scripts/*.sh # Ensure scripts are executable
-    vibes/scripts/setup.sh
+    chmod +x scripts/*.sh # Ensure scripts are executable
+    scripts/setup.sh
     ```
     *If the script fails, check the output for errors, ensure all prerequisites are met, and that the PostgreSQL service can be managed via `systemctl` or `service`.*
 
 3.  **Configure Environment Variables:**
     *   **Backend:** Copy the example and edit it:
         ```bash
-        cp vibes/backend/.env.example vibes/backend/.env
-        nano vibes/backend/.env # Add DB details, JWT secret, Google Cloud credentials/API key
+        cp backend/.env.example backend/.env
+        nano backend/.env # Add DB details, JWT secret, Google Cloud credentials/API key
         ```
     *   **Frontend:** Copy the example and edit it:
         ```bash
-        cp vibes/frontend/.env.example vibes/frontend/.env
-        nano vibes/frontend/.env # Add API URL (e.g., http://localhost:8001)
+        cp frontend/.env.example frontend/.env
+        nano frontend/.env # Add API URL (e.g., http://localhost:8001)
         ```
 
 ### Running the Application
@@ -79,7 +79,7 @@ This project utilizes scripts to simplify the setup and running process.
     This script activates the virtual environment, starts the backend FastAPI server, and starts the frontend Expo development server. Logs are stored in the `logs/` directory at the workspace root.
     ```bash
     # From the project root (e.g., /home/ai/src/vibes)
-    vibes/scripts/start.sh
+    scripts/start.sh
     ```
     The script will output the URLs for the backend and frontend.
 
@@ -92,7 +92,7 @@ This project utilizes scripts to simplify the setup and running process.
     This script stops the backend and frontend processes gracefully.
     ```bash
     # From the project root (e.g., /home/ai/src/vibes)
-    vibes/scripts/stop.sh
+    scripts/stop.sh
     ```
 
 ### Database Management (Optional)
@@ -102,12 +102,12 @@ The `setup.sh` script handles the initial database service startup. If you need 
 *   **Start Database Service:**
     ```bash
     # From the project root (e.g., /home/ai/src/vibes)
-    sudo vibes/scripts/start_db.sh
+    sudo scripts/start_db.sh
     ```
 *   **Stop Database Service:**
     ```bash
     # From the project root (e.g., /home/ai/src/vibes)
-    sudo vibes/scripts/stop_db.sh
+    sudo scripts/stop_db.sh
     ```
 
 ### Development Notes
@@ -117,11 +117,11 @@ The `setup.sh` script handles the initial database service startup. If you need 
     # From the workspace root (/home/ai/src/vibes)
     source .venv/bin/activate
     ```
-*   **Database Migrations:** To create a new migration after changing SQLAlchemy models in `vibes/backend/app/models/`:
+*   **Database Migrations:** To create a new migration after changing SQLAlchemy models in `backend/app/models/`:
     ```bash
     # Make sure venv is active
     # From the workspace root (/home/ai/src/vibes)
-    cd vibes/backend # Navigate to backend directory
+    cd backend # Navigate to backend directory
     alembic revision --autogenerate -m "Your migration message"
     # Review the generated migration script in backend/migrations/versions/
     # Apply the migration (also done by setup.sh)
@@ -132,9 +132,9 @@ The `setup.sh` script handles the initial database service startup. If you need 
 
 **Note:** While the frontend previously interacted directly with the Google API using an API key stored in its `.env`, this has been **refactored for security and best practices**. The backend now handles all communication with the Google Cloud Speech-to-Text API.
 
-1. Ensure the backend `.env` file (`vibes/backend/.env`) contains the necessary `GOOGLE_SPEECH_API_KEY` or is configured to use `GOOGLE_APPLICATION_CREDENTIALS` (Service Account Key recommended for production).
-2. The backend service (`vibes/backend/app/services/speech_service.py`) uses these credentials to interact with the API.
-3. The frontend (`vibes/frontend/src/services/speechToText.ts`) calls the backend endpoint (`/api/speech/transcribe`) to request transcription.
+1. Ensure the backend `.env` file (`backend/.env`) contains the necessary `GOOGLE_SPEECH_API_KEY` or is configured to use `GOOGLE_APPLICATION_CREDENTIALS` (Service Account Key recommended for production).
+2. The backend service (`backend/app/services/speech_service.py`) uses these credentials to interact with the API.
+3. The frontend (`frontend/src/services/speechToText.ts`) calls the backend endpoint (`/api/speech/transcribe`) to request transcription.
 4. You **no longer need** to configure `GOOGLE_SPEECH_API_KEY` or `GOOGLE_CLOUD_PROJECT_ID` directly in the frontend's `.env` file for transcription purposes.
 
 ## Project Structure
@@ -200,4 +200,4 @@ The `setup.sh` script handles the initial database service startup. If you need 
 
 ## License
 
-This project is licensed under the MIT License.
+This project is a private project. All rights reserved.

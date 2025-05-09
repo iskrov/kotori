@@ -4,11 +4,11 @@ echo "Stopping Vibes Application..."
 
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-# Assume the project root is the parent directory of the script directory
+# Project root is the parent directory of the script directory (vibes/)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-# Root-level PID files are one level *above* the project root
-BACKEND_PID_FILE="$PROJECT_ROOT/../.server.pid"
-FRONTEND_PID_FILE="$PROJECT_ROOT/../.frontend.pid"
+# PID files are now relative to the new PROJECT_ROOT (workspace root)
+BACKEND_PID_FILE="$PROJECT_ROOT/.server.pid"
+FRONTEND_PID_FILE="$PROJECT_ROOT/.frontend.pid"
 
 # Function to kill processes by PID file
 kill_by_pid_file() {

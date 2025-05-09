@@ -4,9 +4,10 @@ echo "Setting up Vibes Application..."
 
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-# Assume the project root is the parent directory of the script directory
+# Project root is the parent directory of the script directory (vibes/)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VENV_PATH="$PROJECT_ROOT/../.venv" # .venv is one level above the project root
+# VENV_PATH is now directly in the PROJECT_ROOT (which is the workspace root)
+VENV_PATH="$PROJECT_ROOT/.venv"
 
 echo "Project Root: $PROJECT_ROOT"
 echo "Virtual Env Path: $VENV_PATH"
@@ -101,7 +102,7 @@ if [ $? -ne 0 ]; then
     echo "Test user created. You can login with email: test@example.com, password: password"
 fi
 
-cd "$PROJECT_ROOT" # Go back to project root
+cd "$PROJECT_ROOT" # Go back to project root (vibes/)
 
 # 4. Setup frontend
 echo "Setting up frontend..."
@@ -119,7 +120,7 @@ else
     exit 1
 fi
 
-cd "$PROJECT_ROOT" # Go back to project root
+cd "$PROJECT_ROOT" # Go back to project root (vibes/)
 
 echo "Vibes Application setup completed!"
-echo "To start the application, run: ./scripts/start.sh (from the project root)" 
+echo "To start the application, run: scripts/start.sh (from the project root)" 

@@ -4,13 +4,13 @@ echo "Starting Vibes Application..."
 
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-# Assume the project root is the parent directory of the script directory
+# Project root is the parent directory of the script directory (vibes/)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-# Venv is one level *above* the project root
-VENV_PATH="$PROJECT_ROOT/../.venv"
-LOGS_DIR="$PROJECT_ROOT/../logs" # Place logs alongside .venv, outside the project dir
-BACKEND_PID_FILE="$PROJECT_ROOT/../.server.pid"
-FRONTEND_PID_FILE="$PROJECT_ROOT/../.frontend.pid"
+# Venv, logs, and PID files are now relative to the new PROJECT_ROOT (workspace root)
+VENV_PATH="$PROJECT_ROOT/.venv"
+LOGS_DIR="$PROJECT_ROOT/logs"
+BACKEND_PID_FILE="$PROJECT_ROOT/.server.pid"
+FRONTEND_PID_FILE="$PROJECT_ROOT/.frontend.pid"
 
 # Create root logs directory if it doesn't exist
 mkdir -p "$LOGS_DIR"
@@ -92,7 +92,7 @@ fi
 
 echo "Backend server started successfully (PID: $(cat "$BACKEND_PID_FILE"))."
 
-cd "$PROJECT_ROOT" # Go back to project root
+cd "$PROJECT_ROOT" # Go back to project root (vibes/)
 
 # Start frontend
 echo "Starting frontend..."
@@ -140,4 +140,4 @@ echo "Frontend Logs: $LOGS_DIR/frontend.log (Errors: frontend_error.log)"
 echo "Backend PID: $BACKEND_PID_FILE"
 echo "Frontend PID: $FRONTEND_PID_FILE"
 echo "----------------------------------------"
-echo "To stop the application, run: ./scripts/stop.sh (from the project root)" 
+echo "To stop the application, run: scripts/stop.sh (from the project root)" 
