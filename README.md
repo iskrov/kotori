@@ -146,47 +146,41 @@ The `setup.sh` script handles the initial database service startup. If you need 
 ├── .server.pid          # Backend PID File (Ignored by Git)
 ├── .frontend.pid        # Frontend PID File (Ignored by Git)
 ├── .gitignore
+├── backend/             # FastAPI backend
+│   ├── app/
+│   │   ├── core/
+│   │   ├── models/
+│   │   ├── schemas/
+│   │   ├── api/
+│   │   ├── services/
+│   │   └── main.py
+│   ├── migrations/
+│   ├── requirements.txt
+│   ├── .env.example     # (Should exist here)
+│   └── .gitignore
 ├── docs/                # Project Documentation
 │   ├── todo.md
 │   ├── done.md
 │   ├── plan.md
-│   └── idea.md          # (Or other docs)
-├── vibes/               # Application Source Code
-│   ├── scripts/         # Setup, Start, Stop scripts
-│   │   ├── setup.sh
-│   │   ├── start.sh
-│   │   ├── stop.sh
-│   │   ├── start_db.sh
-│   │   └── stop_db.sh
-│   │
-│   ├── backend/         # FastAPI backend
-│   │   ├── app/
-│   │   │   ├── core/
-│   │   │   ├── models/
-│   │   │   ├── schemas/
-│   │   │   ├── api/
-│   │   │   ├── services/
-│   │   │   └── main.py
-│   │   ├── migrations/
-│   │   ├── requirements.txt
-│   │   ├── .env.example
-│   │   └── .gitignore
-│   │
-│   ├── frontend/        # React Native frontend
-│   │   ├── src/
-│   │   │   ├── components/
-│   │   │   ├── contexts/
-│   │   │   ├── navigation/
-│   │   │   ├── screens/
-│   │   │   ├── services/
-│   │   │   └── types/
-│   │   ├── scripts/     # Frontend-specific utility scripts (JS)
-│   │   ├── package.json
-│   │   ├── .env.example
-│   │   └── .gitignore
-│   │
-│   └── README.md        # (Optional: App-specific README if one exists in vibes/vibes/)
-│
+│   └── idea.md
+├── frontend/            # React Native frontend
+│   ├── src/
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   ├── navigation/
+│   │   ├── screens/
+│   │   ├── services/
+│   │   └── types/
+│   ├── scripts/         # Frontend-specific utility scripts (JS)
+│   ├── package.json
+│   ├── .env.example     # (Should exist here)
+│   └── .gitignore
+├── scripts/             # Setup, Start, Stop scripts (Bash)
+│   ├── setup.sh
+│   ├── start.sh
+│   ├── stop.sh
+│   ├── start_db.sh
+│   └── stop_db.sh
 └── README.md            # This file (Main Project README)
 ```
 
