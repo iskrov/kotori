@@ -1,0 +1,78 @@
+# Python Virtual Environment
+/.venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Python build/distribution
+build/
+dist/
+*.egg-info/
+.tox/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE folders / config
+.idea/
+.vscode/
+# For VSCode, better to ignore specific user settings unless shared team settings
+# .vscode/settings.json
+# .vscode/tasks.json
+# .vscode/launch.json
+*.sublime-project
+*.sublime-workspace
+.cursor/ # Cursor AI specific
+
+# Node.js / Frontend
+node_modules/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# package-lock.json # User requested to ignore this
+# yarn.lock # If using yarn and it's not committed
+frontend/build/ # Assuming frontend build output goes here
+frontend/.expo/ # Expo specific for frontend
+.expo/ # General Expo, if it can be at root
+
+# Secrets & Sensitive Files
+/.keys/
+*.env
+*.env.*
+!.env.example
+# vibes/.env # Example for specific env files if not covered by directory gitignores
+
+# Logs (Centralized)
+/logs/
+# backend/logs/ # Covered by /logs/
+# frontend/logs/ # Covered by /logs/
+# *.log # If logs can appear anywhere and are not centralized
+
+# Runtime files
+/.server.pid
+/.frontend.pid
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Other
+# plan.md # User had these, might want to keep them or decide
+# idea.md # User had these
+
+# User specific requests (ensure covered)
+package-lock.json # Explicitly add as requested by user 

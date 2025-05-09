@@ -1,0 +1,71 @@
+[tool.ruff]
+# Match the formatting rules of Black (optional, but recommended)
+line-length = 88
+indent-width = 4
+
+# Specify the source directory (where 'app' lives)
+# This helps Ruff resolve absolute imports correctly
+src = ["."] # Ruff runs relative to pyproject.toml, so '.' means the backend dir
+
+# Assume Python 3.10
+target-version = "py310"
+
+# --- Start Lint specific section ---
+[tool.ruff.lint]
+# List of enabled rule codes (start with common ones, add more as needed)
+# E: pycodestyle errors
+# W: pycodestyle warnings
+# F: Pyflakes
+# I: isort (import sorting)
+# UP: pyupgrade (modernize syntax)
+# B: flake8-bugbear (potential logic errors) - B008 ignored below
+# C4: flake8-comprehensions (nicer comprehensions)
+# SIM: flake8-simplify (simplify code)
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM"]
+
+# List of rules to ignore (customize as needed)
+ignore = [
+    "E501", # Line too long (handled by formatter)
+    "B008", # Ignore function calls in argument defaults (needed for FastAPI Depends)
+    # Add specific rule codes here if you disagree with them
+]
+
+[tool.ruff.lint.isort]
+# Combine imports on the same line if they fit
+force-single-line = true
+# --- End Lint specific section ---
+
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings
+quote-style = "double"
+# Like Black, automatically detect and respect intended line breaks
+indent-style = "space"
+
+# Exclude common directories from linting/formatting
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "venv", # Added just in case, matches root venv name if run from root
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "migrations", # Often auto-generated, can be noisy
+]
+
+# REMOVED from here:
+# src = ["."] # Ruff runs relative to pyproject.toml, so '.' means the backend dir 

@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Technology Stack
+
+Develop a cross-platform, intuitive frontend using React Native, ensuring seamless performance in a browser and on both iOS and Android devices.
+
+Utilize a user-friendly Python framework (FastAPI) for backend development to ensure rapid development and maintainability.
+
+The dev version has to be deployed locally and test with prod versions will be deployed on Google Cloud Platform (GCP).
+
+Store user notes securely and efficiently by using secure database solutions (Postgres SQL).
+
+Implement easy and secure user authentication, for example, through Google Sign-In.
+
+Leverage a robust existing AI model such as Google Cloud's Speech-to-Text API (https://cloud.google.com/speech-to-text/docs/reference/rest/v1/operations) for accurate voice-to-text transcription.
+
+Use version control with Git.
