@@ -74,5 +74,4 @@ frontend/.expo/ # Expo specific for frontend
 # plan.md # User had these, might want to keep them or decide
 # idea.md # User had these
 
-# User specific requests (ensure covered)
-package-lock.json # Explicitly add as requested by user 
+# User specific requests (ensure covered) 
