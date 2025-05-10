@@ -71,7 +71,7 @@ def read_journal_entry(
     """
     Get a specific journal entry by id.
     """
-    journal_entry = journal_service.get(db=db, id=id)
+    journal_entry = journal_service.get_schema(db=db, id=id)
     if not journal_entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found"

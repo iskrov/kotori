@@ -48,7 +48,7 @@ export interface User {
 }
 
 export interface Tag {
-  id: string;
+  id: string | null;
   name: string;
   count?: number;
   created_at?: string;

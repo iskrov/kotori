@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
@@ -34,9 +34,16 @@ const JournalEntryDetailScreen = () => {
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  useEffect(() => {
-    fetchEntryDetails();
-  }, [entryId]);
+  useFocusEffect(
+    useCallback(() => {
+      console.log('JournalEntryDetailScreen: Screen focused, fetching fresh data');
+      fetchEntryDetails();
+      
+      return () => {
+        console.log('JournalEntryDetailScreen: Screen unfocused');
+      };
+    }, [entryId])
+  );
   
   const fetchEntryDetails = async () => {
     try {
@@ -139,8 +146,8 @@ const JournalEntryDetailScreen = () => {
             <View style={styles.tagsContainer}>
               <Ionicons name="pricetag-outline" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
               <View style={styles.tagsList}>
-                {entry.tags.map((tag: Tag) => (
-                  <View key={tag.id} style={styles.tag}>
+                {entry.tags.map((tag: Tag, index: number) => (
+                  <View key={tag.id ? String(tag.id) : `${entry.id}-tag-${index}`} style={styles.tag}>
                     <Text style={styles.tagText}>{tag.name}</Text>
                   </View>
                 ))}

@@ -10,10 +10,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
+import { Tag } from '../types'; // Make sure this path is correct
 
 interface TagInputProps {
-  tags: string[];
-  onChangeTags: (tags: string[]) => void;
+  tags: Tag[];
+  onChangeTags: (tags: Tag[]) => void;
   maxTags?: number;
   placeholder?: string;
 }
@@ -32,19 +33,18 @@ const TagInput: React.FC<TagInputProps> = ({
     if (!inputValue.trim()) {
       return;
     }
-    const newTag = inputValue.trim().toLowerCase();
-    if (tags.includes(newTag) || tags.length >= maxTags) {
+    const newTagName = inputValue.trim().toLowerCase();
+    if (tags.some(tag => tag.name.toLowerCase() === newTagName) || tags.length >= maxTags) {
       setInputValue('');
       return;
     }
+    const newTag: Tag = { name: newTagName, id: null }; // id: null or a temporary client-side ID
     onChangeTags([...tags, newTag]);
     setInputValue('');
   };
 
-  const handleRemoveTag = (index: number) => {
-    const newTags = [...tags];
-    newTags.splice(index, 1);
-    onChangeTags(newTags);
+  const handleRemoveTag = (indexToRemove: number) => {
+    onChangeTags(tags.filter((_, index) => index !== indexToRemove));
   };
 
   const handleKeyPress = (e: any) => {
@@ -57,21 +57,26 @@ const TagInput: React.FC<TagInputProps> = ({
   return (
     <View style={styles.container} testID="tag-input-container">
       {tags.length > 0 && (
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.tagsScrollView}
           contentContainerStyle={styles.tagsContainer}
           testID="tags-scroll-view"
+          keyboardShouldPersistTaps="handled"
         >
           {tags.map((tag, index) => (
-            <View key={index} style={styles.tag} testID={`tag-item-${index}`}>
-              <Text style={styles.tagText} testID={`tag-text-${index}`}>#{tag}</Text>
+            <View 
+              key={tag.id ? `tag-${tag.id}` : `tag-${tag.name}-${index}`}
+              style={styles.tag} 
+              testID={`tag-item-${tag.name}-${index}`}
+            >
+              <Text style={styles.tagText} testID={`tag-text-${tag.name}`}>#{tag.name}</Text>
               <TouchableOpacity
                 style={styles.tagRemoveButton}
                 onPress={() => handleRemoveTag(index)}
-                testID={`tag-delete-button-${index}`}
-                accessibilityLabel={`Delete tag ${tag}`}
+                testID={`tag-delete-button-${tag.name}-${index}`}
+                accessibilityLabel={`Delete tag ${tag.name}`}
               >
                 <Ionicons name="close-circle" size={16} color={theme.colors.textSecondary} />
               </TouchableOpacity>
@@ -107,7 +112,7 @@ const TagInput: React.FC<TagInputProps> = ({
         </TouchableOpacity>
       </View>
       
-      {tags.length < maxTags && (
+      {tags.length < maxTags && inputValue.length === 0 && (
         <Text style={styles.helpText} testID="tag-input-help-text">
           Press space, comma, or tap + to add a tag
         </Text>

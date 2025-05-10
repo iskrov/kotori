@@ -17,6 +17,14 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
 
+  // Log tag IDs for debugging
+  if (entry.tags && entry.tags.length > 0) {
+    console.log(
+      `JournalCard entry ID ${entry.id} - Tag IDs for keys:`,
+      entry.tags.map(t => String(t.id))
+    );
+  }
+
   const getPreviewText = (content: string, maxLength: number = 100) => {
     if (!content) return 'No content';
     if (content.length <= maxLength) return content;
@@ -61,8 +69,8 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
       
       {entry.tags && entry.tags.length > 0 && (
         <View style={styles.tagsContainer} testID="tags-container">
-          {entry.tags.map((tag: Tag) => (
-            <View key={tag.id} style={styles.tag} testID={`tag-${tag.id}`}>
+          {entry.tags.map((tag: Tag, index: number) => (
+            <View key={tag.id ? String(tag.id) : `${entry.id}-tag-${index}`} style={styles.tag} testID={`tag-${tag.id ?? index}`}>
               <Text style={styles.tagText}>{tag.name}</Text>
             </View>
           ))}

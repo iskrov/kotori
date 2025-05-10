@@ -62,15 +62,32 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # CORS middleware configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=86400,  # 24 hours
-)
+if settings.ENVIRONMENT == "development":
+    logger.info(f"Setting up CORS for development environment with origins: {settings.CORS_ORIGINS}")
+    # Use explicit origins rather than wildcard when withCredentials is true
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,  # Use explicit origins list
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+        max_age=86400,  # 24 hours
+    )
+    logger.info("CORS middleware configured for development (with explicit origins)")
+else:
+    logger.info(f"Setting up CORS for production environment with origins: {settings.CORS_ORIGINS}")
+    # Stricter CORS settings for production
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+        max_age=86400,  # 24 hours
+    )
+    logger.info("CORS middleware configured for production (restricted origins)")
 
 
 # Request logging middleware

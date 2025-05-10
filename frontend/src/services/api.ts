@@ -27,9 +27,32 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 10000,
-  // Temporarily force withCredentials to false for debugging CORS
-  withCredentials: false, 
+  // Enable credentials for CORS
+  withCredentials: true, 
 });
+
+// Debug axios configuration
+console.log('API Config:', {
+  baseURL: getApiUrl(),
+  withCredentials: true,
+  defaultHeaders: api.defaults.headers
+});
+
+// Add specific debug configuration for handling PUT requests
+api.interceptors.request.use(
+  async (config) => {
+    // If this is a PUT request, add extra debug info
+    if (config.method?.toLowerCase() === 'put') {
+      console.log('Making PUT request to:', config.url);
+      console.log('PUT request headers:', config.headers);
+      console.log('PUT request withCredentials:', config.withCredentials);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Add request interceptor for authorization headers
 api.interceptors.request.use(
@@ -293,12 +316,102 @@ export const JournalAPI = {
   
   createEntry: (data: JournalEntryCreate) => api.post('/api/journals', data),
   
-  updateEntry: (id: string, data: JournalEntryUpdate) => api.put(`/api/journals/${id}`, data),
+  updateEntry: (id: string, data: JournalEntryUpdate) => {
+    console.log('JournalAPI.updateEntry called with data:', JSON.stringify(data));
+    // Make a defensive copy of data
+    const sanitizedData = { ...data };
+    
+    // Ensure entry_date is present
+    if (!sanitizedData.entry_date) {
+      console.error('Warning: Missing entry_date in updateEntry', sanitizedData);
+      
+      // Fetch the entry to get its entry_date if missing
+      return api.get(`/api/journals/${id}`).then(response => {
+        const existingEntry = response.data;
+        sanitizedData.entry_date = existingEntry.entry_date;
+        
+        console.log('JournalAPI.updateEntry: Added entry_date from fetched entry:', sanitizedData.entry_date);
+        
+        // Continue with tags handling and update
+        return processUpdateWithTags(id, sanitizedData);
+      }).catch(error => {
+        console.error('Failed to fetch journal entry for update:', error);
+        throw new Error(`Failed to prepare journal entry update: ${error.message}`);
+      });
+    } else {
+      // If entry_date is already present, just process tags and update
+      return processUpdateWithTags(id, sanitizedData).catch(error => {
+        console.error('Failed to update journal entry with processUpdateWithTags:', error);
+        
+        // Last resort fallback - try a direct fetch API call
+        if (error.message && error.message.includes('CORS')) {
+          console.log('Attempting final fallback with fetch API for CORS issues');
+          return AsyncStorage.getItem('access_token').then(token => {
+            const apiUrl = getApiUrl();
+            const url = `${apiUrl}/api/journals/${id}`;
+            
+            // Process tags one more time to ensure they're strings
+            if (sanitizedData.tags && Array.isArray(sanitizedData.tags)) {
+              sanitizedData.tags = sanitizedData.tags.map((tag: any) => 
+                typeof tag === 'string' ? tag : (tag && typeof tag === 'object' && 'name' in tag) ? tag.name : String(tag)
+              );
+            }
+            
+            return fetch(url, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : '',
+              },
+              credentials: 'include',
+              body: JSON.stringify(sanitizedData)
+            }).then(response => {
+              if (!response.ok) {
+                throw new Error(`Fetch API error: ${response.status} ${response.statusText}`);
+              }
+              return response.json();
+            });
+          });
+        }
+        
+        throw error; // Re-throw if not a CORS issue or if fetch also fails
+      });
+    }
+  },
   
   deleteEntry: (id: string) => 
     api.delete(`/api/journals/${id}`),
   
   searchEntries: (query: string) => api.get(`/api/journals/search?q=${query}`),
+};
+
+// Helper function to process tags and send the update
+const processUpdateWithTags = (id: string, sanitizedData: JournalEntryUpdate) => {
+  // Ensure tags is properly formatted as string[]
+  if (sanitizedData.tags) {
+    // Make sure tags is an array of strings by extracting tag names
+    const stringTags = sanitizedData.tags.map((tag: string | {name: string}) => {
+      // If tag is already a string, use it directly
+      if (typeof tag === 'string') {
+        return tag;
+      }
+      
+      // If tag is an object with name property, extract the name
+      if (typeof tag === 'object' && tag !== null && 'name' in tag) {
+        return tag.name;
+      }
+      
+      // Fallback to string representation (should not happen)
+      console.error('JournalAPI.updateEntry: Unexpected tag format:', tag);
+      return String(tag);
+    });
+    
+    sanitizedData.tags = stringTags;
+    console.log('JournalAPI.updateEntry: Properly extracted tag names:', JSON.stringify(stringTags));
+  }
+  
+  console.log('JournalAPI.updateEntry: Sending payload for api.put:', JSON.stringify(sanitizedData));
+  return api.put(`/api/journals/${id}`, sanitizedData);
 };
 
 // Reminders

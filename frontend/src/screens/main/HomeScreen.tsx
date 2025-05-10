@@ -60,6 +60,16 @@ const HomeScreen = () => {
     }, []) // Dependency array is empty, so it runs on every focus
   );
 
+  // Log recentEntries IDs when they change, for debugging key prop warning
+  useEffect(() => {
+    if (recentEntries.length > 0) {
+      logger.info(
+        'HomeScreen: recentEntries IDs for key check:',
+        recentEntries.map(entry => entry.id)
+      );
+    }
+  }, [recentEntries]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -79,7 +89,7 @@ const HomeScreen = () => {
       logger.info("HomeScreen: Fetching recent journals from /api/journals...");
       const entriesResponse = await api.get('/api/journals', {
         params: { 
-          limit: 3, 
+          limit: 5,
           sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
         }
       });
@@ -116,6 +126,17 @@ const HomeScreen = () => {
     navigation.navigate('Main', { screen: 'Journal', params: { screen: 'JournalList' } });
   };
 
+  const navigateToDetail = (entryId: string) => {
+    // Navigate to JournalEntryDetail within the Journal stack, which is part of the Main tab
+    navigation.navigate('Main', { 
+      screen: 'Journal', 
+      params: { 
+        screen: 'JournalEntryDetail', 
+        params: { entryId: entryId } 
+      }
+    });
+  };
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -128,7 +149,9 @@ const HomeScreen = () => {
     <ScrollView 
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />
+        Platform.OS !== 'web' ? (
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />
+        ) : undefined
       }
     >
       <View style={styles.header}>
@@ -162,7 +185,11 @@ const HomeScreen = () => {
 
       {recentEntries.length > 0 ? (
         recentEntries.map((entry) => (
-          <JournalCard key={entry.id} entry={entry} />
+          <JournalCard 
+            key={String(entry.id)} 
+            entry={entry} 
+            onPress={() => navigateToDetail(entry.id)}
+          />
         ))
       ) : (
         <View style={styles.emptyContainer}>

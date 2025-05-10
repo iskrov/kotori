@@ -16,80 +16,123 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
 import { JournalAPI } from '../../services/api';
-import { JournalEntry, JournalEntryCreate, JournalEntryUpdate, JournalStackParamList } from '../../types';
+import { JournalEntry, JournalEntryCreate, JournalEntryUpdate, JournalStackParamList, Tag } from '../../types';
 import TagInput from '../../components/TagInput';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 
 type JournalEntryFormRouteProp = RouteProp<JournalStackParamList, 'JournalEntryForm'>;
 
 const JournalEntryFormScreen = () => {
   const route = useRoute<JournalEntryFormRouteProp>();
   const navigation = useNavigation();
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   const { journalId } = route.params || {};
   
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [initialEntry, setInitialEntry] = useState<JournalEntry | null>(null);
 
-  // Fetch entry data if editing an existing entry
   useEffect(() => {
     if (journalId) {
       fetchEntryDetails();
     }
-  }, [journalId]);
+    navigation.setOptions({
+      headerTitle: journalId ? 'Edit Entry' : 'New Entry',
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerNavButton}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={!content.trim() || isSaving}
+          style={styles.headerNavButton}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          ) : (
+            <Text style={[styles.saveText, (!content.trim()) && styles.disabledButtonText]}>Save</Text>
+          )}
+        </TouchableOpacity>
+      ),
+    });
+  }, [journalId, navigation, isSaving, title, content, tags, theme, initialEntry]);
 
   const fetchEntryDetails = async () => {
+    if (!journalId) return;
     try {
       setIsLoading(true);
       const response = await JournalAPI.getEntry(journalId);
-      const entry = response.data;
+      const entry = response.data as JournalEntry;
       
       setInitialEntry(entry);
       setTitle(entry.title || '');
       setContent(entry.content || '');
-      setTags(entry.tags.map(tag => tag.name));
+      setTags(entry.tags || []);
     } catch (error) {
-      console.error('Error fetching journal entry details', error);
-      Alert.alert('Error', 'Failed to load journal entry details');
+      console.error('Error fetching journal entry details:', error);
+      Alert.alert('Error', 'Failed to load journal entry details. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSave = async () => {
+    console.log('[FormScreen] Attempting to save. Content trimmed:', content.trim());
     if (!content.trim()) {
-      Alert.alert('Error', 'Please enter some content for your journal entry');
+      Alert.alert('Validation Error', 'Please enter some content for your journal entry.');
       return;
     }
 
     try {
       setIsSaving(true);
+      console.log('[FormScreen] Current tags state before map:', JSON.stringify(tags));
+      const tagNamesForApi = tags.map(tag => {
+        if (!tag || typeof tag.name === 'undefined') {
+          console.error('[FormScreen] Invalid tag object in tags array:', JSON.stringify(tag));
+          throw new Error('Invalid tag object encountered during mapping.');
+        }
+        return tag.name;
+      });
+      console.log('[FormScreen] handleSave - tagNamesForApi (after map):', JSON.stringify(tagNamesForApi));
 
-      if (journalId) {
-        // Update existing entry
+      if (journalId && initialEntry) {
         const entryData: JournalEntryUpdate = {
-          title: title.trim() || null,
+          title: title.trim() || undefined,
           content: content.trim(),
-          tags: tags,
+          tags: tagNamesForApi,
+          entry_date: initialEntry.entry_date,
         };
+        console.log('[FormScreen] Updating entry with data:', JSON.stringify(entryData));
         await JournalAPI.updateEntry(journalId, entryData);
-      } else {
-        // Create new entry
+      } else if (!journalId) {
         const entryData: JournalEntryCreate = {
-          title: title.trim() || null,
+          title: title.trim() || undefined,
           content: content.trim(),
           entry_date: format(new Date(), 'yyyy-MM-dd'),
-          tags: tags,
+          tags: tagNamesForApi,
         };
+        console.log('[FormScreen] Creating new entry with data:', JSON.stringify(entryData));
         await JournalAPI.createEntry(entryData);
+      } else {
+        console.error('[FormScreen] handleSave: Attempting to update without initialEntry data.');
+        Alert.alert('Save Error', 'Could not save changes. Initial entry data missing.');
+        setIsSaving(false);
+        return;
       }
 
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     } catch (error) {
-      console.error('Error saving journal entry', error);
-      Alert.alert('Error', 'Failed to save journal entry');
+      console.error('Error saving journal entry:', error);
+      Alert.alert('Save Error', 'Failed to save journal entry. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -98,7 +141,7 @@ const JournalEntryFormScreen = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7D4CDB" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -106,41 +149,19 @@ const JournalEntryFormScreen = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>
-          {journalId ? 'Edit Entry' : 'New Entry'}
-        </Text>
-        
-        <TouchableOpacity
-          style={[styles.headerButton, !content.trim() && styles.disabledButton]}
-          onPress={handleSave}
-          disabled={!content.trim() || isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#7D4CDB" />
-          ) : (
-            <Text style={styles.saveText}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView style={styles.formContainer}>
+      <ScrollView 
+        style={styles.formContainer}
+        keyboardShouldPersistTaps="handled"
+      >
         <TextInput
           style={styles.titleInput}
           placeholder="Title (optional)"
           value={title}
           onChangeText={setTitle}
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textSecondary}
         />
         
         <TextInput
@@ -150,7 +171,8 @@ const JournalEntryFormScreen = () => {
           onChangeText={setContent}
           multiline
           textAlignVertical="top"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textSecondary}
+          scrollEnabled={false}
         />
         
         <View style={styles.tagsSection}>
@@ -158,6 +180,7 @@ const JournalEntryFormScreen = () => {
           <TagInput
             tags={tags}
             onChangeTags={setTags}
+            placeholder="Add tags..."
           />
         </View>
       </ScrollView>
@@ -165,73 +188,63 @@ const JournalEntryFormScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fff',
-  },
-  headerButton: {
-    paddingVertical: 8,
+  headerNavButton: {
     paddingHorizontal: 12,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    paddingVertical: 8,
   },
   cancelText: {
     fontSize: 16,
-    color: '#777',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   saveText: {
     fontSize: 16,
-    color: '#7D4CDB',
-    fontWeight: '600',
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  disabledButtonText: {
+    color: theme.colors.disabled,
   },
   formContainer: {
     flex: 1,
-    padding: 16,
+    padding: theme.spacing.md,
   },
   titleInput: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-    paddingVertical: 8,
+    fontSize: theme.typography.fontSizes.lg,
+    fontFamily: theme.typography.fontFamilies.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   contentInput: {
-    fontSize: 18,
-    color: '#333',
-    lineHeight: 26,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.regular,
+    color: theme.colors.text,
+    lineHeight: theme.typography.lineHeights.md,
     minHeight: 200,
   },
   tagsSection: {
-    marginTop: 30,
-    marginBottom: 20,
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
   },
   tagsLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
   },
 });
 

@@ -45,8 +45,13 @@ const JournalScreen = () => {
   // Fetch journal entries when screen is focused
   useFocusEffect(
     useCallback(() => {
+      console.log('JournalScreen: Screen focused, fetching fresh data');
       fetchEntries();
       fetchTags();
+      return () => {
+        // Cleanup when screen is unfocused
+        console.log('JournalScreen: Screen unfocused');
+      };
     }, [])
   );
   

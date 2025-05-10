@@ -22,6 +22,7 @@ import logger from '../../utils/logger';
 import TagInput from '../../components/TagInput';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import { Tag } from '../../types';
 
 const JournalEntryFormScreen = () => {
   const navigation = useNavigation();
@@ -32,7 +33,7 @@ const JournalEntryFormScreen = () => {
   
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingEntry, setIsFetchingEntry] = useState(false);
   

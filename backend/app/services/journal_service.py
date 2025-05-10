@@ -13,9 +13,10 @@ from .base import BaseService
 
 
 class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalEntryUpdate]):
-    def get(self, db: Session, id: Any) -> JournalEntry | None:
+    def get(self, db: Session, id: Any) -> JournalEntryModel | None:
         """
-        Get a single journal entry by ID, with tags eagerly loaded and correctly formatted.
+        Get a single journal entry by ID as SQLAlchemy model, with tags eagerly loaded.
+        This is used internal to the service layer when we need the actual model instance.
         """
         db_obj = (
             db.query(self.model)
@@ -23,6 +24,14 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
             .filter(self.model.id == id)
             .first()
         )
+        return db_obj
+
+    def get_schema(self, db: Session, id: Any) -> JournalEntry | None:
+        """
+        Get a single journal entry by ID as a Pydantic schema, with tags correctly formatted.
+        This is used for API responses to ensure consistent formatting.
+        """
+        db_obj = self.get(db, id)
         if not db_obj:
             return None
 

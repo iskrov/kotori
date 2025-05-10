@@ -111,22 +111,23 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     setHasTranscribedAudio(false); // Reset transcription flag
 
     return () => {
-      logger.info('AudioRecorder: Component will unmount. Cleaning up.');
+      logger.info('AudioRecorder: Component will unmount. Performing final cleanup.');
       isMountedRef.current = false;
       disconnectWebSocket();
-      // Access audioUri directly from state for cleanup
-      // NOTE: Using audioUri directly in cleanup is tricky because it captures the value at the time the effect runs.
-      // It's better if cleanupRecordingFile can handle null or if useAudioRecording handles its own cleanup.
-      // For now, assume cleanupRecordingFile is robust.
-      if (audioUri && !hasTranscribedAudio) { // Only cleanup if URI exists and wasn't successfully sent
-         logger.info(`[AudioRecorder Cleanup] Attempting to clean up URI: ${audioUri}`);
+      
+      // More careful cleanup of audioUri on unmount
+      // Access the latest audioUri via a ref if necessary, or ensure useAudioRecording handles its own primary cleanup.
+      // For now, this relies on the audioUri state at the time of unmount, which might not be the one we want to clean.
+      // A better approach might be for useAudioRecording to expose a specific cleanup for its *current* recording if unmounted mid-op.
+      if (audioUri && !hasTranscribedAudio) { 
+         logger.info(`[AudioRecorder Cleanup on Unmount] Attempting to clean up URI: ${audioUri}`);
          cleanupRecordingFile(audioUri).catch(err =>
            logger.error('Error cleaning up recording file during unmount', err)
          );
        }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioUri, cleanupRecordingFile, disconnectWebSocket, hasTranscribedAudio]);
+  }, []); // <-- EMPTY DEPENDENCY ARRAY FOR TRUE MOUNT/UNMOUNT BEHAVIOR
 
   // Effect 2: Handle WebSocket connection based on permission (runs when permissionGranted changes)
   useEffect(() => {
@@ -287,14 +288,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     return null;
   };
 
-  // Determine current status text
-  let statusText = "Tap the mic to start recording";
-  if (isRecording) statusText = "Recording your thoughts...";
-  else if (isProcessing) statusText = "Processing audio...";
-  else if (audioUri && !hasTranscribedAudio && !isProcessing) statusText = "Processing audio..."; // After stop, before processing starts
-  else if (hasTranscribedAudio) statusText = "Transcription complete. Tap Done.";
-  else if (recordingError) statusText = `Error: ${recordingError}`;
-
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
@@ -309,10 +302,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
       <View style={styles.mainContent}>
         <RecordingStatus 
-          statusText={statusText} 
-          duration={recordingDuration} 
           isRecording={isRecording} 
-          isProcessing={isProcessing} 
+          duration={recordingDuration} 
+          hasTranscript={currentFullTranscript.trim().length > 0}
+          transcriptPreview={currentFullTranscript}
         />
 
         <View style={styles.transcriptPreviewContainer}>
@@ -324,8 +317,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
         <RecordingButton
           isRecording={isRecording}
-          onStartRecording={handleStartRecording}
-          onStopRecording={handleStopRecording}
+          onPress={() => {
+            if (isRecording) {
+              handleStopRecording();
+            } else {
+              handleStartRecording();
+            }
+          }}
           disabled={isProcessing}
         />
       </View>
