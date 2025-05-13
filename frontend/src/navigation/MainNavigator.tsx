@@ -1,10 +1,10 @@
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View } from 'react-native';
-import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { View, TouchableOpacity } from 'react-native';
 import { useAppTheme } from '../contexts/ThemeContext';
+import { MainStackParamList, JournalStackParamList } from './types';
 
 import HomeScreen from '../screens/main/HomeScreen';
 import JournalScreen from '../screens/main/JournalScreen';
@@ -14,34 +14,15 @@ import SettingsScreen from '../screens/main/SettingsScreen';
 import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
 import JournalEntryFormScreen from '../screens/main/JournalEntryFormScreen';
 import ReminderFormScreen from '../screens/main/ReminderFormScreen';
-import { RootStackParamList } from './types';
 
-// Define ParamList for the Journal Stack
-type JournalStackParamList = {
-  JournalList: undefined;
-  JournalEntryDetail: { journalId: string };
-  JournalEntryForm: { journalId?: string } | undefined; // For new or edit
-  ReminderForm: { reminderId?: string } | undefined; // For new or edit
-};
+const Tab = createBottomTabNavigator<MainStackParamList>();
+const JournalStackNavigator = createStackNavigator<JournalStackParamList>();
 
-// Define ParamList for the Main Tabs (using names from Tab.Screen)
-type MainTabParamList = {
-  Home: undefined;
-  Journal: { screen?: keyof JournalStackParamList }; // Allow navigating to nested screens
-  Record: { startRecording?: boolean } | undefined; // Add param for triggering recording
-  Calendar: undefined;
-  Settings: undefined;
-};
-
-const Tab = createBottomTabNavigator<MainTabParamList>();
-const Stack = createStackNavigator<JournalStackParamList>();
-
-// Journal stack for nested navigation
 const JournalStack = () => {
   const { theme } = useAppTheme();
 
   return (
-    <Stack.Navigator
+    <JournalStackNavigator.Navigator
       screenOptions={{
         headerStyle: {
           backgroundColor: theme.colors.card,
@@ -52,31 +33,31 @@ const JournalStack = () => {
         },
       }}
     >
-      <Stack.Screen 
+      <JournalStackNavigator.Screen 
         name="JournalList" 
         component={JournalScreen} 
         options={{ title: 'Journal Entries' }}
       />
-      <Stack.Screen 
+      <JournalStackNavigator.Screen 
         name="JournalEntryDetail" 
         component={JournalEntryDetailScreen} 
         options={{ title: 'Journal Entry' }}
       />
-      <Stack.Screen 
+      <JournalStackNavigator.Screen 
         name="JournalEntryForm" 
         component={JournalEntryFormScreen} 
         options={({ route }) => ({ 
           title: route.params?.journalId ? 'Edit Entry' : 'New Entry'
         })}
       />
-      <Stack.Screen 
+      <JournalStackNavigator.Screen 
         name="ReminderForm" 
         component={ReminderFormScreen} 
         options={({ route }) => ({ 
           title: route.params?.reminderId ? 'Edit Reminder' : 'New Reminder'
         })}
       />
-    </Stack.Navigator>
+    </JournalStackNavigator.Navigator>
   );
 };
 
@@ -101,13 +82,14 @@ const MainNavigator = () => {
           } else if (route.name === 'Journal') {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Record') {
-            iconName = focused ? 'mic' : 'mic-outline';
+            return null;
           } else if (route.name === 'Calendar') {
             iconName = focused ? 'calendar' : 'calendar-outline';
           } else if (route.name === 'Settings') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
-          
+          if (!iconName) return null;
+
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,
@@ -115,6 +97,7 @@ const MainNavigator = () => {
         tabBarStyle: {
           backgroundColor: theme.colors.card,
           borderTopColor: theme.colors.border,
+          height: 60,
         },
       })}
     >
@@ -127,40 +110,43 @@ const MainNavigator = () => {
       <Tab.Screen 
         name="Record" 
         component={RecordScreen} 
-        options={{ 
+        options={({ navigation }) => ({
           title: 'Record',
-          tabBarLabel: () => null,
-          tabBarIcon: ({ focused, color, size }) => (
-            <View style={{ 
-              position: 'absolute', 
-              bottom: 10,
-              height: 60, 
-              width: 60, 
-              borderRadius: 30, 
-              backgroundColor: theme.colors.primary,
-              justifyContent: 'center', 
-              alignItems: 'center',
-              shadowColor: theme.colors.shadow,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 3.84,
-              elevation: 5,
-            }}>
-              <Ionicons 
-                name={'mic'}
-                size={size * 1.2} 
-                color={theme.colors.onPrimary}
-              />
-            </View>
-          )
-        }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            // Prevent default action
-            e.preventDefault();
-            // Navigate to Record screen with param
-            navigation.navigate('Record', { startRecording: true });
-          },
+          tabBarButton: (props: BottomTabBarButtonProps) => (
+            <TouchableOpacity
+              {...props}
+              style={{ 
+                flex: 1, 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+              }}
+              onPress={() => {
+                navigation.navigate('Record', { startRecording: true });
+              }}
+            >
+              <View style={{
+                position: 'absolute',
+                bottom: 10,
+                height: 60,
+                width: 60,
+                borderRadius: 30,
+                backgroundColor: theme.colors.primary,
+                justifyContent: 'center', 
+                alignItems: 'center',
+                shadowColor: theme.colors.shadow,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5,
+              }}>
+                <Ionicons 
+                  name={'mic'}
+                  size={30} 
+                  color={theme.colors.onPrimary}
+                />
+              </View>
+            </TouchableOpacity>
+          ),
         })}
       />
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Calendar' }} />

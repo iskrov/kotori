@@ -140,7 +140,7 @@ The `setup.sh` script handles the initial database service startup. If you need 
 ## Project Structure
 
 ```
-/home/ai/src/vibes/      # Workspace Root (Git Repository Root)
+vibes/      # Workspace Root (Git Repository Root)
 ├── .venv/               # Python Virtual Environment (Ignored by Git)
 ├── logs/                # Runtime Logs (Ignored by Git)
 ├── .server.pid          # Backend PID File (Ignored by Git)

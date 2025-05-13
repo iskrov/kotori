@@ -52,22 +52,25 @@
    - Create advanced filtering options (date ranges, keywords)
    - Add sorting capabilities for different viewing preferences
 
-## Phase 4: Reminder System
+## Phase 4: Recording & Transcription Enhancements
 
-10. **Reminder Framework**
-    - Design database models for user reminders
-    - Implement notification scheduling system
-    - Create reminder management API endpoints
+10. **Recording Speed Optimization**
+    - Implement global "Quick Record" access from anywhere in the app
+    - Optimize recording modal presentation and initialization
+    - Implement proactive permission handling to minimize delays
+    - Streamline the audio recording initialization process
 
-11. **Customization Options**
-    - Build interfaces for reminder customization
-    - Implement frequency, timing, and style options
-    - Create reminder templates for quick setup
+11. **Multi-language Transcription Support**
+    - Integrate Google Cloud STT multi-language capabilities
+    - Update transcription processing for language detection
+    - Modify UI to support and display multi-language content
+    - Implement language tagging for journal entries
 
-12. **Notification System**
-    - Integrate with native notification systems
-    - Implement cross-platform notification handling
-    - Create notification interaction handlers
+12. **Resilient Transcription Foundation**
+    - Ensure reliable local audio storage independent of transcription
+    - Design data model to support transcription status tracking
+    - Prepare UI components for asynchronous transcription states
+    - Implement status indicators for transcription progress
 
 ## Phase 5: Hidden Mode & Data Protection
 
@@ -104,7 +107,7 @@
     - Unit‑test cryptographic routines.
     - Conduct white‑box security review and simulate border‑inspection scenario.
 
-## Phase 6: Analytics and Gamification
+## Phase 6: Further Core Functionality
 
 21. **Data Analysis Framework**
     - Design analytics data models and aggregation methods
@@ -121,7 +124,7 @@
     - Create achievement and milestone system
     - Implement visual feedback for user progress
 
-## Phase 7: Testing and Refinement
+## Phase 7: Testing, Optimization & Deployment
 
 24. **Comprehensive Testing**
     - Write unit tests for all components
@@ -138,7 +141,7 @@
     - Implement screen reader compatibility
     - Add keyboard navigation alternatives
 
-    ## Phase 8: Deployment and Launch
+## Phase 8: Deployment and Launch
 
 27. **Cloud Infrastructure Setup**
     - Configure Google Cloud services for production

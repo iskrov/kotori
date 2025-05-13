@@ -33,6 +33,15 @@
 - [x] Created placeholder screens for Calendar and Settings
 - [x] Basic settings screen
 
+## Phase 4: Recording & Transcription Enhancements
+
+### Sub-Phase 4.1 — Faster Recording Initiation
+- [x] Decided existing central 'Record' tab meets global quick record button needs
+- [x] Implement proactive permission handling
+  - [x] Request microphone permissions earlier in app flow (in MainNavigator)
+- [x] Streamline recording logic (frontend – permissions, state, loading)
+  - [x] Optimize Audio.setAudioModeAsync configuration (in MainNavigator)
+
 ## Backend - Real-time Transcription Setup
 - [x] Create WebSocket endpoint (/ws/transcribe)
 - [x] Implement backend service logic for streaming audio (SpeechService.process_audio_stream)

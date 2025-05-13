@@ -53,13 +53,14 @@
 - [x] Basic settings screen  
 - [x] Calendar-screen placeholder  
 
-## Phase 4: Recording & Transcription Enhancements (Current Focus)
+## Phase 4: Recording & Transcription Enhancements
 
 ### Sub-Phase 4.1 — Faster Recording Initiation
-- [ ] Analyze & profile current recording flow (frontend)
-- [ ] Optimize UI/UX for quick access (frontend)
-- [ ] Streamline recording logic (frontend – permissions, state, loading)
-- [ ] Verify backend pre-recording calls (optional)
+- [x] Decided existing central 'Record' tab meets global quick record button needs
+- [x] Implement proactive permission handling
+  - [x] Request microphone permissions earlier in app flow (in MainNavigator)
+- [x] Streamline recording logic (frontend – permissions, state, loading)
+  - [x] Optimize Audio.setAudioModeAsync configuration (in MainNavigator)
 
 ### Sub-Phase 4.2 — Multi-language Speech Support
 - [ ] Research Google Cloud STT multi-language options (backend)
@@ -68,7 +69,18 @@
 - [ ] Update database schema for language info (if needed)
 - [ ] Ensure frontend displays mixed-language transcriptions correctly
 
-### Sub-Phase 4.3 — Testing & Refinement
+### Sub-Phase 4.3 — Async Transcription Foundation (Optional)
+- [ ] Ensure reliable local audio file storage
+  - [ ] Move temporary recordings to persistent app storage
+  - [ ] Implement proper file naming/organization
+- [ ] Add transcription status field to journal entry schema
+  - [ ] Update database models and migrations
+  - [ ] Modify frontend components to display status
+- [ ] Create placeholder UI elements for pending transcriptions
+  - [ ] Add status indicators to journal entries
+  - [ ] Design loading states for pending transcriptions
+
+### Sub-Phase 4.4 — Testing & Refinement
 - [ ] Test recording-speed improvements (compare vs baseline)
 - [ ] Test multi-language transcription accuracy (diverse samples)
 - [ ] Perform regression testing
@@ -76,7 +88,6 @@
 
 ## Phase 5: Hidden Mode & Data Protection
 ### Threat-Model & UX
-- [ ] Document user scenarios (unlock, decoy, self-destruct)
 - [ ] Design invisible unlock UI flow
 
 ### Crypto Layer
@@ -151,5 +162,5 @@
 - Implement tagging system for better organization  
 - Add mood-tracking functionality  
 - **Privacy enhancements:**  
-  - Add “SOS” voice trigger to freeze app for 24 h  
+  - Add "SOS" voice trigger to freeze app for 24 h  
   - Research homomorphic encryption for remote backups of private entries 
