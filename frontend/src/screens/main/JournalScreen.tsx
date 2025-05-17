@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,13 @@ import JournalCard from '../../components/JournalCard';
 import { JournalEntry, Tag, MainTabParamList, JournalStackParamList, RootStackParamList } from '../../types';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppTheme } from '../../contexts/ThemeContext';
+import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { AppTheme } from '../../config/theme';
+
+// --- Special Tag for Hidden Entries (Client-Side) ---
+// TODO: Move this to a shared constants file
+const HIDDEN_ENTRY_TAG = "_hidden_entry";
+// ----------------------------------------------------
 
 // Define navigation prop types correctly
 type JournalScreenNavigationProp = StackNavigationProp<JournalStackParamList, 'JournalList'>;
@@ -31,6 +37,7 @@ const JournalScreen = () => {
   const navigation = useNavigation<JournalScreenNavigationProp>();
   const appNavigation = useNavigation<AppNavigationProp>(); // For navigating to other tabs like Record
   const { theme } = useAppTheme();
+  const { isHiddenModeActive } = useHiddenMode();
   const styles = getStyles(theme);
   
   // State
@@ -55,10 +62,10 @@ const JournalScreen = () => {
     }, [])
   );
   
-  // Filter entries whenever search query or selected tags change
+  // Filter entries whenever search query, selected tags, base entries, or hidden mode changes
   useEffect(() => {
     filterEntries();
-  }, [searchQuery, selectedTags, entries]);
+  }, [searchQuery, selectedTags, entries, isHiddenModeActive]);
   
   // Fetch journal entries from API
   const fetchEntries = async () => {
@@ -94,27 +101,35 @@ const JournalScreen = () => {
   
   // Filter entries based on search query and selected tags
   const filterEntries = () => {
-    let filtered = [...entries];
+    let processedEntries = [...entries];
     
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(entry => 
+      processedEntries = processedEntries.filter(entry => 
         entry.title.toLowerCase().includes(query) || 
         entry.content.toLowerCase().includes(query)
       );
     }
     
-    // Filter by selected tags (now entry.tags is Tag[])
+    // Filter by selected tags
     if (selectedTags.length > 0) {
-      filtered = filtered.filter(entry => 
+      processedEntries = processedEntries.filter(entry => 
         selectedTags.every(selectedTagName => 
           entry.tags.some(tagObject => tagObject.name === selectedTagName)
         )
       );
     }
+
+    // Filter by hidden mode status
+    if (!isHiddenModeActive) {
+      processedEntries = processedEntries.filter(entry => 
+        !entry.tags.some(tagObject => tagObject.name === HIDDEN_ENTRY_TAG)
+      );
+    }
+    // If isHiddenModeActive is true, all entries (that match search/tags) are shown
     
-    setFilteredEntries(filtered);
+    setFilteredEntries(processedEntries);
   };
   
   // Toggle tag selection
@@ -250,8 +265,8 @@ const JournalScreen = () => {
               <Ionicons name="journal-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
               <Text style={styles.emptyText}>No journal entries found</Text>
               <Text style={styles.emptySubtext}>
-                {searchQuery || selectedTags.length > 0
-                  ? 'Try changing your search or filters'
+                {searchQuery || selectedTags.length > 0 || !isHiddenModeActive && entries.some(e => e.tags.some(t=>t.name === HIDDEN_ENTRY_TAG)) 
+                  ? 'Try changing your search or filters, or check hidden mode.'
                   : 'Tap the + button to create your first entry'}
               </Text>
             </View>

@@ -1,8 +1,8 @@
-import React from 'react';
-import { createBottomTabNavigator, BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import React, { useCallback } from 'react';
+import { createBottomTabNavigator, BottomTabBarButtonProps, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity, Image } from 'react-native';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { MainStackParamList, JournalStackParamList } from './types';
 
@@ -64,6 +64,53 @@ const JournalStack = () => {
 const MainNavigator = () => {
   const { theme } = useAppTheme();
 
+  const getRecordScreenOptions = useCallback((
+    { navigation }: { navigation: BottomTabNavigationProp<MainStackParamList, 'Record'> }
+  ) => {
+    const TabBarButtonComponent = (props: BottomTabBarButtonProps) => (
+        <TouchableOpacity
+            {...props}
+            style={{ 
+                flex: 1, 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+            }}
+            onPress={() => navigation.navigate('Record', { startRecording: true })}
+        >
+            <View style={{
+                position: 'absolute',
+                bottom: 10,
+                height: 60,
+                width: 60,
+                borderRadius: 30,
+                backgroundColor: theme.colors.card,
+                justifyContent: 'center', 
+                alignItems: 'center',
+                shadowColor: theme.colors.shadow,
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.15,
+                shadowRadius: 2.0,
+                elevation: 3,
+            }}>
+                <Image 
+                    source={require('../assets/vibes_logo_bw.png')} 
+                    style={{ 
+                        width: 40,
+                        height: 40,
+                        // tintColor: theme.colors.primary // Temporarily removed
+                    }}
+                    resizeMode="contain"
+                />
+            </View>
+        </TouchableOpacity>
+    );
+
+    return {
+        title: 'Record',
+        tabBarButton: TabBarButtonComponent,
+    };
+  }, [theme]);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -82,7 +129,9 @@ const MainNavigator = () => {
           } else if (route.name === 'Journal') {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Record') {
-            return null;
+            // iconName = 'help-circle-outline'; // This was for debugging
+            // Restore original fallback:
+            return <Image source={require('../assets/vibes_logo_bw.png')} style={{ width: size, height: size, tintColor: color }} resizeMode="contain" />;
           } else if (route.name === 'Calendar') {
             iconName = focused ? 'calendar' : 'calendar-outline';
           } else if (route.name === 'Settings') {
@@ -110,44 +159,7 @@ const MainNavigator = () => {
       <Tab.Screen 
         name="Record" 
         component={RecordScreen} 
-        options={({ navigation }) => ({
-          title: 'Record',
-          tabBarButton: (props: BottomTabBarButtonProps) => (
-            <TouchableOpacity
-              {...props}
-              style={{ 
-                flex: 1, 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-              }}
-              onPress={() => {
-                navigation.navigate('Record', { startRecording: true });
-              }}
-            >
-              <View style={{
-                position: 'absolute',
-                bottom: 10,
-                height: 60,
-                width: 60,
-                borderRadius: 30,
-                backgroundColor: theme.colors.primary,
-                justifyContent: 'center', 
-                alignItems: 'center',
-                shadowColor: theme.colors.shadow,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 3.84,
-                elevation: 5,
-              }}>
-                <Ionicons 
-                  name={'mic'}
-                  size={30} 
-                  color={theme.colors.onPrimary}
-                />
-              </View>
-            </TouchableOpacity>
-          ),
-        })}
+        options={getRecordScreenOptions}
       />
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Calendar' }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />

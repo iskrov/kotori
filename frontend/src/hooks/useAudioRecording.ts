@@ -324,7 +324,7 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
     startRecording // Callback, its stability depends on its own deps
   ]);
 
-  const cleanupRecordingFile = async (uri: string | null) => {
+  const cleanupRecordingFile = useCallback(async (uri: string | null) => {
     if (uri && Platform.OS !== 'web') {
         try {
             const fileInfo = await FileSystem.getInfoAsync(uri);
@@ -336,7 +336,7 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
             logger.error(`Failed to delete recording file ${uri}`, err);
         }
     }
-  };
+  }, []);
 
   return {
     isRecording,

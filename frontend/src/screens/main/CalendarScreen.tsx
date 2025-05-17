@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,17 @@ import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDa
 import { Ionicons } from '@expo/vector-icons';
 
 import { JournalAPI } from '../../services/api';
-import { JournalEntry } from '../../types';
+import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import { MainStackParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
+import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { AppTheme } from '../../config/theme';
+
+// --- Special Tag for Hidden Entries (Client-Side) ---
+// TODO: Move this to a shared constants file
+const HIDDEN_ENTRY_TAG = "_hidden_entry";
+// ----------------------------------------------------
 
 type CalendarScreenNavigationProp = StackNavigationProp<MainStackParamList>;
 type JournalDetailNavigationProp = StackNavigationProp<JournalStackParamList, 'JournalEntryDetail'>;
@@ -27,13 +33,23 @@ const CalendarScreen = () => {
   const navigation = useNavigation<CalendarScreenNavigationProp>();
   const journalNavigation = useNavigation<JournalDetailNavigationProp>();
   const { theme } = useAppTheme();
+  const { isHiddenModeActive } = useHiddenMode();
   const styles = getStyles(theme);
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
-  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
+  const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
+  const [filteredEntriesForSelectedDate, setFilteredEntriesForSelectedDate] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const visibleEntries = useMemo(() => {
+    if (isHiddenModeActive) {
+      return allEntries;
+    }
+    return allEntries.filter(entry => 
+      !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG)
+    );
+  }, [allEntries, isHiddenModeActive]);
   
   useFocusEffect(
     React.useCallback(() => {
@@ -43,7 +59,7 @@ const CalendarScreen = () => {
   
   useEffect(() => {
     filterEntriesByDate();
-  }, [selectedDate, entries]);
+  }, [selectedDate, visibleEntries]);
   
   const getDaysInMonth = () => {
     const start = startOfMonth(currentMonth);
@@ -55,7 +71,7 @@ const CalendarScreen = () => {
     try {
       setIsLoading(true);
       const response = await JournalAPI.getEntries();
-      setEntries(response.data);
+      setAllEntries(response.data);
     } catch (error) {
       console.error('Error fetching journal entries', error);
       Alert.alert('Error', 'Failed to load journal entries');
@@ -65,7 +81,7 @@ const CalendarScreen = () => {
   };
   
   const filterEntriesByDate = () => {
-    const filtered = entries.filter(entry => {
+    const filtered = visibleEntries.filter(entry => {
       try {
         const entryDate = parseISO(entry.entry_date);
         return entryDate.getFullYear() === selectedDate.getFullYear() &&
@@ -76,7 +92,7 @@ const CalendarScreen = () => {
         return false;
       }
     });
-    setFilteredEntries(filtered);
+    setFilteredEntriesForSelectedDate(filtered);
   };
   
   const goToPreviousMonth = () => {
@@ -101,7 +117,7 @@ const CalendarScreen = () => {
   
   const renderDay = (day: Date) => {
     const dayString = format(day, 'd');
-    const hasEntries = entries.some(entry => {
+    const hasEntriesOnDay = visibleEntries.some(entry => {
       try {
         const entryDate = parseISO(entry.entry_date);
         return entryDate.getFullYear() === day.getFullYear() &&
@@ -130,7 +146,7 @@ const CalendarScreen = () => {
           {dayString}
         </Text>
         
-        {hasEntries && <View style={[
+        {hasEntriesOnDay && <View style={[
           styles.entryIndicator,
           isSelected && styles.selectedEntryIndicator
         ]} />}
@@ -200,10 +216,14 @@ const CalendarScreen = () => {
         </View>
       ) : (
         <View style={styles.entriesContainer}>
-          {filteredEntries.length === 0 ? (
+          {filteredEntriesForSelectedDate.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="calendar-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
-              <Text style={styles.emptyText}>No entries for this date</Text>
+              <Text style={styles.emptyText}>
+                {(!isHiddenModeActive && allEntries.some(e => e.tags.some(t => t.name === HIDDEN_ENTRY_TAG) && isSameDay(parseISO(e.entry_date), selectedDate)))
+                  ? "Some entries for this date are hidden"
+                  : "No entries for this date"}
+              </Text>
               <TouchableOpacity 
                 style={styles.createButton}
                 onPress={handleCreateEntry}
@@ -213,7 +233,7 @@ const CalendarScreen = () => {
             </View>
           ) : (
             <FlatList
-              data={filteredEntries}
+              data={filteredEntriesForSelectedDate}
               renderItem={renderEntry}
               keyExtractor={item => item.id}
               contentContainerStyle={styles.listContent}

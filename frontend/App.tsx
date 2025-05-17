@@ -10,6 +10,8 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import Navigation from './src/navigation';
 import logger from './src/utils/logger';
 import { ThemeProvider, useAppTheme } from './src/contexts/ThemeContext';
+import { HiddenModeProvider } from './src/contexts/HiddenModeContext';
+// import { initializeAppInsights } from './src/services/appInsights'; // Commented out to fix linter error
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -101,33 +103,41 @@ const AppContent = () => {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <NavigationContainer
-          onStateChange={() => {
-            if (__DEV__) {
-              logger.debug('Navigation state changed');
-            }
-          }}
-          fallback={
-            // Use StyleSheet for initial loading
-            <View style={styles.loadingContainer}> 
-              <Text>Loading navigation...</Text>
-            </View>
-          }
-        >
-          <Navigation />
-          <StatusBar style={statusBarStyle} /> {/* Use mapped style */}
-        </NavigationContainer>
+        <ThemeProvider>
+          <HiddenModeProvider>
+            <NavigationContainer
+              onStateChange={() => {
+                if (__DEV__) {
+                  logger.debug('Navigation state changed');
+                }
+              }}
+              fallback={
+                // Use StyleSheet for initial loading
+                <View style={styles.loadingContainer}> 
+                  <Text>Loading navigation...</Text>
+                </View>
+              }
+            >
+              <Navigation />
+              <StatusBar style={statusBarStyle} /> {/* Use mapped style */}
+            </NavigationContainer>
+          </HiddenModeProvider>
+        </ThemeProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
 };
 
 export default function App() {
+  // initializeAppInsights(); // Commented out
+
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
-          <AppContent /> {/* Render AppContent which uses the theme provider */} 
+          <HiddenModeProvider>
+            <AppContent />
+          </HiddenModeProvider>
         </ThemeProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

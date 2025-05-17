@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -16,13 +16,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
 import { useAuth } from '../../contexts/AuthContext';
+import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { api } from '../../services/api';
-import { JournalEntry } from '../../types';
+import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import { RootStackParamList } from '../../navigation/types';
 import { logger } from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+
+// --- Special Tag for Hidden Entries (Client-Side) ---
+// TODO: Move this to a shared constants file
+const HIDDEN_ENTRY_TAG = "_hidden_entry";
+// ----------------------------------------------------
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
 
@@ -30,6 +36,7 @@ const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user } = useAuth();
   const { theme } = useAppTheme();
+  const { isHiddenModeActive } = useHiddenMode();
   const styles = getStyles(theme);
   
   // Extract first name for greeting
@@ -48,6 +55,17 @@ const HomeScreen = () => {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Filter entries based on hidden mode
+  const displayedEntries = useMemo(() => {
+    if (isHiddenModeActive) {
+      return recentEntries;
+    }
+    // Correctly check if any tag object has a name matching HIDDEN_ENTRY_TAG
+    return recentEntries.filter(entry => 
+      !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG)
+    );
+  }, [recentEntries, isHiddenModeActive]);
 
   // Replace useEffect with useFocusEffect to fetch data whenever the screen comes into focus
   useFocusEffect(
@@ -89,7 +107,7 @@ const HomeScreen = () => {
       logger.info("HomeScreen: Fetching recent journals from /api/journals...");
       const entriesResponse = await api.get('/api/journals', {
         params: { 
-          limit: 5,
+          limit: 10, // Fetch a bit more to account for potential hidden ones not shown
           sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
         }
       });
@@ -183,8 +201,8 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {recentEntries.length > 0 ? (
-        recentEntries.map((entry) => (
+      {displayedEntries.length > 0 ? (
+        displayedEntries.map((entry) => (
           <JournalCard 
             key={String(entry.id)} 
             entry={entry} 

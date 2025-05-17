@@ -26,16 +26,16 @@ import JournalForm from '../../components/JournalForm';
 // Hooks
 import useJournalEntry, { JournalData } from '../../hooks/useJournalEntry';
 import { getLanguageName } from '../../config/languageConfig';
+import { useHiddenMode } from '../../contexts/HiddenModeContext';
 
 // Utils
 import logger from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 
-// Define colors directly in the file instead of importing
-// const colors = {
-//   primary: '#7D4CDB',
-// };
+// --- Special Tag for Hidden Entries (Client-Side) ---
+const HIDDEN_ENTRY_TAG = "_hidden_entry";
+// ----------------------------------------------------
 
 // Type definitions for navigation and route
 type RecordScreenRouteProp = RouteProp<{ Record: RecordScreenParams | undefined }, 'Record'>;
@@ -45,6 +45,7 @@ const RecordScreen = () => {
   logger.info('RecordScreen instance created/rendered.');
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
+  const { isHiddenModeActive } = useHiddenMode();
   
   // Navigation and route
   const navigation = useNavigation<RecordScreenNavigationProp>();
@@ -64,14 +65,14 @@ const RecordScreen = () => {
   // Refs to handle unmount and navigation
   const mountedRef = useRef(true);
   const isNavigatingRef = useRef(false);
-  const initialStartRecordingChecked = useRef(false); // To process startRecording param only once
+  const initialStartRecordingChecked = useRef(false);
   
   // Get journalId from route params only ONCE for initial state
   const initialJournalId = useMemo(() => route.params?.journalId || null, []);
 
   // Use our journal entry hook
   const {
-    journalId, // Source of truth for the entry ID
+    journalId,
     isSaving,
     isAutoSaving,
     saveEntry,
@@ -79,41 +80,46 @@ const RecordScreen = () => {
     cancelAutoSave,
     error: saveError
   } = useJournalEntry(
-    // Pass initial data, including initialJournalId.
-    // The hook manages the ID internally after the first save.
-    useMemo(() => ({
-      id: initialJournalId,
-      title,
-      content,
-      tags,
-      audioUri,
-    }), [initialJournalId, title, content, tags, audioUri]),
+    useMemo(() => {
+      let currentTags = tags;
+      if (isHiddenModeActive && !currentTags.includes(HIDDEN_ENTRY_TAG)) {
+        currentTags = [...currentTags, HIDDEN_ENTRY_TAG];
+      } else if (!isHiddenModeActive && currentTags.includes(HIDDEN_ENTRY_TAG)) {
+        currentTags = currentTags.filter(t => t !== HIDDEN_ENTRY_TAG);
+      }
+
+      return {
+        id: initialJournalId,
+        title,
+        content,
+        tags: currentTags,
+        audioUri,
+      };
+    }, [initialJournalId, title, content, tags, audioUri, isHiddenModeActive]),
     {
       autoSaveDelay: 3000,
       onSaveComplete: useCallback((savedId: string | null) => {
-        if (!mountedRef.current) { // Check mounted first
+        if (!mountedRef.current) {
           logger.debug('[RecordScreen] onSaveComplete: Aborted (unmounted).');
           return;
         } 
-        // Check navigating flag *after* mounted check
         if (isNavigatingRef.current) {
           if (savedId) {
             logger.info(`[RecordScreen] Save successful (ID: ${savedId}). Navigating back.`);
             if (navigation.canGoBack()) navigation.goBack();
-            // Keep isNavigatingRef=true because we are navigating
           } else {
-            logger.info('[RecordScreen] Save completed but no ID (likely nothing to save or aborted). Resetting nav flag.');
-            isNavigatingRef.current = false; // Reset flag if no navigation occurred
+            logger.info('[RecordScreen] Save completed but no ID. Resetting nav flag.');
+            isNavigatingRef.current = false; 
           }
         } else {
-            logger.debug('[RecordScreen] onSaveComplete: Save completed but navigation flag was false (maybe auto-save?).');
+            logger.debug('[RecordScreen] onSaveComplete: Save completed (navigation flag false).');
         }
       }, [navigation]), 
       onSaveError: (error) => {
         if (!mountedRef.current) return;
         logger.error('[RecordScreen] Save failed', error);
         Alert.alert('Save Failed', 'Could not save the journal entry. Please try again.');
-        isNavigatingRef.current = false; // Always reset flag on error
+        isNavigatingRef.current = false; 
       },
     }
   );
@@ -124,7 +130,6 @@ const RecordScreen = () => {
       initialStartRecordingChecked.current = true;
       logger.info('RecordScreen: Detected startRecording param, showing recorder.');
       setShowRecorder(true);
-      // No setParams needed here, handled by ref check
     }
   }, [route.params?.startRecording]);
 
@@ -172,27 +177,32 @@ const RecordScreen = () => {
     setShowRecorder(true); 
   }, []);
   
-  const _updateJournalFieldsFromTranscription = useCallback((text: string, languageCode?: string) => {
+  const _updateJournalFieldsFromTranscription = useCallback((transcribedText: string, languageCode?: string, forHiddenEntry?: boolean) => {
     if (!mountedRef.current) return;
     
     setContent(prevContent => {
       const separator = prevContent.trim() ? '\n\n' : '';
-      return `${prevContent}${separator}${text}`;
+      return `${prevContent}${separator}${transcribedText}`;
     });
     
     if (languageCode) {
       const languageName = getLanguageName(languageCode);
       setTags(prevTags => {
-        if (languageName && !prevTags.includes(languageName)) {
-          return [...prevTags, languageName];
+        let newTags = prevTags;
+        if (languageName && !newTags.includes(languageName)) {
+          newTags = [...newTags, languageName];
         }
-        return prevTags;
+        if (forHiddenEntry && !newTags.includes(HIDDEN_ENTRY_TAG)) {
+          newTags = [...newTags, HIDDEN_ENTRY_TAG];
+          logger.info(`[RecordScreen] Added ${HIDDEN_ENTRY_TAG} due to active hidden mode for this entry.`);
+        }
+        return newTags;
       });
     }
     
     setTitle(prevTitle => {
-      if (!prevTitle.trim() && text) { 
-        const words = text.split(' ');
+      if (!prevTitle.trim() && transcribedText) { 
+        const words = transcribedText.split(' ');
         return words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
       }
       return prevTitle;
@@ -200,13 +210,18 @@ const RecordScreen = () => {
   }, []);
   
   const handleTranscriptionComplete = useCallback((transcribedText: string, finalAudioUri?: string, detectedLanguage?: string) => {
-    logger.info(`[RecordScreen] handleTranscriptionComplete received. URI: ${finalAudioUri}, Lang: ${detectedLanguage}`);
+    logger.info(`[RecordScreen] handleTranscriptionComplete received. URI: ${finalAudioUri}, Lang: ${detectedLanguage}, HiddenMode: ${isHiddenModeActive}`);
     if (!mountedRef.current) return;
-    try {
-      if (finalAudioUri) setAudioUri(finalAudioUri);
-      if (transcribedText) _updateJournalFieldsFromTranscription(transcribedText, detectedLanguage);
-    } catch (err) { logger.error('[RecordScreen] Error processing transcription', err); }
-  }, [_updateJournalFieldsFromTranscription]);
+    
+    if (transcribedText || finalAudioUri) {
+      try {
+        if (finalAudioUri) setAudioUri(finalAudioUri);
+        if (transcribedText) {
+          _updateJournalFieldsFromTranscription(transcribedText, detectedLanguage, isHiddenModeActive);
+        }
+      } catch (err) { logger.error('[RecordScreen] Error processing transcription', err); }
+    }
+  }, [_updateJournalFieldsFromTranscription, isHiddenModeActive]);
   
   // Called by AudioRecorder's onCancel prop
   const handleRecorderCancelOrDone = useCallback(() => {
@@ -249,17 +264,14 @@ const RecordScreen = () => {
         />
       </ScrollView>
       
+      {/* TEST: Render AudioRecorder in an overlay View instead of a Modal */}
       {showRecorder && (
-        <Modal
-          visible={showRecorder}
-          animationType="slide"
-          onRequestClose={handleRecorderCancelOrDone}
-        >
+        <View style={styles.audioRecorderOverlay}>
           <AudioRecorder
             onTranscriptionComplete={handleTranscriptionComplete}
             onCancel={handleRecorderCancelOrDone}
           />
-        </Modal>
+        </View>
       )}
       
       {(isSaving || isAutoSaving || isLoading) && (
@@ -298,6 +310,15 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.text,
     textAlign: 'center',
     fontFamily: theme.typography.fontFamilies.bold,
+  },
+  audioRecorderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: theme.colors.background,
+    zIndex: 1000,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
