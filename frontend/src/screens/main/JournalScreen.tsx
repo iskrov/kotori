@@ -52,14 +52,19 @@ const JournalScreen = () => {
   // Fetch journal entries when screen is focused
   useFocusEffect(
     useCallback(() => {
-      console.log('JournalScreen: Screen focused, fetching fresh data');
-      fetchEntries();
-      fetchTags();
+      console.log('JournalScreen: Screen focused, preparing to fetch data.');
+      // Test with a small delay
+      const timer = setTimeout(() => {
+        console.log('JournalScreen: Delay complete, fetching fresh data now.');
+        fetchEntries();
+        fetchTags();
+      }, 500); // 500ms delay
+
       return () => {
-        // Cleanup when screen is unfocused
+        clearTimeout(timer);
         console.log('JournalScreen: Screen unfocused');
       };
-    }, [])
+    }, []) // Keep empty dependency array
   );
   
   // Filter entries whenever search query, selected tags, base entries, or hidden mode changes

@@ -136,6 +136,7 @@ api.interceptors.response.use(
     // Handle 401 (Unauthorized) errors
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
+      logger.info(`API Response: 401 Unauthorized for ${originalRequest.url}. Attempting token refresh.`);
       
       try {
         logger.info('Attempting token refresh');
@@ -147,28 +148,31 @@ api.interceptors.response.use(
           logger.warn('No refresh token available, logging out user');
           await logout();
           return Promise.reject({
-            message: 'Session expired. Please login again.',
+            message: 'Session expired. No refresh token. Please login again.',
             status: 401
           });
         }
         
         // Call token refresh endpoint
+        logger.info(`Calling /api/auth/refresh with refresh token: ${refreshToken ? refreshToken.substring(0, 10) + '...' : 'null'}`);
         const response = await axios.post(`${getApiUrl()}/api/auth/refresh`, {
           refresh_token: refreshToken,
         });
         
         if (response.data.access_token) {
-          logger.info('Token refresh successful');
+          logger.info('Token refresh successful. New access token received.');
           // Save new tokens
           await AsyncStorage.setItem('access_token', response.data.access_token);
           
           if (response.data.refresh_token) {
             await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
+            logger.info('New refresh token also received and stored.');
           }
           
           // Update header for the instance defaults and the original request
           const newAccessToken = response.data.access_token;
           api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+          logger.info(`Retrying original request to ${originalRequest.url} with new token.`);
           
           // Create a new config for the retry based on the original request
           const retryConfig = {
@@ -182,13 +186,18 @@ api.interceptors.response.use(
           // Retry the original request using the base axios with the new config
           return axios(retryConfig);
         }
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         // If refresh fails, logout user
-        logger.error('Token refresh failed', refreshError);
+        logger.error('Token refresh failed', { 
+          message: refreshError.message, 
+          status: refreshError.response?.status,
+          data: refreshError.response?.data 
+        });
         await logout();
         return Promise.reject({
-          message: 'Session expired. Please login again.',
-          status: 401
+          message: 'Session expired. Token refresh failed. Please login again.',
+          status: 401,
+          originalError: refreshError.message
         });
       }
     }
@@ -308,8 +317,12 @@ export const UserAPI = {
 
 // Journal entries
 export const JournalAPI = {
-  getEntries: (params?: { page?: number, limit?: number, tags?: string[] }) => 
-    api.get('/api/journals', { params }),
+  getEntries: (params?: { 
+    page?: number, 
+    limit?: number, 
+    tags?: string[], 
+    entry_date?: string  // Add entry_date parameter for filtering by date
+  }) => api.get('/api/journals', { params }),
   
   getEntry: (id: string) => 
     api.get(`/api/journals/${id}`),

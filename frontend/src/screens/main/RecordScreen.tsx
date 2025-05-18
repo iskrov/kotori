@@ -15,6 +15,7 @@ import {
 import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
 import { format } from 'date-fns';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 
 // Types
 import { RootStackParamList, RecordScreenParams } from '../../navigation/types';
@@ -55,6 +56,7 @@ const RecordScreen = () => {
   // UI states
   const [isLoading, setIsLoading] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
+  const [initialRecordingHandled, setInitialRecordingHandled] = useState(false);
   
   // Journal entry form data
   const [title, setTitle] = useState('');
@@ -115,10 +117,18 @@ const RecordScreen = () => {
             logger.debug('[RecordScreen] onSaveComplete: Save completed (navigation flag false).');
         }
       }, [navigation]), 
-      onSaveError: (error) => {
+      onSaveError: (error: any) => {
         if (!mountedRef.current) return;
-        logger.error('[RecordScreen] Save failed', error);
-        Alert.alert('Save Failed', 'Could not save the journal entry. Please try again.');
+        logger.error('[RecordScreen] Save failed', { 
+          message: error.message, 
+          status: error.status,
+          originalError: error.originalError,
+          errorObject: error
+        });
+        Alert.alert(
+          'Save Failed',
+          `Could not save the journal entry. ${error.message ? error.message : 'Please try again.'}`
+        );
         isNavigatingRef.current = false; 
       },
     }
@@ -126,12 +136,28 @@ const RecordScreen = () => {
 
   // Effect to handle the startRecording navigation parameter
   useEffect(() => {
-    if (route.params?.startRecording && !initialStartRecordingChecked.current) {
-      initialStartRecordingChecked.current = true;
-      logger.info('RecordScreen: Detected startRecording param, showing recorder.');
-      setShowRecorder(true);
+    if (route.params?.startRecording && !initialRecordingHandled) {
+      if (!showRecorder) {
+        logger.info('[RecordScreen] useEffect: route.params.startRecording is true and initial recording not handled. Setting showRecorder to true.');
+        setShowRecorder(true);
+        setInitialRecordingHandled(true); // Mark as handled
+      }
+      // initialStartRecordingChecked.current = true; // This ref can likely be removed or re-evaluated
+    } else if (route.params && route.params.hasOwnProperty('startRecording') && !route.params.startRecording) {
+      // This case handles if startRecording is explicitly set to false (e.g. after saving)
+      if (showRecorder) {
+        logger.info('[RecordScreen] useEffect: route.params.startRecording is explicitly false. Setting showRecorder to false.');
+        setShowRecorder(false);
+      }
+      // initialStartRecordingChecked.current = true;
+    } else if (!route.params?.journalId && !initialStartRecordingChecked.current && !route.params?.hasOwnProperty('startRecording') && !initialRecordingHandled) {
+      // Default to show recorder for a new entry if not started via param and not handled yet
+      logger.info('[RecordScreen] useEffect: New entry, startRecording param absent, and initial not handled. Defaulting to show recorder.');
+      if (!showRecorder) setShowRecorder(true);
+      setInitialRecordingHandled(true); // Mark as handled here too if we default to show
+      // initialStartRecordingChecked.current = true;
     }
-  }, [route.params?.startRecording]);
+  }, [route.params, showRecorder, initialRecordingHandled, navigation]); // Removed navigation, added initialRecordingHandled
 
   // Main mount/unmount and focus effect
   useEffect(() => {
@@ -148,6 +174,8 @@ const RecordScreen = () => {
     };
   }, [journalId, content, title, audioUri, saveEntry, cancelAutoSave, isFocused]);
 
+  const canSave = useMemo(() => title.trim() !== '' || content.trim() !== '' || audioUri !== null, [title, content, audioUri]);
+
   // Effect for auto-saving content changes
   useEffect(() => {
     if (!isFocused || isNavigatingRef.current || showRecorder || isSaving || isAutoSaving) {
@@ -162,12 +190,20 @@ const RecordScreen = () => {
   
   // Manual Save Button Press
   const handleSavePress = useCallback(() => {
-    if (!mountedRef.current || isNavigatingRef.current) return;
-    logger.info('[RecordScreen] handleSavePress: Initiating manual save.');
+    if (!mountedRef.current || isNavigatingRef.current || isSaving) {
+      logger.info('[RecordScreen] handleSavePress: Aborted (unmounted, navigating, or already saving).', { isSaving });
+      return;
+    }
+    if (!canSave) {
+      Alert.alert("Empty Entry", "Please add a title, content, or a recording before saving.");
+      return;
+    }
+    logger.info('[RecordScreen] handleSavePress: Initiating manual save. Current journalId:', journalId);
+    logger.info('[RecordScreen] Data to save:', { title, content, tags, audioUri });
     isNavigatingRef.current = true; 
     cancelAutoSave(); 
     saveEntry(); 
-  }, [saveEntry, cancelAutoSave]);
+  }, [saveEntry, cancelAutoSave, title, content, audioUri, tags, journalId, canSave, isSaving]);
   
   // Audio Recorder Handlers
   const handleShowRecorder = useCallback(() => {
@@ -219,9 +255,20 @@ const RecordScreen = () => {
         if (transcribedText) {
           _updateJournalFieldsFromTranscription(transcribedText, detectedLanguage, isHiddenModeActive);
         }
+
+        logger.info('[RecordScreen] Auto-saving after transcription completion');
+        isNavigatingRef.current = true;
+        cancelAutoSave();
+        
+        setTimeout(() => {
+          if (mountedRef.current) {
+            saveEntry();
+          }
+        }, 100);
+        
       } catch (err) { logger.error('[RecordScreen] Error processing transcription', err); }
     }
-  }, [_updateJournalFieldsFromTranscription, isHiddenModeActive]);
+  }, [_updateJournalFieldsFromTranscription, isHiddenModeActive, saveEntry, cancelAutoSave]);
   
   // Called by AudioRecorder's onCancel prop
   const handleRecorderCancelOrDone = useCallback(() => {
@@ -229,8 +276,17 @@ const RecordScreen = () => {
     if (mountedRef.current) {
       setShowRecorder(false);
       setIsLoading(false);
+      
+      // If there's no content yet (user canceled before recording/transcribing),
+      // navigate back instead of showing the empty form
+      if (!title.trim() && !content.trim() && !audioUri && !initialJournalId) {
+        logger.info('[RecordScreen] No content after recording canceled, navigating back.');
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        }
+      }
     }
-  }, []);
+  }, [title, content, audioUri, navigation, initialJournalId]);
   
   // --- Rendering ---
   return (
@@ -239,15 +295,27 @@ const RecordScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
     >
+      <View style={styles.headerBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButtonLeft} accessibilityLabel="Go back">
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{journalId ? 'Edit Voice Entry' : 'New Voice Entry'}</Text>
+        <TouchableOpacity 
+          onPress={handleSavePress} 
+          style={styles.headerButtonRight} 
+          disabled={!canSave || isSaving || isAutoSaving}
+          accessibilityLabel="Save entry"
+        >
+          <Ionicons name="checkmark-done-outline" size={28} color={(!canSave || isSaving || isAutoSaving) ? theme.colors.disabled : theme.colors.primary} />
+          <Text style={[styles.headerButtonText, (!canSave || isSaving || isAutoSaving) && styles.disabledText]}>Save</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{journalId ? 'Edit Journal' : 'New Journal Entry'}</Text>
-        </View>
-        
         <JournalForm
           title={title}
           content={content}
@@ -278,7 +346,7 @@ const RecordScreen = () => {
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={theme.colors.white} />
           <Text style={styles.loadingText}>
-            {isSaving ? 'Saving...' : isAutoSaving ? 'Auto-saving...' : 'Loading...'}
+            {isSaving ? 'Saving...' : isAutoSaving ? 'Auto-saving...' : isLoading ? 'Processing...' : 'Loading...'}
           </Text>
         </View>
       )}
@@ -298,18 +366,46 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   scrollContent: {
     paddingBottom: theme.spacing.lg,
   },
-  header: {
-    padding: theme.spacing.md,
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    height: Platform.OS === 'ios' ? 50 : 60,
+    backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  headerButtonLeft: {
+    padding: theme.spacing.sm,
+  },
+  headerButtonRight: {
+    padding: theme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: theme.typography.fontSizes.lg,
     fontWeight: 'bold',
     color: theme.colors.text,
-    textAlign: 'center',
     fontFamily: theme.typography.fontFamilies.bold,
+  },
+  headerButtonText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.bold,
+    marginLeft: theme.spacing.xs,
+  },
+  disabledText: {
+    color: theme.colors.disabled,
   },
   audioRecorderOverlay: {
     position: 'absolute',

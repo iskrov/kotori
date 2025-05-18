@@ -58,8 +58,19 @@ const CalendarScreen = () => {
   );
   
   useEffect(() => {
-    filterEntriesByDate();
-  }, [selectedDate, visibleEntries]);
+    // When the selectedDate changes, fetch entries for that date
+    if (selectedDate) {
+      fetchEntriesForSelectedDate(selectedDate);
+    }
+  }, [selectedDate]);
+
+  // Keep a separate effect for when visibility mode changes
+  useEffect(() => {
+    if (selectedDate && allEntries.length > 0) {
+      // Refresh filtered entries when hidden mode changes
+      fetchEntriesForSelectedDate(selectedDate);
+    }
+  }, [isHiddenModeActive]);
   
   const getDaysInMonth = () => {
     const start = startOfMonth(currentMonth);
@@ -70,8 +81,14 @@ const CalendarScreen = () => {
   const fetchEntries = async () => {
     try {
       setIsLoading(true);
-      const response = await JournalAPI.getEntries();
-      setAllEntries(response.data);
+      // Fetch all entries for date indicators in the calendar
+      const allEntriesResponse = await JournalAPI.getEntries({
+        limit: 100  // Fetch more entries to show indicators properly
+      });
+      setAllEntries(allEntriesResponse.data);
+      
+      // Also trigger filtering for the selected date
+      await fetchEntriesForSelectedDate(selectedDate);
     } catch (error) {
       console.error('Error fetching journal entries', error);
       Alert.alert('Error', 'Failed to load journal entries');
@@ -80,19 +97,34 @@ const CalendarScreen = () => {
     }
   };
   
+  // New function to fetch entries for a specific date
+  const fetchEntriesForSelectedDate = async (date: Date) => {
+    try {
+      // Format date as YYYY-MM-DD for API query
+      const formattedDate = format(date, 'yyyy-MM-dd');
+      
+      // Use entry_date parameter to filter by exact date
+      const response = await JournalAPI.getEntries({
+        // Filter by the specific date
+        entry_date: formattedDate
+      });
+      
+      // Filter entries based on hidden mode
+      const entries = response.data;
+      const filtered = isHiddenModeActive 
+        ? entries 
+        : entries.filter((entry: JournalEntry) => !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG));
+      
+      setFilteredEntriesForSelectedDate(filtered);
+    } catch (error) {
+      console.error(`Error fetching entries for date ${format(date, 'yyyy-MM-dd')}`, error);
+      setFilteredEntriesForSelectedDate([]);
+    }
+  };
+  
+  // Replace filterEntriesByDate with a function that triggers fetchEntriesForSelectedDate
   const filterEntriesByDate = () => {
-    const filtered = visibleEntries.filter(entry => {
-      try {
-        const entryDate = parseISO(entry.entry_date);
-        return entryDate.getFullYear() === selectedDate.getFullYear() &&
-               entryDate.getMonth() === selectedDate.getMonth() &&
-               entryDate.getDate() === selectedDate.getDate();
-      } catch (e) {
-        console.error(`Error parsing entry_date: ${entry.entry_date}`, e);
-        return false;
-      }
-    });
-    setFilteredEntriesForSelectedDate(filtered);
+    fetchEntriesForSelectedDate(selectedDate);
   };
   
   const goToPreviousMonth = () => {
@@ -137,7 +169,11 @@ const CalendarScreen = () => {
           styles.dayContainer,
           isSelected && styles.selectedDayContainer
         ]} 
-        onPress={() => setSelectedDate(day)}
+        onPress={() => {
+          setSelectedDate(day);
+          // Fetch entries immediately for better user experience
+          fetchEntriesForSelectedDate(day);
+        }}
       >
         <Text style={[
           styles.dayText,
@@ -219,11 +255,9 @@ const CalendarScreen = () => {
           {filteredEntriesForSelectedDate.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Ionicons name="calendar-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
-              <Text style={styles.emptyText}>
-                {(!isHiddenModeActive && allEntries.some(e => e.tags.some(t => t.name === HIDDEN_ENTRY_TAG) && isSameDay(parseISO(e.entry_date), selectedDate)))
-                  ? "Some entries for this date are hidden"
-                  : "No entries for this date"}
-              </Text>
+                          <Text style={styles.emptyText}>
+              {"No entries for this date"}
+            </Text>
               <TouchableOpacity 
                 style={styles.createButton}
                 onPress={handleCreateEntry}

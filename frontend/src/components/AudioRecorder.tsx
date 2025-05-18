@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Dimensions,
-  Platform,
   ScrollView,
+  Image,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import speechToTextService from '../services/speechToText';
@@ -17,8 +17,6 @@ import { Audio } from 'expo-av';
 
 // Import shared components
 import LanguageSelectorModal from './LanguageSelectorModal';
-import RecordingButton from './RecordingButton';
-import RecordingStatus from './RecordingStatus';
 
 // Import hooks
 import useAudioRecording from '../hooks/useAudioRecording';
@@ -47,6 +45,15 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const styles = getStyles(theme);
   const { activateHiddenMode } = useHiddenMode();
 
+  // States for chunked recording
+  const [transcriptSegments, setTranscriptSegments] = useState<string[]>([]);
+  const [currentSegmentTranscript, setCurrentSegmentTranscript] = useState('');
+  const [isTranscribingSegment, setIsTranscribingSegment] = useState(false);
+
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const waveAnim1 = useRef(new Animated.Value(0)).current;
+  const waveAnim2 = useRef(new Animated.Value(0)).current;
+
   const {
     isRecording,
     recordingDuration,
@@ -61,7 +68,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   });
 
   // State management
-  const [currentFullTranscript, setCurrentFullTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [languageOptions, setLanguageOptions] = useState<LanguageOption[]>(getInitialLanguageOptions());
@@ -71,6 +77,36 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   // Refs to track component state
   const isMountedRef = useRef(true);
   const callbackCalledRef = useRef(false);
+
+  useEffect(() => {
+    if (isRecording) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.1, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ])
+      ).start();
+      Animated.loop(
+        Animated.stagger(300, [
+          Animated.sequence([
+            Animated.timing(waveAnim1, { toValue: 1, duration: 800, useNativeDriver: true }),
+            Animated.timing(waveAnim1, { toValue: 0, duration: 800, useNativeDriver: true }),
+          ]),
+          Animated.sequence([
+            Animated.timing(waveAnim2, { toValue: 1, duration: 800, useNativeDriver: true }),
+            Animated.timing(waveAnim2, { toValue: 0, duration: 800, useNativeDriver: true }),
+          ])
+        ])
+      ).start();
+    } else {
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+      waveAnim1.stopAnimation();
+      waveAnim1.setValue(0);
+      waveAnim2.stopAnimation();
+      waveAnim2.setValue(0);
+    }
+  }, [isRecording, pulseAnim, waveAnim1, waveAnim2]);
 
   // --- Check for Secret Phrase ---
   const checkAndHandleSecretPhrase = useCallback((transcript: string) => {
@@ -96,43 +132,27 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   // WebSocket handlers
   const handleWebSocketError = useCallback((errorMessage: string) => {
     logger.error('WebSocket Transcription Error:', errorMessage);
-    if (isMountedRef.current) setIsProcessing(false);
+    if (isMountedRef.current) {
+      setIsProcessing(false); // This might need to be setIsTranscribingSegment
+      setCurrentSegmentTranscript("Error with live transcription.");
+    }
   }, []);
 
   const handleInterimTranscript = useCallback((text: string) => {
-    logger.debug('Interim transcript received (component):', text);
+    logger.debug('Interim transcript received (WS):', text);
     if (isMountedRef.current) {
-      // Avoid adding the secret phrase to the preview if it's the only thing
-      // This is a soft check, batch processing is the definitive one.
-      if (!checkAndHandleSecretPhrase(text.trim())) { // Check here too
-        setCurrentFullTranscript(prev => prev + text + ' ');
-      }
+      setCurrentSegmentTranscript(prev => prev + text);
     }
-  }, [checkAndHandleSecretPhrase]);
+  }, []);
 
   const handleFinalTranscript = useCallback((text: string, detectedLanguage?: string) => {
-    logger.info(`Final transcript (component): ${text}, lang: ${detectedLanguage}`);
+    logger.info(`Final transcript (WS): ${text}, lang: ${detectedLanguage}`);
     if (isMountedRef.current) {
-      // We mainly rely on the batch transcript for calling onTranscriptionComplete.
-      // This primarily updates the UI preview.
-      // If the final transcript segment IS the secret phrase, we might not want to add it.
-      // However, checkAndHandleSecretPhrase is already called by the batch processor later.
-      // For the UI, let's ensure it reflects what will likely be processed.
-
-      // If this final WS transcript *is* the secret phrase, don't append it to the running transcript visually
-      // as it will be consumed by the batch processor.
-      // The batch processor will be the source of truth for onTranscriptionComplete.
-      const isSecret = checkAndHandleSecretPhrase(text);
-      if (!isSecret) {
-         setCurrentFullTranscript(prev => prev + text + ' ');
-      } else {
-        // If it was secret, maybe clear the current full transcript if it only contained that.
-        // This is tricky because WS can send multiple final transcripts.
-        // For now, let's assume batch handles consumption.
-        logger.info('[AudioRecorder] WS final transcript matched secret phrase. UI will be updated by batch logic or if only phrase was said.');
-      }
+      // For now, WS final transcript also just updates the current segment preview.
+      // Batch processing will be the source of truth for appending to accumulatedTranscript.
+      setCurrentSegmentTranscript(text + ' '); 
     }
-  }, [checkAndHandleSecretPhrase]);
+  }, []);
 
   // WebSocket hook
   const {
@@ -152,6 +172,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   useEffect(() => {
     isMountedRef.current = true;
     logger.info('AudioRecorder: Component did mount.');
+
+    // Reset states for chunked recording when component mounts
+    setTranscriptSegments([]);
+    setCurrentSegmentTranscript('');
+    setIsTranscribingSegment(false);
 
     callbackCalledRef.current = false;
     setHasTranscribedAudio(false);
@@ -191,140 +216,132 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   }, [permissionGranted]);
 
-  // Simplified function to safely handle the done/cancel action
+  // Simplified function to safely handle the done/cancel action (X button)
   const handleDone = useCallback(() => {
-    logger.info('AudioRecorder: handleDone called, closing recorder');
+    logger.info('AudioRecorder: handleDone (X button) called, closing recorder and discarding changes.');
     if (isMountedRef.current) {
-      if (isRecording) {
+      if (isRecording) { // If recording, stop it first
         stopRecording().catch(err => 
-          logger.error('Error stopping recording during handleDone', err)
+          logger.error('Error stopping recording during handleDone (X button)', err)
         );
-        // Let the useEffect for audioUri handle the transcription
-      } else if (audioUri && !hasTranscribedAudio && !callbackCalledRef.current && !isProcessing) {
-        logger.info('handleDone: audioUri present, but not yet processed. Relying on useEffect to process.');
-        // This case should ideally not call onCancel immediately if processing is expected.
-        // However, current flow: onCancel will be called.
-      } else if (!audioUri && !isProcessing && currentFullTranscript.trim()) {
-          // This case is for when WS might have provided the full transcript,
-          // and no batch processing (audioUri) is pending/expected.
-          const transcriptToProcess = currentFullTranscript.trim();
-          const isSecretOnly = checkAndHandleSecretPhrase(transcriptToProcess);
-
-          if (!callbackCalledRef.current) {
-            callbackCalledRef.current = true; // Mark callback attempted
-            setHasTranscribedAudio(true); // Mark as "processed"
-            if (!isSecretOnly) {
-                logger.info('[AudioRecorder] Done pressed. WS transcript to process (not secret).');
-                onTranscriptionComplete(transcriptToProcess, undefined, languageOptions.find(l => l.selected)?.code || languageOptions[0]?.code);
-            } else {
-                logger.info('[AudioRecorder] Done pressed. WS transcript was ONLY secret phrase. Not calling onTranscriptionComplete.');
-                // If it was only the secret phrase, we don't pass anything up.
-            }
-          }
       }
-      // Always call onCancel to ensure the UI closes.
-      // If transcription is pending via audioUri, it will proceed in the background.
-      onCancel();
+      onCancel(); // Always call onCancel to close
     }
-  }, [isRecording, stopRecording, onCancel, audioUri, hasTranscribedAudio, isProcessing, currentFullTranscript, languageOptions, onTranscriptionComplete, checkAndHandleSecretPhrase]);
+  }, [isRecording, stopRecording, onCancel]);
 
-  // Handle recording actions
-  const handleStartRecording = async () => {
-    if (!permissionGranted) {
-      logger.warn('[AudioRecorder] Start recording called, but permissions not granted.');
-      Alert.alert(
-        "Permission Required", 
-        "Microphone permission is needed to record. Please ensure it\'s granted in your device settings. The app should have prompted you."
-      );
-      return;
-    }
+  // This is the save action that was previously in handleFinalizeAndClose
+  const handleAcceptTranscript = useCallback(() => {
+    logger.info('[AudioRecorder] Accept transcript button pressed.');
+    
     if (!isMountedRef.current) return;
 
-    logger.info('[AudioRecorder] Resetting state for new recording.');
-    setCurrentFullTranscript('');
-    callbackCalledRef.current = false;
-    setHasTranscribedAudio(false);
-    setProcessedUris(new Set()); 
-    
-    logger.info('[AudioRecorder] Starting recording...');
-    await startRecording();
-  };
-
-  const handleStopRecording = async () => {
-    if (!isMountedRef.current) return;
-    logger.info('[AudioRecorder] Stopping recording...');
-    await stopRecording();
-  };
-
-  // Process the recording once audioUri is available
-  useEffect(() => {
-    if (!audioUri || isProcessing || callbackCalledRef.current || !isMountedRef.current || processedUris.has(audioUri)) {
+    if (isRecording) {
+      Alert.alert("Still Recording", "Please stop the current recording segment before finalizing.");
+      logger.warn('[AudioRecorder] Finalize attempted while still recording.');
       return;
     }
-    
-    const processAndCallback = async () => {
+    if (isTranscribingSegment) {
+      Alert.alert("Processing Segment", "Please wait for the current audio segment to finish processing before finalizing.");
+      logger.warn('[AudioRecorder] Finalize attempted while transcribing a segment.');
+      return;
+    }
+
+    const combinedTranscript = transcriptSegments.join('\n\n');
+    logger.info('[AudioRecorder] Finalizing transcript and closing.', { segmentsCount: transcriptSegments.length });
+    const langCode = languageOptions.find(l => l.selected)?.code || languageOptions[0]?.code || 'auto';
+    onTranscriptionComplete(combinedTranscript, undefined, langCode);
+    onCancel(); // This will trigger unmount and reset states via the mount useEffect return function
+  }, [isRecording, isTranscribingSegment, transcriptSegments, languageOptions, onTranscriptionComplete, onCancel, isMountedRef]);
+
+
+
+  const processSegment = async (uri: string, selectedLangCode: string) => {
+    if (!uri || processedUris.has(uri)) {
+      logger.info('[AudioRecorder] processSegment: URI already processed or invalid.', { uri });
+      return;
+    }
+
+    logger.info('[AudioRecorder] processSegment', { uri: uri, language: selectedLangCode });
+    setIsTranscribingSegment(true);
+    setCurrentSegmentTranscript('Processing audio segment...'); // Update live preview
+    setProcessedUris(prev => new Set(prev).add(uri));
+    setHasTranscribedAudio(true); // Mark that some audio has been processed
+
+    try {
+      const result = await speechToTextService.transcribeAudio(uri, { languageCode: selectedLangCode });
       if (!isMountedRef.current) return;
-      
-      setIsProcessing(true);
-      setProcessedUris(prev => new Set(prev).add(audioUri!));
-      
-      try {
-        const selectedLanguageCodes = languageOptions.filter(l => l.selected).map(l => l.code);
-        if (selectedLanguageCodes.length === 0) selectedLanguageCodes.push('en-US');
 
-        logger.info(`Processing recording from URI: ${audioUri} with languages: ${selectedLanguageCodes.join(', ')}`);
-        const result = await speechToTextService.transcribeAudio(audioUri!, { languageCode: selectedLanguageCodes[0] });
+      const transcriptText = result.transcript?.trim() || '';
+      logger.info('[AudioRecorder] Segment transcribed', { text: transcriptText, detectedLanguage: result.detected_language_code });
 
-        if (!isMountedRef.current) {
-          logger.warn('Component unmounted during transcription processing');
-          return;
-        }
-
-        // Ensure callbackCalledRef is only set once for this audioUri
-        if (callbackCalledRef.current && processedUris.has(audioUri!)) {
-            logger.warn(`[AudioRecorder] processAndCallback: callback already called for URI ${audioUri}. Aborting duplicate.`);
-            setIsProcessing(false);
-            return;
-        }
-        callbackCalledRef.current = true;
-        setHasTranscribedAudio(true);
-
-
-        if (result && result.transcript) {
-          const isSecret = checkAndHandleSecretPhrase(result.transcript);
-          if (isSecret) {
-            logger.info('[AudioRecorder] Secret phrase matched in batch transcript. Consuming it. Not calling onTranscriptionComplete.');
-            setCurrentFullTranscript(''); // Clear preview if only secret phrase
-          } else {
-            logger.info('Batch transcription successful (not secret). Calling onTranscriptionComplete.');
-            onTranscriptionComplete(result.transcript, audioUri, result.detected_language_code);
-            setCurrentFullTranscript(result.transcript); // Update preview with batch result
-          }
-        } else {
-          logger.warn('Batch transcription returned no results or failed. Calling onTranscriptionComplete with empty string.');
-          onTranscriptionComplete('', audioUri); 
-          setCurrentFullTranscript("Transcription failed or no speech detected."); // Update preview with error
-        }
-      } catch (error: any) {
-        if (!isMountedRef.current) return;
-        // Ensure callbackCalledRef is checked/set here too in case of error before success
-        if (!callbackCalledRef.current) {
-            callbackCalledRef.current = true;
-            setHasTranscribedAudio(true);
-        }
-        logger.error('Failed to transcribe audio (batch)', { message: error?.message, uri: audioUri });
-        Alert.alert('Transcription Error', `Failed to transcribe the recording: ${error?.message || 'Unknown error'}`);
-        onTranscriptionComplete('', audioUri); // Call with empty on error
-        setCurrentFullTranscript("Transcription error."); // Update preview with error
-      } finally {
-        if (isMountedRef.current) {
-          setIsProcessing(false);
-        }
+      const isSecret = checkAndHandleSecretPhrase(transcriptText);
+      if (isSecret) {
+        logger.info('[AudioRecorder] Secret phrase detected in segment. Not appending to accumulated transcript.');
+        // Potentially give some feedback that a command was recognized?
+      } else if (transcriptText) {
+        setTranscriptSegments(prev => [...prev, sanitizeText(transcriptText)]);
       }
-    };
+      setCurrentSegmentTranscript(''); // Clear segment preview
+      cleanupRecordingFile(uri); // Clean up the processed segment file
 
-    processAndCallback();
-  }, [audioUri, isProcessing, languageOptions, onTranscriptionComplete, processedUris, checkAndHandleSecretPhrase, cleanupRecordingFile]);
+    } catch (error: any) {
+      logger.error('[AudioRecorder] Error transcribing audio segment:', error);
+      if (isMountedRef.current) {
+        setCurrentSegmentTranscript('Error transcribing segment. Try again.');
+        // Alert.alert('Transcription Error', error.message || 'Failed to transcribe audio segment.');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsTranscribingSegment(false);
+      }
+    }
+  };
+
+  // Effect to process audio URI when it changes (i.e., after a recording segment stops)
+  useEffect(() => {
+    if (audioUri && !isRecording && !processedUris.has(audioUri) && permissionGranted) {
+      const selectedLang = languageOptions.find(l => l.selected) || languageOptions[0];
+      const langCode = selectedLang?.code || 'auto'; // Default to auto if something goes wrong
+      logger.info(`[AudioRecorder] useEffect detected new audioUri: ${audioUri} for language: ${langCode}. Starting processSegment.`);
+      processSegment(audioUri, langCode);
+    }
+  }, [audioUri, isRecording, processedUris, permissionGranted, languageOptions]);
+
+  const handleMicPress = async () => {
+    if (!permissionGranted) {
+      Alert.alert('Permissions Required', 'Audio recording permission is needed to record.');
+      logger.warn('Mic pressed but permission not granted.');
+      return;
+    }
+
+    if (isRecording) {
+      logger.info('[AudioRecorder] Mic press: Stopping current recording segment.');
+      // Intentionally not setting currentSegmentTranscript to 'Finalizing segment...' here yet
+      // to keep this step minimal. stopRecording will eventually trigger audioUri effect.
+      try {
+        await stopRecording();
+        // setIsTranscribingSegment(true); // This will be handled by the effect that processes audioUri
+      } catch (error) {
+        logger.error('[AudioRecorder] Error stopping recording segment:', error);
+        // setCurrentSegmentTranscript('Error stopping. Tap mic to try again.'); // Keep UI minimal for now
+        // setIsTranscribingSegment(false); // Reset if stop failed
+      }
+    } else { // Not recording
+      if (isTranscribingSegment) {
+        logger.info('[AudioRecorder] Mic press: Still transcribing previous segment. Please wait.');
+        Alert.alert('Processing', 'Still processing the previous audio. Please wait a moment.');
+        return;
+      }
+      logger.info('[AudioRecorder] Mic press: Starting new recording segment.');
+      // setCurrentSegmentTranscript(''); // Keep UI minimal for now
+      try {
+        await startRecording();
+      } catch (error) {
+        logger.error('[AudioRecorder] Error starting new recording segment:', error);
+        Alert.alert('Error Starting Recording', 'Could not start a new recording. Please try again.');
+      }
+    }
+  };
 
   // Language selection handler
   const toggleLanguageSelection = (code: string) => {
@@ -345,91 +362,105 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     .map(l => l.name.split(' ')[0])
     .join(', ');
 
-  // Render debug info for timer
-  const renderDebugInfo = () => {
-    if (process.env.NODE_ENV === 'development') {
-      const errorMsg = recordingError ? (recordingError instanceof Error ? recordingError.message : String(recordingError)) : 'none';
-      return (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>
-            Duration: {recordingDuration}s, isRecording: {isRecording ? 'yes' : 'no'}
-          </Text>
-          <Text style={styles.debugText}>
-            Perm: {permissionGranted ? 'yes' : 'no'}, Error: {errorMsg}
-          </Text>
-          <Text style={styles.debugText}>
-            URI: {audioUri ? 'yes' : 'no'}, Processing: {isProcessing ? 'yes' : 'no'}
-          </Text>
-        </View>
-      );
-    }
-    return null;
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Function to sanitize/clean transcript text
+  const sanitizeText = (text: string): string => {
+    // Remove any leading special characters like (, [, •, etc.
+    return text.replace(/^[\(\[\•\-\*]+\s*/g, '').trim();
+  };
+
+  const canAcceptTranscript = !isRecording && !isTranscribingSegment && transcriptSegments.length > 0;
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerBar}>
-        <TouchableOpacity onPress={onCancel} style={styles.headerSideButton} accessibilityLabel="Close recorder">
-          <Ionicons name="close" size={28} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Voice Recorder</Text>
-        <TouchableOpacity onPress={handleDone} style={styles.headerSideButton} accessibilityLabel="Done" disabled={isProcessing && !hasTranscribedAudio}>
-          <Text style={[styles.doneButtonText, (isProcessing && !hasTranscribedAudio) && styles.disabledText]}>Done</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Main Content */}
       <View style={styles.mainContent}>
         {/* Timer and Status */}
         <View style={styles.statusContainer}>
-          <Text style={styles.timerText}>{recordingDuration}s</Text>
+          <Text style={styles.timerText}>{formatDuration(recordingDuration)}</Text>
           <Text style={styles.statusText}>
-            {isRecording ? 'Recording...' : 'Tap the mic to start recording'}
+            {isRecording 
+              ? "Tap mic to STOP segment"
+              : isTranscribingSegment 
+              ? "Processing segment..."
+              : permissionGranted
+              ? "Tap mic to START new segment"
+              : "Waiting for audio permission..."}
           </Text>
+          {currentSegmentTranscript.trim() && !isRecording && (
+            <Text style={[styles.statusText, styles.segmentStatusText]}>
+              Segment: {currentSegmentTranscript}
+            </Text>
+          )}
         </View>
 
-        {/* Central Mic Button */}
-        <TouchableOpacity
-          style={[styles.micButton, isRecording && styles.micButtonActive]}
-          onPress={() => {
-            if (isRecording) {
-              handleStopRecording();
-            } else {
-              handleStartRecording();
-            }
-          }}
-          accessibilityLabel={isRecording ? 'Stop recording' : 'Start recording'}
-          disabled={isProcessing}
-        >
-          <Ionicons name="mic" size={48} color={theme.colors.white} />
-        </TouchableOpacity>
-
+        {/* Central Mic Button & Sound Waves */}
+        <View style={styles.micAreaContainer}>
+          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim1.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}] , opacity: waveAnim1.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
+          <Animated.View style={[styles.micButtonContainer, { transform: [{ scale: pulseAnim }] }]}>
+            <TouchableOpacity
+              style={[styles.micButton, isRecording && styles.micButtonActive, (isProcessing || !permissionGranted) && styles.disabledButton]}
+              onPress={handleMicPress}
+              accessibilityLabel={isRecording ? 'Stop recording' : 'Start recording'}
+              disabled={isProcessing || !permissionGranted}
+            >
+              <Ionicons name={isRecording ? "mic-off-circle" : "mic-circle"} size={60} color={theme.colors.white} />
+            </TouchableOpacity>
+          </Animated.View>
+          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim2.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}] , opacity: waveAnim2.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
+        </View>
+        
         {/* Language Selector */}
-        <TouchableOpacity onPress={() => setShowLanguageSelector(true)} style={styles.languagePill} accessibilityLabel="Select language">
-          <Ionicons name="language-outline" size={20} color={theme.colors.textSecondary} />
+        <TouchableOpacity onPress={() => setShowLanguageSelector(true)} style={styles.languagePill} accessibilityLabel="Select language" disabled={isRecording || isProcessing}>
+          <Ionicons name="language-outline" size={20} color={theme.colors.textSecondary} style={{marginRight: theme.spacing.xs}}/>
           <Text style={styles.languagePillText}>{selectedLanguageNames || 'Select Language'} ({languageOptions.filter(l => l.selected).length})</Text>
         </TouchableOpacity>
 
         {/* Transcript Preview */}
-        <View style={styles.transcriptPreviewContainer}>
-          <Text style={styles.transcriptLabel}>Transcript Preview:</Text>
+        <View style={styles.transcriptCard}>
+          <View style={styles.transcriptHeaderContainer}>
+            <Text style={styles.transcriptCardTitle}>📝 Accumulated Transcript</Text>
+            <TouchableOpacity 
+              style={styles.acceptIconContainer} 
+              onPress={handleAcceptTranscript}
+              disabled={!canAcceptTranscript}
+              accessibilityLabel="Save transcript"
+            >
+              <View style={styles.saveButtonContent}>
+                <Ionicons 
+                  name="checkmark-done-outline" 
+                  size={20}
+                  color={canAcceptTranscript ? theme.colors.primary : theme.colors.disabled}
+                />
+                <Text style={[styles.saveButtonText, !canAcceptTranscript && styles.disabledText]}>
+                  Save
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
           <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContentContainer}>
-            <Text style={styles.transcriptText}>
-              {isRecording
-                ? "Recording... Transcript will appear after processing."
-                : isProcessing 
-                  ? "Processing transcript..."
-                  : currentFullTranscript || "Your transcribed text will appear here..."}
-            </Text>
+            {transcriptSegments.length > 0 ? (
+              transcriptSegments.map((segment, index) => (
+                <View key={index} style={styles.segmentContainer}>
+                  <Text style={styles.transcriptText}>{segment}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.transcriptText}>
+                {isRecording && !isTranscribingSegment
+                  ? "Listening..."
+                  : "Start recording. Your transcript will appear here."}
+              </Text>
+            )}
           </ScrollView>
         </View>
-
-        {/* Debug Info (dev only) */}
-        {renderDebugInfo()}
       </View>
 
-      {/* Language Selector Modal */}
       <LanguageSelectorModal
         visible={showLanguageSelector}
         languageOptions={languageOptions}
@@ -439,8 +470,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         maxSelection={MAX_LANGUAGE_SELECTION}
       />
       
-      {/* Processing Overlay */}
-      {(isProcessing) && (
+      {isProcessing && (
         <View style={styles.processingOverlay}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.processingText}>Processing...</Text>
@@ -453,40 +483,9 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    justifyContent: 'flex-start',
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
-  },
-  headerSideButton: {
-    padding: theme.spacing.sm,
-    minWidth: 44,
-    alignItems: 'center',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.bold,
-  },
-  doneButtonText: {
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.primary,
-    fontFamily: theme.typography.fontFamilies.bold,
-  },
-  disabledText: {
-    color: theme.colors.disabled,
+    alignItems: 'center',
   },
   mainContent: {
     flex: 1,
@@ -499,91 +498,136 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   timerText: {
-    fontSize: 28,
+    fontSize: 48,
     fontWeight: 'bold',
-    color: theme.colors.primary,
-    marginBottom: theme.spacing.xs,
+    color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.bold,
+    marginBottom: theme.spacing.xs,
   },
   statusText: {
     fontSize: theme.typography.fontSizes.md,
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.semiBold,
+    fontFamily: theme.typography.fontFamilies.regular,
+    textAlign: 'center',
+  },
+  segmentStatusText: {
+    marginTop: theme.spacing.xs,
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  micAreaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: theme.spacing.xl,
+  },
+  micButtonContainer: {
+    // For the pulse animation
   },
   micButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: theme.spacing.lg,
     shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 4,
-    borderColor: theme.colors.primary,
-    transitionProperty: 'background-color',
-    transitionDuration: '0.2s',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 10,
+    marginHorizontal: 20,
   },
   micButtonActive: {
-    backgroundColor: theme.colors.error,
-    borderColor: theme.colors.error,
+    backgroundColor: theme.colors.error, 
+    shadowColor: theme.colors.error,
+  },
+  disabledButton: {
+    backgroundColor: theme.colors.disabled,
+    shadowColor: theme.colors.disabled,
+    opacity: 0.7,
+  },
+  soundWave: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary + '66', // Softer purple (primary with ~40% opacity)
   },
   languagePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
     borderRadius: 20,
-    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
-    marginBottom: theme.spacing.lg,
-    marginTop: -theme.spacing.sm,
-    minHeight: 36,
+    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100, // Subtle background
+    marginVertical: theme.spacing.md,
   },
   languagePillText: {
-    marginLeft: theme.spacing.sm,
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
   },
-  transcriptPreviewContainer: {
-    minHeight: 60,
-    maxHeight: 120,
+  transcriptCard: {
     width: '100%',
-    borderColor: theme.colors.border,
-    borderWidth: 1,
+    minHeight: 120,
+    maxHeight: 200,
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
-    padding: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
+    padding: theme.spacing.md,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: theme.spacing.lg,
   },
-  transcriptLabel: {
+  transcriptHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  transcriptCardTitle: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+  },
+  acceptIconContainer: { // Renamed from editIconContainer
+    padding: theme.spacing.xs,
+  },
+  saveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  saveButtonText: {
     fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
+    color: theme.colors.primary,
     fontFamily: theme.typography.fontFamilies.semiBold,
+    marginLeft: 4,
+  },
+  disabledText: {
+    color: theme.colors.disabled,
   },
   transcriptScroll: {
     flex: 1,
+    paddingTop: theme.spacing.xs,
   },
   transcriptContentContainer: {
+    paddingTop: theme.spacing.xs,
     paddingBottom: theme.spacing.sm,
   },
   transcriptText: {
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.regular,
+    lineHeight: theme.typography.fontSizes.sm * 1.8, // Explicit line height based on font size
   },
   processingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)', 
+    backgroundColor: theme.isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(250, 250, 250, 0.7)', 
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: 100,
   },
   processingText: {
     marginTop: theme.spacing.md,
@@ -591,15 +635,15 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.semiBold,
   },
-  debugContainer: {
-    marginVertical: 5,
-    padding: 4,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-  },
-  debugText: {
-    fontSize: 10,
-    color: '#666',
+
+  segmentContainer: {
+    marginBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.md, // Increased vertical padding
+    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: theme.isDarkMode ? 'rgba(60, 60, 80, 0.2)' : 'rgba(240, 240, 250, 0.7)', 
+    borderRadius: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: theme.colors.primary,
   },
 });
 

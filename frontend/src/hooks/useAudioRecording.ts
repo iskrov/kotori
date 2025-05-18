@@ -133,15 +133,17 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
     logger.info('Stopping audio recording...');
     setIsRecording(false);
     
-    // Clear timer interval
+    // Calculate final duration before clearing timer and resetting refs
+    const finalDuration = startTimeRef.current ? Math.floor((Date.now() - startTimeRef.current) / 1000) : 0;
+    logger.info(`[useAudioRecording] Final duration: ${finalDuration}s`);
+    
+    // IMPORTANT: Clear timer interval BEFORE resetting startTimeRef to avoid timer ticks with startTimeRef=0
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     
-    // Record final duration before resetting
-    const finalDuration = startTimeRef.current ? Math.floor((Date.now() - startTimeRef.current) / 1000) : 0;
-    logger.info(`[useAudioRecording] Final duration: ${finalDuration}s`);
+    // Set the final duration and then reset startTimeRef (order matters)
     setRecordingDuration(finalDuration);
     startTimeRef.current = 0;
 
@@ -221,9 +223,26 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
       // Use a direct function instead of updateTimer to ensure closure has latest startTimeRef
       timerRef.current = setInterval(() => {
         const currentTime = Date.now();
+        
+        // Safety check: If startTimeRef is 0 or otherwise invalid, stop the timer
+        if (!startTimeRef.current) {
+          logger.warn('[useAudioRecording] Timer tick with invalid startTimeRef (0). Clearing interval.');
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          return;
+        }
+        
         const elapsed = Math.floor((currentTime - startTimeRef.current) / 1000);
         logger.info(`Timer tick: current=${currentTime}, start=${startTimeRef.current}, elapsed=${elapsed}s`);
-        setRecordingDuration(elapsed);
+        
+        // Only update the duration if we have a valid elapsed time (prevents displaying astronomical values)
+        if (elapsed >= 0 && elapsed < 86400) { // Sanity check: < 24 hours
+          setRecordingDuration(elapsed);
+        } else {
+          logger.warn(`[useAudioRecording] Invalid elapsed time calculated: ${elapsed}s. Ignoring this tick.`);
+        }
         
         // Check max duration
         if (mergedOptions.maxDuration && 

@@ -107,7 +107,7 @@ const HomeScreen = () => {
       logger.info("HomeScreen: Fetching recent journals from /api/journals...");
       const entriesResponse = await api.get('/api/journals', {
         params: { 
-          limit: 10, // Fetch a bit more to account for potential hidden ones not shown
+          limit: 3, // Only show 3 most recent entries on the home screen
           sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
         }
       });

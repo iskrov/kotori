@@ -1,10 +1,13 @@
 import React, { useCallback } from 'react';
-import { createBottomTabNavigator, BottomTabBarButtonProps, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, TouchableOpacity, Image } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Platform, Image } from 'react-native';
+import { useNavigation, TabActions } from '@react-navigation/native';
 import { useAppTheme } from '../contexts/ThemeContext';
-import { MainStackParamList, JournalStackParamList } from './types';
+import { AppTheme } from '../config/theme';
+import { MainStackParamList, JournalStackParamList, RootStackParamList } from './types';
+import logger from '../utils/logger';
 
 import HomeScreen from '../screens/main/HomeScreen';
 import JournalScreen from '../screens/main/JournalScreen';
@@ -24,19 +27,16 @@ const JournalStack = () => {
   return (
     <JournalStackNavigator.Navigator
       screenOptions={{
-        headerStyle: {
-          backgroundColor: theme.colors.card,
-        },
+        headerShown: false,
+        headerStyle: { backgroundColor: theme.colors.card },
         headerTintColor: theme.colors.text,
-        headerTitleStyle: {
-          color: theme.colors.text,
-        },
+        headerTitleStyle: { color: theme.colors.text, fontFamily: theme.typography.fontFamilies.bold },
       }}
     >
       <JournalStackNavigator.Screen 
         name="JournalList" 
         component={JournalScreen} 
-        options={{ title: 'Journal Entries' }}
+        options={{ title: 'Journal' }}
       />
       <JournalStackNavigator.Screen 
         name="JournalEntryDetail" 
@@ -63,108 +63,119 @@ const JournalStack = () => {
 
 const MainNavigator = () => {
   const { theme } = useAppTheme();
+  const styles = getNavigatorStyles(theme);
+  const navigation = useNavigation();
 
-  const getRecordScreenOptions = useCallback((
-    { navigation }: { navigation: BottomTabNavigationProp<MainStackParamList, 'Record'> }
-  ) => {
-    const TabBarButtonComponent = (props: BottomTabBarButtonProps) => (
-        <TouchableOpacity
-            {...props}
-            style={{ 
-                flex: 1, 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-            }}
-            onPress={() => navigation.navigate('Record', { startRecording: true })}
-        >
-            <View style={{
-                position: 'absolute',
-                bottom: 10,
-                height: 60,
-                width: 60,
-                borderRadius: 30,
-                backgroundColor: theme.colors.card,
-                justifyContent: 'center', 
-                alignItems: 'center',
-                shadowColor: theme.colors.shadow,
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.15,
-                shadowRadius: 2.0,
-                elevation: 3,
-            }}>
-                <Image 
-                    source={require('../assets/vibes_logo_bw.png')} 
-                    style={{ 
-                        width: 40,
-                        height: 40,
-                        // tintColor: theme.colors.primary // Temporarily removed
-                    }}
-                    resizeMode="contain"
-                />
-            </View>
-        </TouchableOpacity>
-    );
-
-    return {
-        title: 'Record',
-        tabBarButton: TabBarButtonComponent,
-    };
-  }, [theme]);
+  const CustomRecordButton = useCallback(
+    ({ children }: BottomTabBarButtonProps) => (
+      <TouchableOpacity
+        style={styles.recordTabButton}
+        onPress={() => {
+          logger.info('[MainNavigator] CustomRecordButton pressed. Navigating to Record screen with startRecording: true.');
+          navigation.dispatch(
+            TabActions.jumpTo('Record', { 
+              startRecording: true, 
+              journalId: undefined
+            })
+          );
+        }}
+      >
+        <View style={styles.recordButtonInner}>
+          <Image 
+            source={require('../assets/vibes_button_transparent.png')} 
+            style={styles.recordButtonImage} 
+            resizeMode="contain" 
+          />
+        </View>
+      </TouchableOpacity>
+    ),
+    [theme, styles, navigation]
+  );
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerStyle: {
-          backgroundColor: theme.colors.card,
-        },
-        headerTintColor: theme.colors.text,
-        headerTitleStyle: {
-          color: theme.colors.text,
-        },
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap | undefined;
-          
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Journal') {
-            iconName = focused ? 'book' : 'book-outline';
-          } else if (route.name === 'Record') {
-            // iconName = 'help-circle-outline'; // This was for debugging
-            // Restore original fallback:
-            return <Image source={require('../assets/vibes_logo_bw.png')} style={{ width: size, height: size, tintColor: color }} resizeMode="contain" />;
-          } else if (route.name === 'Calendar') {
-            iconName = focused ? 'calendar' : 'calendar-outline';
-          } else if (route.name === 'Settings') {
-            iconName = focused ? 'settings' : 'settings-outline';
-          }
-          if (!iconName) return null;
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
+        headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textDisabled,
-        tabBarStyle: {
-          backgroundColor: theme.colors.card,
-          borderTopColor: theme.colors.border,
-          height: 60,
+        tabBarStyle: styles.tabBarStyle,
+        tabBarLabelStyle: styles.tabBarLabelStyle,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap | undefined;
+          if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
+          else if (route.name === 'Journal') iconName = focused ? 'book' : 'book-outline';
+          else if (route.name === 'Calendar') iconName = focused ? 'calendar' : 'calendar-outline';
+          else if (route.name === 'Settings') iconName = focused ? 'cog' : 'cog-outline';
+          
+          if (route.name === 'Record') return null;
+
+          if (!iconName) return <View style={{width:size, height:size}}/>;
+          return <Ionicons name={iconName} size={focused ? size + 2 : size} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-      <Tab.Screen 
-        name="Journal" 
-        component={JournalStack} 
-        options={{ headerShown: false, title: 'Journal' }}
-      />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home'}} />
+      <Tab.Screen name="Journal" component={JournalStack} options={{ tabBarLabel: 'Journal'}} />
       <Tab.Screen 
         name="Record" 
         component={RecordScreen} 
-        options={getRecordScreenOptions}
+        options={{
+          tabBarLabel: () => null,
+          tabBarButton: (props) => <CustomRecordButton {...props} />,
+        }}
       />
-      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ title: 'Calendar' }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendar'}} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings'}}/>
     </Tab.Navigator>
   );
 };
+
+const getNavigatorStyles = (theme: AppTheme) => StyleSheet.create({
+  tabBarStyle: {
+    backgroundColor: theme.colors.card,
+    borderTopColor: theme.colors.border,
+    borderTopWidth: 1,
+    height: Platform.OS === 'ios' ? 80 : 70,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+  },
+  tabBarLabelStyle: {
+    fontSize: theme.typography.fontSizes.xs,
+    fontFamily: theme.typography.fontFamilies.regular,
+    marginBottom: Platform.OS === 'ios' ? 0 : theme.spacing.sm,
+  },
+  recordTabButton: {
+    top: -25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: theme.colors.primary,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    ...(Platform.OS === 'android' && {
+      position: 'absolute',
+      left: '50%',
+      marginLeft: -35,
+      bottom: 15,
+    })
+  },
+  recordButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordButtonImage: {
+    width: 35,
+    height: 35,
+    tintColor: theme.colors.white,
+  },
+});
 
 export default MainNavigator; 
