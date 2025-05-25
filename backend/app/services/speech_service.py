@@ -15,6 +15,7 @@ from google.cloud.speech_v2.types import cloud_speech # Use V2 types
 from google.oauth2 import service_account
 
 from ..core.config import settings
+from .encryption_service import encryption_service
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,16 @@ class SpeechService:
                 transcription_result["detected_language_code"] = detected_lang_from_response
                 logger.info(f"Detected language: {detected_lang_from_response}")
 
+            # Check for code phrases if we have a user context
+            transcription_result["code_phrase_detected"] = None
+            transcript_text = transcription_result.get("transcript", "").strip()
+            if transcript_text:
+                # This will be enhanced to take user_id and check user-specific phrases
+                code_phrase_type = self._check_code_phrases(transcript_text)
+                if code_phrase_type:
+                    transcription_result["code_phrase_detected"] = code_phrase_type
+                    logger.info(f"Code phrase detected: {code_phrase_type}")
+
             return transcription_result
 
         except Exception as e:
@@ -176,6 +187,58 @@ class SpeechService:
             raise RuntimeError(
                 "Failed to transcribe audio via Google Cloud Speech V2 API"
             ) from e
+
+    def _check_code_phrases(self, transcript: str, user_id: Optional[int] = None) -> Optional[str]:
+        """
+        Check if the transcript contains any code phrases.
+        Returns the type of code phrase detected: 'unlock', 'decoy', 'panic', or None.
+        
+        TODO: This needs to be enhanced to:
+        1. Accept user_id parameter
+        2. Fetch user's stored phrase hashes from database
+        3. Check against user-specific phrases instead of hardcoded ones
+        """
+        # Normalize transcript for comparison
+        normalized_transcript = transcript.strip().lower().translate(
+            str.maketrans('', '', '.,!?;:')
+        )
+        
+        # TODO: Replace these hardcoded phrases with user-specific database lookups
+        # For now, using placeholder phrases for testing
+        test_phrases = {
+            'unlock': ['show hidden entries', 'unlock secret mode', 'reveal private'],
+            'decoy': ['show decoy profile', 'switch to decoy'],
+            'panic': ['emergency destroy', 'delete everything now']
+        }
+        
+        for phrase_type, phrases in test_phrases.items():
+            for phrase in phrases:
+                normalized_phrase = phrase.strip().lower().translate(
+                    str.maketrans('', '', '.,!?;:')
+                )
+                if normalized_phrase == normalized_transcript:
+                    return phrase_type
+        
+        return None
+
+    async def transcribe_audio_with_user_context(
+        self, 
+        audio_content: bytes, 
+        user_id: int,
+        language_codes: Optional[List[str]] = None
+    ) -> dict:
+        """
+        Enhanced transcription method that includes user-specific code phrase checking.
+        """
+        result = await self.transcribe_audio(audio_content, language_codes)
+        
+        # Enhanced code phrase checking with user context
+        transcript_text = result.get("transcript", "").strip()
+        if transcript_text:
+            code_phrase_type = self._check_code_phrases(transcript_text, user_id)
+            result["code_phrase_detected"] = code_phrase_type
+            
+        return result
 
     def _build_streaming_config(self, language_codes: Optional[List[str]] = None) -> dict:
         """Builds the streaming configuration dictionary for V2 API."""

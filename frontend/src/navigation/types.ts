@@ -12,6 +12,7 @@ export type JournalStackParamList = {
   JournalEntryDetail: { entryId: string };
   JournalEntryForm: { journalId?: string };
   ReminderForm: { reminderId?: string };
+  DeleteConfirmation: { entryId: string };
 };
 
 // Main stack params - Define Record screen params directly here

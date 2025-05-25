@@ -22,6 +22,7 @@ export type JournalStackParamList = {
   JournalEntryDetail: { entryId: string };
   JournalEntryForm: { journalId?: string };
   ReminderForm: { reminderId?: string };
+  DeleteConfirmation: { entryId: string };
 };
 
 // Reminder Frequency
@@ -48,7 +49,7 @@ export interface User {
 }
 
 export interface Tag {
-  id: string | null;
+  id: number;
   name: string;
   count?: number;
   created_at?: string;
@@ -65,6 +66,14 @@ export interface JournalEntry {
   tags: Tag[];
   created_at: string;
   updated_at: string;
+  // Zero-Knowledge Encryption fields
+  is_hidden?: boolean;
+  encrypted_content?: string;
+  encryption_iv?: string;
+  encryption_salt?: string;
+  encrypted_key?: string;
+  key_derivation_iterations?: number;
+  encryption_algorithm?: string;
 }
 
 export interface JournalEntryCreate {
@@ -73,6 +82,14 @@ export interface JournalEntryCreate {
   entry_date: string;
   audio_url?: string;
   tags?: string[];
+  // Zero-Knowledge Encryption fields
+  is_hidden?: boolean;
+  encrypted_content?: string;
+  encryption_iv?: string;
+  encryption_salt?: string;
+  encrypted_key?: string;
+  key_derivation_iterations?: number;
+  encryption_algorithm?: string;
 }
 
 export interface JournalEntryUpdate {

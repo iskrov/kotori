@@ -18,6 +18,7 @@ from jose import JWTError, jwt
 from app.dependencies import get_db
 from app.models.user import User
 from app.services.speech_service import SpeechService, speech_service
+from app.services.session_service import session_service
 from app.core.config import settings
 from app.services.user_service import user_service
 
@@ -83,7 +84,7 @@ async def transcribe_audio_endpoint(
 ):
     """
     Receives an audio file and optional language codes, transcribes it using the SpeechService,
-    and returns the transcription.
+    and returns the transcription. Handles code phrase detection for hidden mode activation.
     Defaults to automatic language detection if language_codes are not provided or empty.
     (Authentication handled manually within endpoint)
     """
@@ -144,20 +145,37 @@ async def transcribe_audio_endpoint(
 
         # Add more robust validation if necessary (e.g., file size limit)
 
-        # Pass the language codes to the service
-        transcription_data = await speech_service_instance.transcribe_audio(
+        # Use the enhanced transcription method with user context for code phrase detection
+        transcription_data = await speech_service_instance.transcribe_audio_with_user_context(
             audio_content,
-            language_codes=effective_language_codes # Pass None or the list
+            user_id=current_user.id,
+            language_codes=effective_language_codes
         )
+        
+        # Handle code phrase detection
+        code_phrase_detected = transcription_data.get("code_phrase_detected")
+        if code_phrase_detected == "unlock":
+            session_service.activate_hidden_mode(current_user.id)
+            logger.info(f"Hidden mode activated for user {current_user.id} via code phrase")
+        elif code_phrase_detected == "decoy":
+            # TODO: Implement decoy mode
+            logger.info(f"Decoy mode triggered for user {current_user.id} (not implemented)")
+        elif code_phrase_detected == "panic":
+            # TODO: Implement panic/self-destruct mode
+            logger.info(f"Panic mode triggered for user {current_user.id} (not implemented)")
+        
         logger.info(
             f"Successfully transcribed audio for user {current_user.email}. "
             f"Transcript length: {len(transcription_data.get('transcript', ''))}, "
-            f"Detected language: {transcription_data.get('detected_language_code')}"
+            f"Detected language: {transcription_data.get('detected_language_code')}, "
+            f"Code phrase: {code_phrase_detected or 'none'}"
         )
 
+        # Return response (don't expose code phrase detection to client for security)
         return {
             "transcript": transcription_data.get("transcript", ""),
-            "detected_language_code": transcription_data.get("detected_language_code")
+            "detected_language_code": transcription_data.get("detected_language_code"),
+            "hidden_mode_activated": code_phrase_detected == "unlock"  # Only expose unlock status
         }
 
     except RuntimeError as e:

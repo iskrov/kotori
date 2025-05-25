@@ -72,22 +72,38 @@ class Logger {
   }
 
   public debug(message: string, data?: any) {
-    console.debug(message, data);
+    if (data !== undefined) {
+      console.debug(message, data);
+    } else {
+      console.debug(message);
+    }
     this.writeToFile('debug', message, data);
   }
 
   public info(message: string, data?: any) {
-    console.info(message, data);
+    if (data !== undefined) {
+      console.info(message, data);
+    } else {
+      console.info(message);
+    }
     this.writeToFile('info', message, data);
   }
 
   public warn(message: string, data?: any) {
-    console.warn(message, data);
+    if (data !== undefined) {
+      console.warn(message, data);
+    } else {
+      console.warn(message);
+    }
     this.writeToFile('warn', message, data);
   }
 
   public error(message: string, data?: any) {
-    console.error(message, data);
+    if (data !== undefined) {
+      console.error(message, data);
+    } else {
+      console.error(message);
+    }
     this.writeToFile('error', message, data);
   }
 

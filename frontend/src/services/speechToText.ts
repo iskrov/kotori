@@ -1,15 +1,16 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import logger from '../utils/logger';
 // Import the NAMED export 'api' (the axios instance) and alias it
 import { api as axiosInstance } from './api';
 import axios from 'axios';
+import * as FileSystem from 'expo-file-system';
 
 // Define types for response and options
 interface TranscriptionResult {
   transcript: string;
   detected_language_code?: string; // Added optional detected language
+  hidden_mode_activated?: boolean; // Added for code phrase detection
   // Add other fields if your backend returns more info (e.g., confidence)
 }
 

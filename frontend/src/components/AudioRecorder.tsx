@@ -9,9 +9,11 @@ import {
   ScrollView,
   Image,
   Animated,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import speechToTextService from '../services/speechToText';
+import { hiddenModeManager } from '../services/hiddenModeManager';
 import logger from '../utils/logger';
 import { Audio } from 'expo-av';
 
@@ -28,10 +30,6 @@ import { getInitialLanguageOptions, LanguageOption, MAX_LANGUAGE_SELECTION } fro
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
 
-// --- Define Secret Phrase (Temporary) ---
-const SECRET_PHRASE = "show hidden entries";
-// -----------------------------------------
-
 interface AudioRecorderProps {
   onTranscriptionComplete: (text: string, audioUri?: string, detectedLanguage?: string) => void;
   onCancel: () => void;
@@ -43,7 +41,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
-  const { activateHiddenMode } = useHiddenMode();
 
   // States for chunked recording
   const [transcriptSegments, setTranscriptSegments] = useState<string[]>([]);
@@ -82,19 +79,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     if (isRecording) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.1, duration: 700, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.1, duration: 700, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: Platform.OS !== 'web' }),
         ])
       ).start();
       Animated.loop(
         Animated.stagger(300, [
           Animated.sequence([
-            Animated.timing(waveAnim1, { toValue: 1, duration: 800, useNativeDriver: true }),
-            Animated.timing(waveAnim1, { toValue: 0, duration: 800, useNativeDriver: true }),
+            Animated.timing(waveAnim1, { toValue: 1, duration: 800, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(waveAnim1, { toValue: 0, duration: 800, useNativeDriver: Platform.OS !== 'web' }),
           ]),
           Animated.sequence([
-            Animated.timing(waveAnim2, { toValue: 1, duration: 800, useNativeDriver: true }),
-            Animated.timing(waveAnim2, { toValue: 0, duration: 800, useNativeDriver: true }),
+            Animated.timing(waveAnim2, { toValue: 1, duration: 800, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(waveAnim2, { toValue: 0, duration: 800, useNativeDriver: Platform.OS !== 'web' }),
           ])
         ])
       ).start();
@@ -107,27 +104,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       waveAnim2.setValue(0);
     }
   }, [isRecording, pulseAnim, waveAnim1, waveAnim2]);
-
-  // --- Check for Secret Phrase ---
-  const checkAndHandleSecretPhrase = useCallback((transcript: string) => {
-    const normalizedTranscript = transcript
-      .trim()
-      .toLowerCase()
-      .replace(/[.,!?;:]/g, '');
-
-    const normalizedSecret = SECRET_PHRASE
-      .trim()
-      .toLowerCase()
-      .replace(/[.,!?;:]/g, '');
-
-    if (normalizedTranscript === normalizedSecret) {
-      logger.info(`[AudioRecorder] Secret phrase "${SECRET_PHRASE}" detected! Activating hidden mode.`);
-      activateHiddenMode();
-      return true;
-    }
-    return false;
-  }, [activateHiddenMode]);
-  // -------------------------------
 
   // WebSocket handlers
   const handleWebSocketError = useCallback((errorMessage: string) => {
@@ -272,15 +248,38 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       if (!isMountedRef.current) return;
 
       const transcriptText = result.transcript?.trim() || '';
-      logger.info('[AudioRecorder] Segment transcribed', { text: transcriptText, detectedLanguage: result.detected_language_code });
+      logger.info('[AudioRecorder] Segment transcribed', { 
+        text: transcriptText, 
+        detectedLanguage: result.detected_language_code
+      });
 
-      const isSecret = checkAndHandleSecretPhrase(transcriptText);
-      if (isSecret) {
-        logger.info('[AudioRecorder] Secret phrase detected in segment. Not appending to accumulated transcript.');
-        // Potentially give some feedback that a command was recognized?
-      } else if (transcriptText) {
-        setTranscriptSegments(prev => [...prev, sanitizeText(transcriptText)]);
+      if (transcriptText) {
+        // ✅ ZERO-KNOWLEDGE: Client-side code phrase detection
+        const phraseResult = await hiddenModeManager.checkForCodePhrases(transcriptText);
+        
+        if (phraseResult.found) {
+          logger.info('[AudioRecorder] Code phrase detected client-side', { type: phraseResult.type });
+          
+          if (phraseResult.type === 'unlock') {
+            // Activate hidden mode
+            hiddenModeManager.activateHiddenMode();
+            logger.info('[AudioRecorder] Hidden mode activated');
+            // Don't add the code phrase to the transcript
+          } else if (phraseResult.type === 'decoy') {
+            // Show decoy entries - hiddenModeManager will handle this
+            logger.info('[AudioRecorder] Decoy mode activated');
+          } else if (phraseResult.type === 'panic') {
+            // Activate panic mode
+            await hiddenModeManager.activatePanicMode();
+            logger.warn('[AudioRecorder] PANIC MODE ACTIVATED');
+            Alert.alert('Security Alert', 'Emergency data clearing activated');
+          }
+        } else {
+          // No code phrase detected, add to transcript normally
+          setTranscriptSegments(prev => [...prev, sanitizeText(transcriptText)]);
+        }
       }
+      
       setCurrentSegmentTranscript(''); // Clear segment preview
       cleanupRecordingFile(uri); // Clean up the processed segment file
 
@@ -360,7 +359,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const selectedLanguageNames = languageOptions
     .filter(l => l.selected)
     .map(l => l.name.split(' ')[0])
-    .join(', ');
+    .join(', ') || 'Select Language';
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -392,16 +391,16 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
               ? "Tap mic to START new segment"
               : "Waiting for audio permission..."}
           </Text>
-          {currentSegmentTranscript.trim() && !isRecording && (
+          {currentSegmentTranscript.trim() && !isRecording ? (
             <Text style={[styles.statusText, styles.segmentStatusText]}>
               Segment: {currentSegmentTranscript}
             </Text>
-          )}
+          ) : null}
         </View>
 
         {/* Central Mic Button & Sound Waves */}
         <View style={styles.micAreaContainer}>
-          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim1.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}] , opacity: waveAnim1.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
+          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim1.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}], opacity: waveAnim1.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
           <Animated.View style={[styles.micButtonContainer, { transform: [{ scale: pulseAnim }] }]}>
             <TouchableOpacity
               style={[styles.micButton, isRecording && styles.micButtonActive, (isProcessing || !permissionGranted) && styles.disabledButton]}
@@ -412,13 +411,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
               <Ionicons name={isRecording ? "mic-off-circle" : "mic-circle"} size={60} color={theme.colors.white} />
             </TouchableOpacity>
           </Animated.View>
-          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim2.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}] , opacity: waveAnim2.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
+          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim2.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}], opacity: waveAnim2.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
         </View>
         
         {/* Language Selector */}
         <TouchableOpacity onPress={() => setShowLanguageSelector(true)} style={styles.languagePill} accessibilityLabel="Select language" disabled={isRecording || isProcessing}>
-          <Ionicons name="language-outline" size={20} color={theme.colors.textSecondary} style={{marginRight: theme.spacing.xs}}/>
-          <Text style={styles.languagePillText}>{selectedLanguageNames || 'Select Language'} ({languageOptions.filter(l => l.selected).length})</Text>
+          <Ionicons name="language-outline" size={20} color={theme.colors.textSecondary} style={styles.languageIcon} />
+          <Text style={styles.languagePillText}>{selectedLanguageNames}{languageOptions.filter(l => l.selected).length > 0 ? ` (${languageOptions.filter(l => l.selected).length})` : ''}</Text>
         </TouchableOpacity>
 
         {/* Transcript Preview */}
@@ -437,7 +436,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
                   size={20}
                   color={canAcceptTranscript ? theme.colors.primary : theme.colors.disabled}
                 />
-                <Text style={[styles.saveButtonText, !canAcceptTranscript && styles.disabledText]}>
+                <Text style={[styles.saveButtonText, !canAcceptTranscript ? styles.disabledText : null]}>
                   Save
                 </Text>
               </View>
@@ -470,12 +469,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         maxSelection={MAX_LANGUAGE_SELECTION}
       />
       
-      {isProcessing && (
+      {isProcessing ? (
         <View style={styles.processingOverlay}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.processingText}>Processing...</Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 };
@@ -522,7 +521,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginVertical: theme.spacing.xl,
   },
   micButtonContainer: {
-    // For the pulse animation
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   micButton: {
     width: 100,
@@ -551,7 +551,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.primary + '66', // Softer purple (primary with ~40% opacity)
+    backgroundColor: theme.colors.primary,
+    opacity: 0.4,
   },
   languagePill: {
     flexDirection: 'row',
@@ -644,6 +645,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderRadius: 8,
     borderLeftWidth: 2,
     borderLeftColor: theme.colors.primary,
+  },
+  languageIcon: {
+    marginRight: theme.spacing.xs,
   },
 });
 

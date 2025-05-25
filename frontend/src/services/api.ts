@@ -321,13 +321,42 @@ export const JournalAPI = {
     page?: number, 
     limit?: number, 
     tags?: string[], 
-    entry_date?: string  // Add entry_date parameter for filtering by date
+    entry_date?: string,
+    include_hidden?: boolean  // Add support for hidden entries
   }) => api.get('/api/journals', { params }),
   
   getEntry: (id: string) => 
     api.get(`/api/journals/${id}`),
   
   createEntry: (data: JournalEntryCreate) => api.post('/api/journals', data),
+
+  // New method for creating encrypted hidden entries
+  createEncryptedEntry: (data: {
+    title?: string;
+    encrypted_content: string;    // Base64 encrypted content
+    encrypted_key: string;        // Base64 wrapped entry key
+    iv: string;                   // Base64 IV
+    salt: string;                 // Base64 salt
+    algorithm: string;            // Encryption algorithm
+    wrapIv: string;               // Base64 IV used for key wrapping
+    entry_date?: string;
+    audio_url?: string;
+    tags?: string[];
+  }) => api.post('/api/journals', {
+    title: data.title || '',
+    content: "",  // No plaintext content for hidden entries
+    is_hidden: true,
+    encrypted_content: data.encrypted_content,
+    encryption_iv: data.iv,
+    encryption_salt: data.salt,
+    encrypted_key: data.encrypted_key,
+    key_derivation_iterations: 100000,  // Default iterations
+    encryption_algorithm: data.algorithm,
+    encryption_wrap_iv: data.wrapIv,
+    entry_date: data.entry_date || new Date().toISOString(),
+    audio_url: data.audio_url,
+    tags: data.tags || [],
+  }),
   
   updateEntry: (id: string, data: JournalEntryUpdate) => {
     console.log('JournalAPI.updateEntry called with data:', JSON.stringify(data));
@@ -392,10 +421,23 @@ export const JournalAPI = {
     }
   },
   
-  deleteEntry: (id: string) => 
-    api.delete(`/api/journals/${id}`),
+  deleteEntry: (id: string) => {
+    console.log(`[JournalAPI.deleteEntry] Deleting entry with ID: ${id}`);
+    const deletePromise = api.delete(`/api/journals/${id}`);
+    deletePromise.then(result => {
+      console.log(`[JournalAPI.deleteEntry] Delete successful for ID ${id}:`, result);
+    }).catch(error => {
+      console.error(`[JournalAPI.deleteEntry] Delete failed for ID ${id}:`, error);
+    });
+    return deletePromise;
+  },
   
-  searchEntries: (query: string) => api.get(`/api/journals/search?q=${query}`),
+  searchEntries: (query: string, includeHidden?: boolean) => 
+    api.get(`/api/journals/search?q=${query}${includeHidden ? '&include_hidden=true' : ''}`),
+
+  // Get only hidden entries (encrypted content)
+  getHiddenEntries: (params?: { skip?: number, limit?: number }) =>
+    api.get('/api/journals/hidden', { params }),
 };
 
 // Helper function to process tags and send the update

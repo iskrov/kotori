@@ -17,6 +17,7 @@ import SettingsScreen from '../screens/main/SettingsScreen';
 import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
 import JournalEntryFormScreen from '../screens/main/JournalEntryFormScreen';
 import ReminderFormScreen from '../screens/main/ReminderFormScreen';
+import DeleteConfirmationScreen from '../screens/main/DeleteConfirmationScreen';
 
 const Tab = createBottomTabNavigator<MainStackParamList>();
 const JournalStackNavigator = createStackNavigator<JournalStackParamList>();
@@ -56,6 +57,11 @@ const JournalStack = () => {
         options={({ route }) => ({ 
           title: route.params?.reminderId ? 'Edit Reminder' : 'New Reminder'
         })}
+      />
+      <JournalStackNavigator.Screen 
+        name="DeleteConfirmation" 
+        component={DeleteConfirmationScreen} 
+        options={{ title: 'Delete Entry' }}
       />
     </JournalStackNavigator.Navigator>
   );

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional, List
 
 from pydantic import BaseModel
 
@@ -23,30 +24,66 @@ class Tag(TagBase):
 
 # Base model for journal entries
 class JournalEntryBase(BaseModel):
-    title: str | None = None
-    content: str
-    entry_date: datetime
+    title: Optional[str] = None
+    content: str = ""  # Empty for hidden entries (content encrypted client-side)
+    entry_date: Optional[datetime] = None
 
 
 # Properties to receive on creation
 class JournalEntryCreate(JournalEntryBase):
-    audio_url: str | None = None
-    tags: list[str] | None = []
+    audio_url: Optional[str] = None
+    tags: Optional[List[str]] = []
+    
+    # Hidden entry support with client-side encryption
+    is_hidden: Optional[bool] = False
+    encrypted_content: Optional[str] = None  # Base64 encoded encrypted content
+    encryption_iv: Optional[str] = None      # Base64 encoded initialization vector
+    encryption_salt: Optional[str] = None    # Base64 encoded salt for key derivation
+    encrypted_key: Optional[str] = None      # Entry key wrapped with master key
+    key_derivation_iterations: Optional[int] = None  # PBKDF2 iterations
+    encryption_algorithm: Optional[str] = None       # Encryption algorithm
+    encryption_wrap_iv: Optional[str] = None         # IV for key wrapping
+    
+    # Timestamps
+    created_at: Optional[datetime] = None
 
 
 # Properties to receive on update
-class JournalEntryUpdate(JournalEntryBase):
-    audio_url: str | None = None
-    tags: list[str] | None = []
+class JournalEntryUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    entry_date: Optional[datetime] = None
+    audio_url: Optional[str] = None
+    tags: Optional[List[str]] = None
+    
+    # Hidden entry updates
+    is_hidden: Optional[bool] = None
+    encrypted_content: Optional[str] = None
+    encryption_iv: Optional[str] = None
+    encryption_salt: Optional[str] = None
+    encrypted_key: Optional[str] = None
+    key_derivation_iterations: Optional[int] = None
+    encryption_algorithm: Optional[str] = None
+    encryption_wrap_iv: Optional[str] = None
 
 
 # Properties shared by models stored in DB
 class JournalEntryInDBBase(JournalEntryBase):
     id: int
-    audio_url: str | None = None
+    audio_url: Optional[str] = None
     user_id: int
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    # Hidden entry fields
+    is_hidden: bool = False
+    encrypted_content: Optional[str] = None
+    encryption_iv: Optional[str] = None
+    encryption_salt: Optional[str] = None
+    encrypted_key: Optional[str] = None
+    key_derivation_iterations: Optional[int] = None
+    encryption_algorithm: Optional[str] = None
+    encryption_wrap_iv: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -54,9 +91,35 @@ class JournalEntryInDBBase(JournalEntryBase):
 
 # Properties to return to client
 class JournalEntry(JournalEntryInDBBase):
-    tags: list[TagBase] = []
+    tags: List[Tag] = []
 
 
 # Properties stored in DB
 class JournalEntryInDB(JournalEntryInDBBase):
     pass
+
+
+# Response for hidden entries (with encryption metadata)
+class HiddenJournalEntry(JournalEntryInDBBase):
+    """
+    Response schema for hidden entries.
+    Contains encrypted content that can only be decrypted client-side.
+    """
+    tags: List[Tag] = []
+    
+    class Config:
+        from_attributes = True
+
+
+# Schema for bulk operations
+class JournalEntryBulkResponse(BaseModel):
+    entries: List[JournalEntry]
+    total_count: int
+    has_more: bool
+    
+    
+# Schema for search results
+class JournalEntrySearchResponse(BaseModel):
+    entries: List[JournalEntry]
+    search_term: str
+    total_matches: int

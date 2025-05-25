@@ -63,27 +63,8 @@ const JournalEntryDetailScreen = () => {
   };
   
   const handleDelete = async () => {
-    Alert.alert(
-      'Delete Entry',
-      'Are you sure you want to delete this journal entry? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await JournalAPI.deleteEntry(entryId);
-              Alert.alert('Success', 'Journal entry deleted successfully');
-              navigation.goBack();
-            } catch (error) {
-              console.error('Error deleting entry', error);
-              Alert.alert('Error', 'Failed to delete journal entry');
-            }
-          }
-        }
-      ]
-    );
+    console.log('[JournalEntryDetailScreen] handleDelete function called');
+    navigation.navigate('DeleteConfirmation', { entryId });
   };
   
   if (isLoading) {
@@ -168,7 +149,10 @@ const JournalEntryDetailScreen = () => {
         
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={handleDelete}
+          onPress={() => {
+            console.log('[JournalEntryDetailScreen] Delete button pressed!');
+            handleDelete();
+          }}
         >
           <Ionicons name="trash-outline" size={theme.typography.fontSizes.xxl} color={theme.colors.error} />
           <Text style={[styles.actionText, { color: theme.colors.error }]}>Delete</Text>

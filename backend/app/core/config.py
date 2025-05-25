@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_PROJECT: str | None = os.getenv("GOOGLE_CLOUD_PROJECT")
     GOOGLE_CLOUD_LOCATION: str = os.getenv("GOOGLE_CLOUD_LOCATION", "global") # 'global' often used for Speech-to-Text v1
 
+    # Encryption settings for hidden entries
+    ENCRYPTION_MASTER_SALT: str = os.getenv("ENCRYPTION_MASTER_SALT", "default_master_salt_change_in_production")
+    HIDDEN_MODE_TIMEOUT_MINUTES: int = int(os.getenv("HIDDEN_MODE_TIMEOUT_MINUTES", "2"))
+
 
     class Config:
         # Pydantic V2 uses model_config

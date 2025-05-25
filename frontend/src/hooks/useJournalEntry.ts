@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
 import debounce from 'lodash.debounce';
-import { api } from '../services/api';
+import { encryptedJournalService } from '../services/encryptedJournalService';
 import { JournalEntry } from '../types';
 import logger from '../utils/logger';
 
@@ -90,7 +90,7 @@ const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): J
       title: currentData.title.trim() || `Journal - ${format(new Date(), 'yyyy-MM-dd HH:mm')}`,
       content: currentData.content.trim(),
       entry_date: new Date().toISOString(),
-      audio_url: audioUrl, // Use the sanitized URL or null
+      audio_url: audioUrl || undefined, // Convert null to undefined for type compatibility
       tags: currentData.tags,
     };
 
@@ -104,13 +104,13 @@ const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): J
       let response;
       if (currentData.id !== null) {
         logger.info(`performSave: Updating journal entry ID: ${currentData.id}`);
-        response = await api.put<JournalEntry>(`/api/journals/${currentData.id}`, entryData);
+        const updatedEntry = await encryptedJournalService.updateEntry(currentData.id, entryData);
         logger.info(`performSave: Journal entry ID: ${currentData.id} updated.`);
         return currentData.id;
       } else {
         logger.info('performSave: Creating new journal entry with data:', entryData);
-        response = await api.post<JournalEntry>('/api/journals', entryData);
-        const newId = String(response.data.id);
+        const newEntry = await encryptedJournalService.createEntry(entryData);
+        const newId = String(newEntry.id);
         logger.info(`performSave: New journal entry created with ID: ${newId}`);
         if (isMounted.current && !isNavigatingRef.current) {
           setJournalId(newId);
