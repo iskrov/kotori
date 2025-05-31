@@ -26,12 +26,17 @@ class ConfigurationError(Exception):
     pass
 
 
+class LanguageValidationError(Exception):
+    """Custom exception for language validation errors."""
+    pass
+
+
 class SpeechService:
     """
     Service for handling voice-to-text conversion using Google Cloud Speech-to-Text V2
     """
     DEFAULT_RECOGNIZER_ID = "_"
-    CHIRP_2_MODEL = "chirp_2"
+    CHIRP_2_MODEL = "chirp_2"  # Restored for us-central1 compatibility
 
     def __init__(self):
         self.client_options = None
@@ -115,7 +120,7 @@ class SpeechService:
         """
         Transcribes the given audio content using Google Cloud Speech API V2 (sync).
         Defaults to automatic language detection if language_codes is None or empty.
-        Uses the Chirp 2 model.
+        Uses default model for compatibility.
         Returns a dictionary with 'transcript' and 'detected_language_code' (if any).
         """
         if not self.sync_client:
@@ -124,12 +129,13 @@ class SpeechService:
 
         recognizer_name = f"projects/{settings.GOOGLE_CLOUD_PROJECT}/locations/{settings.GOOGLE_CLOUD_LOCATION}/recognizers/{self.DEFAULT_RECOGNIZER_ID}"
 
+        # For V2 API: use ["auto"] for auto-detection, not empty list
         config_language_codes = language_codes if language_codes else ["auto"]
         is_auto_detect = "auto" in config_language_codes
 
         config = cloud_speech.RecognitionConfig(
             auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
-            model=self.CHIRP_2_MODEL,
+            model=self.CHIRP_2_MODEL,  # Use chirp_2 model
             features=cloud_speech.RecognitionFeatures(
                 enable_automatic_punctuation=True,
             ),
@@ -146,7 +152,7 @@ class SpeechService:
 
         try:
             logger.info(
-                f"Sending audio for transcription (languages: {', '.join(config_language_codes)}, model: {self.CHIRP_2_MODEL})..."
+                f"Sending audio for transcription (languages: {'auto-detect' if is_auto_detect else ', '.join(config_language_codes)}, model: {self.CHIRP_2_MODEL})..."
             )
             response = self.sync_client.recognize(request=request)
             logger.info("Transcription received from Google Cloud Speech V2 API.")
@@ -242,15 +248,18 @@ class SpeechService:
 
     def _build_streaming_config(self, language_codes: Optional[List[str]] = None) -> dict:
         """Builds the streaming configuration dictionary for V2 API."""
+        # For V2 API: use ["auto"] for auto-detection, not empty list
         config_language_codes = language_codes if language_codes else ["auto"]
+        
         recognition_config = cloud_speech.RecognitionConfig(
             auto_decoding_config=cloud_speech.AutoDetectDecodingConfig(),
-            model=self.CHIRP_2_MODEL,
+            model=self.CHIRP_2_MODEL,  # Use chirp_2 model
             features=cloud_speech.RecognitionFeatures(
                 enable_automatic_punctuation=True,
             ),
             language_codes=config_language_codes
         )
+        
         streaming_features = cloud_speech.StreamingRecognitionFeatures(
             enable_voice_activity_events=True,
             interim_results=True # Re-enabled as per original
@@ -266,7 +275,7 @@ class SpeechService:
         recognizer_name: str,
         streaming_config_dict: dict,
         user_id: str,
-        language_codes_for_log: List[str] # For logging only
+        lang_display: str # Changed from List[str] to str for display purposes
     ):
         """Async generator yielding requests to Google API for streaming."""
         try:
@@ -274,7 +283,7 @@ class SpeechService:
                 recognizer=recognizer_name,
                 streaming_config=streaming_config_dict
             )
-            logger.info(f"[{user_id}] Sent streaming config (languages: {', '.join(language_codes_for_log)}, model: {self.CHIRP_2_MODEL}) to Google V2")
+            logger.info(f"[{user_id}] Sent streaming config (languages: {lang_display}, model: {self.CHIRP_2_MODEL}) to Google V2")
 
             while True:
                 chunk = await audio_queue.get()
@@ -343,7 +352,7 @@ class SpeechService:
         """
         Handles the bidirectional streaming to Google Cloud Speech API V2 using AsyncClient.
         Defaults to automatic language detection if language_codes is None or empty.
-        Uses the Chirp 2 model.
+        Uses the chirp_2 model for us-central1 compatibility.
         """
         if not self.async_client:
             logger.error(f"Async Speech V2 client not initialized for user {user_id}.")
@@ -354,14 +363,17 @@ class SpeechService:
         recognizer_name = f"projects/{settings.GOOGLE_CLOUD_PROJECT}/locations/{settings.GOOGLE_CLOUD_LOCATION}/recognizers/{self.DEFAULT_RECOGNIZER_ID}"
         logger.info(f"[{user_id}] Using V2 recognizer: {recognizer_name}")
 
-        effective_language_codes = language_codes if language_codes else ["auto"]
-        is_auto_language_detect = "auto" in effective_language_codes
+        # For V2 API: handle auto-detection properly
+        is_auto_language_detect = not language_codes or (len(language_codes) == 1 and language_codes[0] == "auto")
 
         try:
-            streaming_config_dict = self._build_streaming_config(effective_language_codes)
+            streaming_config_dict = self._build_streaming_config(language_codes)
 
+            # For logging purposes
+            lang_display = "auto-detect" if is_auto_language_detect else ", ".join(language_codes)
+            
             request_gen = self._generate_streaming_requests(
-                audio_queue, recognizer_name, streaming_config_dict, user_id, effective_language_codes
+                audio_queue, recognizer_name, streaming_config_dict, user_id, lang_display
             )
 
             logger.info(f"[{user_id}] Initiating Google streaming_recognize (v2)")

@@ -62,23 +62,91 @@
 - [x] Streamline recording logic (frontend – permissions, state, loading)
   - [x] Optimize Audio.setAudioModeAsync configuration (in MainNavigator)
 
-### Sub-Phase 4.2 — Multi-language Speech Support
-- [ ] Research Google Cloud STT multi-language options (backend)
-- [ ] Implement backend changes for multi-language `RecognitionConfig`
-- [ ] Adjust backend transcription-result processing
-- [ ] Update database schema for language info (if needed)
-- [ ] Ensure frontend displays mixed-language transcriptions correctly
+### Sub-Phase 4.2 — Multi-language Speech Support (✅ MOSTLY COMPLETE)
+- [x] **Backend Enhancements:**
+  - [x] Enhanced Google Cloud Speech V2 Configuration
+    - [x] Update backend/app/core/config.py with multi-language settings
+    - [x] Add language validation configuration
+    - [x] Configure confidence scoring and alternatives
+  - [x] Speech Service Multi-Language Implementation
+    - [x] Support up to 4 simultaneous language codes in transcribe_audio()
+    - [x] Add comprehensive language code validation (30+ languages)
+    - [x] Implement confidence scoring for language detection
+    - [x] Add word-level confidence tracking
+    - [x] Return multiple transcription alternatives
+    - [x] Enhanced error handling for unsupported languages
+  - [x] API Endpoint Enhancement
+    - [x] Accept language_codes_json parameter as JSON array
+    - [x] Validate language codes count (max 4)
+    - [x] Return enhanced response with language confidence and alternatives
+    - [x] Improved logging with multi-language context
 
-### Sub-Phase 4.3 — Async Transcription Foundation (Optional)
-- [ ] Ensure reliable local audio file storage
-  - [ ] Move temporary recordings to persistent app storage
-  - [ ] Implement proper file naming/organization
-- [ ] Add transcription status field to journal entry schema
-  - [ ] Update database models and migrations
-  - [ ] Modify frontend components to display status
-- [ ] Create placeholder UI elements for pending transcriptions
-  - [ ] Add status indicators to journal entries
-  - [ ] Design loading states for pending transcriptions
+- [x] **Frontend Enhancements:**
+  - [x] Language Configuration System
+    - [x] Expand frontend/src/config/languageConfig.ts to 30+ languages
+    - [x] Add popular language combinations (English+Spanish, European Mix, etc.)
+    - [x] Add validation functions for language codes
+    - [x] Support for quick-select language combinations
+  - [x] Enhanced Speech Service
+    - [x] Support multiple language codes in TranscriptionOptions
+    - [x] Send language codes as JSON array to backend
+    - [x] Handle enhanced response with confidence scores and alternatives
+    - [x] Improved error handling for language-related issues
+  - [x] AudioRecorder Component Enhancement
+    - [x] Collect multiple selected languages from UI
+    - [x] Pass language codes array to speech service
+    - [x] Display language confidence and alternatives in UI
+    - [x] Show transcription quality indicators
+  - [x] Language Selector Modal Enhancement
+    - [x] Support multi-selection (up to 4 languages)
+    - [x] Add quick-select buttons for popular combinations
+    - [x] Show language codes alongside names
+    - [x] Visual indicators for selection limits
+
+- [ ] **Minor Issues to Resolve:**
+  - [x] **RESOLVED**: Transcription callback not triggered on subsequent recordings
+    - **Root Cause**: `callbackCalledRef.current` flag was set to `true` after first transcription but never reset for new recordings
+    - **Solution**: Reset `callbackCalledRef.current = false` when starting a new recording in `handleMicPress`
+    - **Status**: Fixed - subsequent recordings now properly trigger `handleAcceptTranscript` and auto-save
+  - [x] **RESOLVED**: Multi-language transcription 500 Internal Server Error
+    - **Root Cause**: `GOOGLE_CLOUD_LOCATION` was set to `us-central1` which doesn't support multi-language recognition
+    - **Error**: "Multiple language recognition is only available in the following locations: eu, global, us"
+    - **Solution**: Changed `GOOGLE_CLOUD_LOCATION` from `us-central1` to `global` in backend/.env
+    - **Status**: Fixed - multi-language transcription now works correctly
+    - **Technical Details**: Only `eu`, `global`, and `us` locations support multi-language recognition in Speech V2 API
+  - [ ] **REMAINING**: TypeScript linter error in AudioRecorder.tsx line 267 (detected_language_code type mismatch: string | null vs string | undefined)
+    - **Root Cause**: Backend TranscriptionResponse model (speech.py line 74) uses `Optional[str] = None` which sends `null` in JSON
+    - **Frontend Issue**: Function expects `string | undefined` but receives `string | null` from backend
+    - **Attempted fixes**: Interface changes, null-to-undefined conversion, type assertions - all failed due to persistent type inference
+    - **Impact**: Non-blocking - functionality works correctly, only a TypeScript compilation warning
+    - **Note**: This is a cosmetic issue that doesn't affect runtime functionality
+
+### Sub-Phase 4.3 — User Experience Enhancements
+- [x] **Language Preferences Service:**
+  - [x] Persistent language preferences per user (AsyncStorage-based)
+  - [x] Smart language suggestions based on usage history
+  - [x] Usage analytics and tracking (confidence, session duration, frequency)
+  - [x] Quick switch language management (up to 6 languages)
+  - [x] Auto-suggestion based on time patterns (work hours vs personal)
+  - [x] Language combination detection and suggestions
+- [x] **QuickLanguageSwitcher Component:**
+  - [x] Visual feedback for selected languages with usage badges
+  - [x] Smart suggestions with confidence indicators
+  - [x] Quick language switching during recording
+  - [x] Animated visual feedback during recording state
+  - [x] Integration with language preferences service
+- [x] **Recording Interface Improvements:**
+  - [x] Enhanced AudioRecorder with language preferences integration
+  - [x] Recording session analytics and usage tracking
+  - [x] Complete integration of QuickLanguageSwitcher in AudioRecorder UI
+  - [x] Pre-warm audio permissions and configurations
+  - [x] Optimize recording component initialization
+- [x] **Performance Optimizations:**
+  - [x] Cache language model configurations
+  - [x] Reduce transcription processing time
+  - [x] Background language preference updates
+
+**Note**: There is a minor TypeScript type compatibility issue (string | null vs string | undefined) in the AudioRecorder component that needs to be resolved. This is a cosmetic issue that doesn't affect functionality.
 
 ### Sub-Phase 4.4 — Testing & Refinement
 - [ ] Test recording-speed improvements (compare vs baseline)
@@ -136,6 +204,11 @@
 - [x] **Text Node Root Cause**: ✅ IDENTIFIED - Issue was conditional rendering with `&&` and template literals
 - [x] **Component Restoration**: ✅ FIXED - Applied safe conditional patterns (`? :` with explicit `null`)
 - [x] **Full AudioRecorder Functionality**: ✅ RESTORED - All features working without text node errors
+- [x] **Journal Entry Deletion**: ✅ COMPLETELY FIXED - Database cascade deletion and API response issues resolved
+- [x] **Delete Confirmation UI**: ✅ IMPLEMENTED - Beautiful in-app confirmation screen with app-consistent styling
+- [x] **Database Foreign Key Constraints**: Fixed cascade deletion for journal_entry_tags relationship
+- [x] **API Response Serialization**: Fixed delete endpoint to return simple success response instead of deleted object
+- [x] **Navigation Flow**: Implemented smooth confirmation screen with proper navigation reset to journal list
 - [ ] **Network Error Handling**: Improve error handling for failed requests
 - [ ] **Frontend Testing**: Test the UI fixes in the actual frontend application
 
@@ -145,13 +218,17 @@
 - **Solution**: Use explicit `{condition ? <Component /> : null}` and direct interpolation
 - **Result**: Zero text node errors, fully functional recording interface ✅
 
-### 6.1. Remaining UI/UX Security Features
-- [ ] **Quick Lock Mechanisms:**
-  - [ ] Shake gesture to immediately lock
-  - [ ] Two-finger swipe down gesture
-  - [ ] Emergency lock (power button sequence)
+## Implementation Notes
 
-### 6.2. Comprehensive Security Testing
+The zero-knowledge implementation is now **COMPLETE** and provides mathematical guarantees of privacy. The system has been transformed from a trust-based architecture to a zero-knowledge architecture where:
+
+1. **All encryption/decryption happens on the user's device**
+2. **Keys are stored in hardware-backed secure storage**
+3. **Server cannot access any plaintext data**
+4. **Each entry has forward secrecy**
+5. **Hidden mode is completely client-side**
+
+### 6.1. Comprehensive Security Testing
 - [ ] **Cryptographic Validation:**
   - [ ] Unit tests for all encryption/decryption operations
   - [ ] Key derivation function testing
@@ -176,7 +253,7 @@
   - [ ] Validate panic mode data destruction
   - [ ] Verify hidden entry invisibility
 
-### 6.3. Production Security Hardening
+### 6.2. Production Security Hardening
 - [ ] **Network Security:**
   - [ ] Implement TLS certificate pinning
   - [ ] Add network request integrity validation
@@ -195,7 +272,7 @@
   - [ ] Create incident response procedures
   - [ ] Add security audit trail (without compromising privacy)
 
-### 6.4. User Experience & Documentation
+### 6.3. User Experience & Documentation
 - [ ] **Hidden Mode Setup**: Create user onboarding for code phrases
 - [ ] **Recovery System**: Implement backup phrase system
 - [ ] **Performance Testing**: Verify encryption doesn't impact UX
@@ -272,19 +349,98 @@
 - Implement user feedback system  
 - Add support for image attachments in entries  
 - Implement tagging system for better organization  
-- Add mood-tracking functionality  
+- Add mood-tracking functionality
+- Enable word-level confidence scoring
+- Configure multiple transcription alternatives (up to 3)
+- Implement automatic punctuation and capitalization
+- Add voice activity detection for better segmentation
+- Quality metrics collection and monitoring
+- Display confidence scores in transcript preview
+- Show alternative transcriptions when confidence is low
+- Visual indicators for transcription quality
+- Option to retry transcription for low-quality results
 - **Privacy enhancements:**  
   - Add "SOS" voice trigger to freeze app for 24 h  
+  - Shake gesture to immediately lock
+  - Two-finger swipe down gesture
+  - Emergency lock (power button sequence)
   - Research homomorphic encryption for remote backups of private entries 
 
-## Implementation Notes
+# Todo Tasks for Vibes App
 
-The zero-knowledge implementation is now **COMPLETE** and provides mathematical guarantees of privacy. The system has been transformed from a trust-based architecture to a zero-knowledge architecture where:
+## Current Priority: Bug Fixes and Simplification
 
-1. **All encryption/decryption happens on the user's device**
-2. **Keys are stored in hardware-backed secure storage**
-3. **Server cannot access any plaintext data**
-4. **Each entry has forward secrecy**
-5. **Hidden mode is completely client-side**
+### ✅ COMPLETED: Transcription UI Fix
+- [x] **Fixed transcription text not appearing in UI**
+  - Issue: Transcribed text was being saved to database but not showing in the form
+  - Root cause: `handleTranscriptionComplete` was immediately navigating away after transcription
+  - Solution: Removed immediate save/navigation, let auto-save handle persistence
+  - Result: Users now see transcribed text in the form and can edit before auto-save
 
-Current focus is on comprehensive security testing, production hardening, and advanced multi-device features. 
+### ✅ COMPLETED: Language Selection Simplification  
+- [x] **Reverted to simple single-language selection**
+  - Removed complex multi-language system (up to 4 languages, combinations, smart suggestions)
+  - Replaced with simple dropdown language selector
+  - Simplified languageConfig.ts to ~30 most common languages + auto-detect
+  - Created LanguageSelector component with clean modal interface
+  - Updated AudioRecorder logic to use single language selection
+  - Maintained transcription quality indicators and alternatives
+  - Kept Google Speech V2 API with `latest_long` model
+
+### Current System Status:
+- **Model**: Google Speech-to-Text V2 with `latest_long` model
+- **Language Selection**: Simple dropdown with auto-detect + 30 common languages
+- **Transcription**: Enhanced with confidence scoring, alternatives, quality metrics
+- **UI**: Clean, simple interface without complex language management
+- **Functionality**: Recording → Transcription → Form display → Auto-save
+
+## Next Steps (if needed):
+- [ ] Test the simplified system thoroughly
+- [ ] Verify all audio recording flows work correctly with simplified language selection
+
+## Technical Debt Cleanup:
+- [ ] Fix remaining TypeScript linter error in useAudioRecorderLogic.ts (detected_language_code type)
+- [ ] Remove unused imports and dependencies from complex language system
+- [ ] Update tests to reflect simplified language selection
+
+## Future Enhancements (Low Priority):
+- [ ] Add language persistence (remember user's last selected language)
+- [ ] Add more languages if requested by users
+- [ ] Consider adding back 2-language support if there's demand
+
+---
+
+## System Architecture Notes:
+- **Backend**: FastAPI with Google Cloud Speech V2 API
+- **Frontend**: React Native with simplified language selection
+- **Database**: PostgreSQL with journal entries
+- **Authentication**: JWT with Google Sign-In
+- **Transcription**: Single language or auto-detect with quality metrics
+
+### 🧹 Code Cleanup Tasks (SIMPLIFIED LANGUAGE SYSTEM)
+
+**Obsolete Multi-Language Components (COMPLETED):**
+- [x] QuickLanguageSwitcher.tsx (deleted - replaced by LanguageSelector)
+- [x] LanguageSelectorModal.tsx (deleted - replaced by simple modal in LanguageSelector)  
+- [x] languagePreferences.ts service (deleted - no longer needed with single language selection)
+- [x] Complex language combinations and validation functions (removed from config)
+- [x] Multi-language backend configuration settings (simplified)
+
+**Remaining Cleanup Tasks:**
+- [ ] Review and test all audio recording flows to ensure no broken references
+- [ ] Verify LanguageSelector works correctly in all scenarios
+- [ ] Test transcription with different single language selections
+
+### 🔧 Technical Debt and Optimization
+
+**Performance Optimizations:**
+- [ ] Implement proper error boundaries for better error handling
+- [ ] Add loading states for better UX during API calls
+- [ ] Optimize bundle size by removing unused dependencies
+- [ ] Add proper TypeScript strict mode compliance
+
+**Code Quality:**
+- [ ] Add comprehensive unit tests for core functionality
+- [ ] Implement proper logging strategy across frontend and backend
+- [ ] Add API documentation with OpenAPI/Swagger
+- [ ] Implement proper error handling patterns

@@ -256,19 +256,15 @@ const RecordScreen = () => {
           _updateJournalFieldsFromTranscription(transcribedText, detectedLanguage, isHiddenModeActive);
         }
 
-        logger.info('[RecordScreen] Auto-saving after transcription completion');
-        isNavigatingRef.current = true;
-        cancelAutoSave();
+        // Close the recorder to show the form with transcribed text
+        setShowRecorder(false);
         
-        setTimeout(() => {
-          if (mountedRef.current) {
-            saveEntry();
-          }
-        }, 100);
+        // Let auto-save handle saving in the background, don't immediately navigate away
+        logger.info('[RecordScreen] Transcription complete, closing recorder to show form');
         
       } catch (err) { logger.error('[RecordScreen] Error processing transcription', err); }
     }
-  }, [_updateJournalFieldsFromTranscription, isHiddenModeActive, saveEntry, cancelAutoSave]);
+  }, [_updateJournalFieldsFromTranscription, isHiddenModeActive]);
   
   // Called by AudioRecorder's onCancel prop
   const handleRecorderCancelOrDone = useCallback(() => {

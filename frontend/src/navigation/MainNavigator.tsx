@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { createBottomTabNavigator, BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
 import { MainStackParamList, JournalStackParamList, RootStackParamList } from './types';
 import logger from '../utils/logger';
+import audioPrewarmService from '../services/audioPrewarmService';
 
 import HomeScreen from '../screens/main/HomeScreen';
 import JournalScreen from '../screens/main/JournalScreen';
@@ -72,12 +73,44 @@ const MainNavigator = () => {
   const styles = getNavigatorStyles(theme);
   const navigation = useNavigation();
 
+  // Pre-warm audio system when MainNavigator mounts
+  useEffect(() => {
+    const prewarmAudio = async () => {
+      try {
+        logger.info('[MainNavigator] Starting audio system prewarm...');
+        await audioPrewarmService.prewarmAudioSystem();
+        
+        const metrics = audioPrewarmService.getPerformanceMetrics();
+        logger.info('[MainNavigator] Audio prewarm completed:', metrics);
+      } catch (error) {
+        logger.error('[MainNavigator] Audio prewarm failed:', error);
+      }
+    };
+
+    prewarmAudio();
+
+    // Cleanup on unmount
+    return () => {
+      audioPrewarmService.cleanup();
+    };
+  }, []);
+
   const CustomRecordButton = useCallback(
     ({ children }: BottomTabBarButtonProps) => (
       <TouchableOpacity
         style={styles.recordTabButton}
         onPress={() => {
           logger.info('[MainNavigator] CustomRecordButton pressed. Navigating to Record screen with startRecording: true.');
+          
+          // Check if audio system is ready
+          const isReady = audioPrewarmService.isReadyForRecording();
+          if (!isReady) {
+            logger.warn('[MainNavigator] Audio system not ready, attempting to prewarm...');
+            audioPrewarmService.prewarmAudioSystem().catch(error => {
+              logger.error('[MainNavigator] Failed to prewarm audio system:', error);
+            });
+          }
+          
           navigation.dispatch(
             TabActions.jumpTo('Record', { 
               startRecording: true, 

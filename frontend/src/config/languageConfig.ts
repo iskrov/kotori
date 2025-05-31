@@ -1,49 +1,101 @@
-// Language configuration for the application
+// Simplified language configuration for single language speech recognition
 export interface LanguageOption {
   code: string;
   name: string;
-  selected?: boolean;
+  region?: string;
 }
 
-// List of supported languages for transcription
+// Simplified list of most common languages for transcription
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
-  { code: 'en-US', name: 'English (US)' },
-  { code: 'en-GB', name: 'English (UK)' },
-  { code: 'es-ES', name: 'Spanish' },
-  { code: 'fr-FR', name: 'French' },
-  { code: 'de-DE', name: 'German' },
-  { code: 'it-IT', name: 'Italian' },
-  { code: 'pt-BR', name: 'Portuguese' },
-  { code: 'ru-RU', name: 'Russian' },
-  { code: 'ja-JP', name: 'Japanese' },
-  { code: 'ko-KR', name: 'Korean' },
-  { code: 'zh-CN', name: 'Chinese' },
-  { code: 'zh-TW', name: 'Chinese' },
-  { code: 'ar-SA', name: 'Arabic' },
-  { code: 'hi-IN', name: 'Hindi' },
-  { code: 'nl-NL', name: 'Dutch' },
-  { code: 'pl-PL', name: 'Polish' },
-  { code: 'tr-TR', name: 'Turkish' },
+  // Auto-detect option
+  { code: 'auto', name: 'Auto-detect' },
+  
+  // English variants
+  { code: 'en-US', name: 'English', region: 'United States' },
+  { code: 'en-GB', name: 'English', region: 'United Kingdom' },
+  { code: 'en-AU', name: 'English', region: 'Australia' },
+  { code: 'en-CA', name: 'English', region: 'Canada' },
+  
+  // Spanish variants
+  { code: 'es-ES', name: 'Spanish', region: 'Spain' },
+  { code: 'es-MX', name: 'Spanish', region: 'Mexico' },
+  { code: 'es-US', name: 'Spanish', region: 'United States' },
+  
+  // French variants
+  { code: 'fr-FR', name: 'French', region: 'France' },
+  { code: 'fr-CA', name: 'French', region: 'Canada' },
+  
+  // German
+  { code: 'de-DE', name: 'German', region: 'Germany' },
+  
+  // Italian
+  { code: 'it-IT', name: 'Italian', region: 'Italy' },
+  
+  // Portuguese
+  { code: 'pt-BR', name: 'Portuguese', region: 'Brazil' },
+  { code: 'pt-PT', name: 'Portuguese', region: 'Portugal' },
+  
+  // Chinese
+  { code: 'zh-CN', name: 'Chinese', region: 'Simplified' },
+  { code: 'zh-TW', name: 'Chinese', region: 'Traditional' },
+  
+  // Japanese
+  { code: 'ja-JP', name: 'Japanese', region: 'Japan' },
+  
+  // Korean
+  { code: 'ko-KR', name: 'Korean', region: 'South Korea' },
+  
+  // Russian
+  { code: 'ru-RU', name: 'Russian', region: 'Russia' },
+  
+  // Arabic
+  { code: 'ar-SA', name: 'Arabic', region: 'Saudi Arabia' },
+  
+  // Hindi
+  { code: 'hi-IN', name: 'Hindi', region: 'India' },
+  
+  // Dutch
+  { code: 'nl-NL', name: 'Dutch', region: 'Netherlands' },
+  
+  // Polish
+  { code: 'pl-PL', name: 'Polish', region: 'Poland' },
+  
+  // Turkish
+  { code: 'tr-TR', name: 'Turkish', region: 'Turkey' },
+  
+  // Swedish
+  { code: 'sv-SE', name: 'Swedish', region: 'Sweden' },
+  
+  // Norwegian
+  { code: 'no-NO', name: 'Norwegian', region: 'Norway' },
+  
+  // Danish
+  { code: 'da-DK', name: 'Danish', region: 'Denmark' },
+  
+  // Finnish
+  { code: 'fi-FI', name: 'Finnish', region: 'Finland' },
 ];
-
-// Maximum number of languages that can be selected at once
-export const MAX_LANGUAGE_SELECTION = 3;
 
 // Get a human-readable language name from a language code
 export function getLanguageName(languageCode: string): string | null {
   const language = SUPPORTED_LANGUAGES.find(lang => lang.code === languageCode);
-  if (language) return language.name;
+  if (language) {
+    if (language.code === 'auto') return language.name;
+    return language.region ? `${language.name} (${language.region})` : language.name;
+  }
   
   // Try to match by primary language code (before the dash)
   const langPart = languageCode.split('-')[0];
   const match = SUPPORTED_LANGUAGES.find(lang => lang.code.startsWith(langPart + '-'));
-  return match ? match.name : null;
+  return match ? (match.region ? `${match.name} (${match.region})` : match.name) : null;
 }
 
-// Format language options for initial state (with default selection)
-export function getInitialLanguageOptions(defaultCode: string = 'en-US'): LanguageOption[] {
-  return SUPPORTED_LANGUAGES.map(lang => ({
-    ...lang,
-    selected: lang.code === defaultCode
-  }));
+// Get default language code
+export function getDefaultLanguageCode(): string {
+  return 'auto'; // Default to auto-detect
+}
+
+// Validate single language code
+export function validateLanguageCode(languageCode: string): boolean {
+  return SUPPORTED_LANGUAGES.some(lang => lang.code === languageCode);
 } 
