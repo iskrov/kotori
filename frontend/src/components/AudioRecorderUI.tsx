@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
+  Platform,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
@@ -16,9 +19,20 @@ import { TranscriptionResult } from '../hooks/useAudioRecorderLogic';
 // Import simple language selector
 import LanguageSelector from './LanguageSelector';
 
+// Helper function to add alpha to hex colors
+const addAlpha = (color: string, alpha: string): string => {
+  // If color already has alpha, return as is
+  if (color.length === 9) return color;
+  // Add alpha to 6-digit hex color
+  if (color.length === 7) return color + alpha;
+  // For other formats, just return the color (won't add alpha)
+  return color;
+};
+
 interface AudioRecorderUIProps {
   // State props
   transcriptSegments: string[];
+  setTranscriptSegments: React.Dispatch<React.SetStateAction<string[]>>;
   currentSegmentTranscript: string;
   isTranscribingSegment: boolean;
   lastTranscriptionResult: TranscriptionResult | null;
@@ -48,6 +62,7 @@ interface AudioRecorderUIProps {
 
 export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   transcriptSegments,
+  setTranscriptSegments,
   currentSegmentTranscript,
   isTranscribingSegment,
   lastTranscriptionResult,
@@ -70,159 +85,349 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
 }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
+  const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
 
-  // Simple quality indicator component
-  const renderQualityIndicator = () => {
-    if (!lastTranscriptionResult || !transcriptionQuality) return null;
+  // Combine all transcript segments into one text for unified editing
+  const fullTranscriptText = transcriptSegments.join(' ');
+  
+  const handleFullTranscriptChange = (text: string) => {
+    // Split the text back into segments based on sentences or paragraphs
+    // For now, we'll treat it as one segment, but could be enhanced later
+    if (text.trim()) {
+      setTranscriptSegments([text]);
+    } else {
+      setTranscriptSegments([]);
+    }
+  };
 
-    const getQualityColor = () => {
-      switch (transcriptionQuality) {
-        case 'excellent': return '#4CAF50';
-        case 'good': return '#8BC34A';
-        case 'fair': return '#FFC107';
-        case 'poor': return '#F44336';
-        default: return '#999';
-      }
-    };
-    
+  // Calculate progress for circular indicator (max 5 minutes = 300 seconds)
+  const maxDuration = 300;
+  const progress = Math.min(recordingDuration / maxDuration, 1);
+
+  // Waveform visualization component
+  const renderWaveform = () => {
+    if (!isRecording) return null;
+
+    const bars = Array.from({ length: 20 }, (_, index) => {
+      const animValue = index % 2 === 0 ? waveAnim1 : waveAnim2;
+      
+      return (
+        <Animated.View
+          key={index}
+          style={[
+            styles.waveformBar,
+            {
+              height: animValue.interpolate({
+                inputRange: [0, 1],
+                outputRange: [4, 24],
+              }),
+              opacity: animValue.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.3, 1],
+              }),
+            },
+          ]}
+        />
+      );
+    });
+
     return (
-      <View style={styles.qualityContainer}>
-        <View style={styles.qualityHeader}>
-          <View style={[styles.qualityDot, { backgroundColor: getQualityColor() }]} />
-          <Text style={styles.qualityText}>
-            {transcriptionQuality} ({(lastTranscriptionResult.confidence * 100).toFixed(0)}%)
-          </Text>
-          {lastTranscriptionResult.alternatives.length > 0 && (
-            <TouchableOpacity 
-              onPress={() => setShowAlternatives(!showAlternatives)}
-              style={styles.alternativesButton}
-            >
-              <Text style={styles.alternativesButtonText}>
-                {showAlternatives ? 'Hide' : 'Show'} Alternatives
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        
-        {showAlternatives && lastTranscriptionResult.alternatives.length > 0 && (
-          <View style={styles.alternativesContainer}>
-            {lastTranscriptionResult.alternatives.map((alt, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.alternativeItem}
-                onPress={() => {
-                  // This would need to be passed as a handler from the parent
-                  // For now, we'll leave it as a placeholder
-                  setShowAlternatives(false);
-                }}
-              >
-                <Text style={styles.alternativeText}>{alt.transcript}</Text>
-                <Text style={styles.alternativeConfidence}>
-                  {(alt.confidence * 100).toFixed(0)}%
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+      <View style={styles.waveformContainer}>
+        {bars}
       </View>
     );
   };
 
+  // Get recording status for display
+  const getRecordingStatus = () => {
+    if (!permissionGranted) {
+      return {
+        text: 'Microphone permission required',
+        subtext: 'Please grant microphone access to record',
+        color: theme.colors.error
+      };
+    }
+    
+    if (isRecording) {
+      return {
+        text: 'Recording in progress',
+        subtext: 'Tap the microphone to stop',
+        color: theme.colors.error
+      };
+    }
+    
+    if (isTranscribingSegment) {
+      return {
+        text: 'Processing audio',
+        subtext: 'Converting speech to text...',
+        color: theme.colors.accent
+      };
+    }
+    
+    return {
+      text: 'Ready to record',
+      subtext: 'Tap the microphone to start a new segment',
+      color: theme.colors.primary
+    };
+  };
+
+  const recordingStatus = getRecordingStatus();
+
   return (
     <View style={styles.container}>
-      {/* Main Content */}
-      <View style={styles.mainContent}>
-        {/* Timer and Status */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.timerText}>{formatDuration(recordingDuration)}</Text>
-          <Text style={styles.statusText}>
-            {isRecording 
-              ? "Tap mic to STOP segment"
-              : isTranscribingSegment 
-              ? "Processing segment..."
-              : permissionGranted
-              ? "Tap mic to START new segment"
-              : "Waiting for audio permission..."}
-          </Text>
-          {currentSegmentTranscript.trim() && !isRecording ? (
-            <Text style={[styles.statusText, styles.segmentStatusText]}>
-              Segment: {currentSegmentTranscript}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Central Mic Button & Sound Waves */}
-        <View style={styles.micAreaContainer}>
-          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim1.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}], opacity: waveAnim1.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
-          <Animated.View style={[styles.micButtonContainer, { transform: [{ scale: pulseAnim }] }]}>
+      {/* Language Selector Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isLanguageModalVisible}
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Language</Text>
+            <LanguageSelector
+              selectedLanguage={selectedLanguage}
+              onLanguageChange={(lang) => {
+                handleLanguageChange(lang);
+                setLanguageModalVisible(false);
+              }}
+              disabled={isRecording}
+            />
             <TouchableOpacity
-              style={[styles.micButton, isRecording && styles.micButtonActive, (isProcessing || !permissionGranted) && styles.disabledButton]}
-              onPress={handleMicPress}
-              accessibilityLabel={isRecording ? 'Stop recording' : 'Start recording'}
-              disabled={isProcessing || !permissionGranted}
+              style={styles.modalCloseButton}
+              onPress={() => setLanguageModalVisible(false)}
             >
-              <Ionicons name={isRecording ? "mic-off-circle" : "mic-circle"} size={60} color={theme.colors.white} />
-            </TouchableOpacity>
-          </Animated.View>
-          <Animated.View style={[styles.soundWave, {transform: [{scale: waveAnim2.interpolate({inputRange: [0,1], outputRange: [1, 1.3]})}], opacity: waveAnim2.interpolate({inputRange: [0,0.5,1], outputRange: [0,0.5,0]})}]} />
-        </View>
-        
-        {/* Simple Language Selection */}
-        <LanguageSelector
-          selectedLanguage={selectedLanguage}
-          onLanguageChange={handleLanguageChange}
-          disabled={isRecording}
-        />
-
-        {/* Quality Indicator */}
-        {renderQualityIndicator()}
-
-        {/* Enhanced Transcript Preview */}
-        <View style={styles.transcriptCard}>
-          <View style={styles.transcriptHeaderContainer}>
-            <Text style={styles.transcriptCardTitle}>📝 Accumulated Transcript</Text>
-            <TouchableOpacity 
-              style={styles.acceptIconContainer} 
-              onPress={handleAcceptTranscript}
-              disabled={!canAcceptTranscript}
-              accessibilityLabel="Save transcript"
-            >
-              <View style={styles.saveButtonContent}>
-                <Ionicons 
-                  name="checkmark-done-outline" 
-                  size={20}
-                  color={canAcceptTranscript ? theme.colors.primary : theme.colors.disabled}
-                />
-                <Text style={[styles.saveButtonText, !canAcceptTranscript ? styles.disabledText : null]}>
-                  Save
-                </Text>
-              </View>
+              <Text style={styles.modalCloseButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContentContainer}>
-            {transcriptSegments.length > 0 ? (
-              transcriptSegments.map((segment, index) => (
-                <View key={index} style={styles.segmentContainer}>
-                  <Text style={styles.transcriptText}>{segment}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.transcriptText}>
-                {isRecording && !isTranscribingSegment
-                  ? "Listening..."
-                  : "Start recording. Your transcript will appear here."}
-              </Text>
-            )}
-          </ScrollView>
         </View>
+      </Modal>
+
+      {/* Top Header with Language Selector */}
+      <View style={styles.headerContainer}>
+        <View style={styles.timerContainer}>
+          <Text style={styles.timerText}>{formatDuration(recordingDuration)}</Text>
+          {isRecording && (
+            <View style={styles.recordingIndicator}>
+              <Animated.View 
+                style={[
+                  styles.recordingDot,
+                  {
+                    opacity: pulseAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.3, 1],
+                    }),
+                  }
+                ]}
+              />
+              <Text style={styles.recordingText}>REC</Text>
+            </View>
+          )}
+        </View>
+        
+        <TouchableOpacity
+          style={styles.languageSettingsButton}
+          onPress={() => setLanguageModalVisible(true)}
+          disabled={isRecording}
+        >
+          <Ionicons 
+            name="language" 
+            size={24} 
+            color={isRecording ? theme.colors.disabled : theme.colors.textSecondary} 
+          />
+        </TouchableOpacity>
       </View>
-      
-      {isProcessing ? (
+
+      {/* Processing overlay */}
+      {isProcessing && (
         <View style={styles.processingOverlay}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.processingText}>Processing...</Text>
+          <View style={styles.processingContent}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={styles.processingTitle}>Processing Audio</Text>
+            <Text style={styles.processingSubtext}>
+              Converting your speech to text...
+            </Text>
+          </View>
         </View>
-      ) : null}
+      )}
+
+      <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContent}>
+        {/* Recording Area */}
+        <View style={[styles.recordingArea, transcriptSegments.length === 0 && { flex: 1 }]}>
+          {/* Waveform visualization */}
+          {renderWaveform()}
+
+          {/* Main microphone button with animations */}
+          <View style={styles.micAreaContainer}>
+            <View style={styles.micButtonWrapper}>
+              {/* Animated sound waves */}
+              {isRecording && (
+                <>
+                  <Animated.View
+                    style={[
+                      styles.soundWave,
+                      styles.leftWave,
+                      {
+                        opacity: waveAnim1,
+                        transform: [
+                          {
+                            scale: waveAnim1.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.8, 1.2],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                  <Animated.View
+                    style={[
+                      styles.soundWave,
+                      styles.centerWave,
+                      {
+                        opacity: waveAnim2,
+                        transform: [
+                          {
+                            scale: waveAnim2.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.9, 1.3],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                  <Animated.View
+                    style={[
+                      styles.soundWave,
+                      styles.rightWave,
+                      {
+                        opacity: waveAnim1,
+                        transform: [
+                          {
+                            scale: waveAnim1.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.8, 1.2],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                </>
+              )}
+
+              {/* Main microphone button with progress indicator */}
+              <View style={styles.micButtonContainer}>
+                {/* Circular progress indicator */}
+                {isRecording && (
+                  <View style={styles.progressRing}>
+                    <View 
+                      style={[
+                        styles.progressArc,
+                        {
+                          transform: [
+                            { rotate: `${progress * 360}deg` }
+                          ]
+                        }
+                      ]}
+                    />
+                  </View>
+                )}
+                
+                <Animated.View
+                  style={[
+                    {
+                      transform: [{ scale: pulseAnim }],
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.micButton,
+                      isRecording && styles.micButtonActive,
+                      !permissionGranted && styles.disabledButton,
+                    ]}
+                    onPress={handleMicPress}
+                    disabled={!permissionGranted}
+                  >
+                    <Ionicons
+                      name={isRecording ? 'stop' : 'mic'}
+                      size={36}
+                      color={theme.colors.white}
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            </View>
+          </View>
+
+          {/* Recording Status - positioned right under the mic button */}
+          <View style={styles.statusContainer}>
+            <Text style={[styles.statusText, { color: recordingStatus.color }]}>
+              {recordingStatus.text}
+            </Text>
+            <Text style={styles.statusSubtext}>
+              {recordingStatus.subtext}
+            </Text>
+          </View>
+
+          {/* Current segment preview */}
+          {currentSegmentTranscript && currentSegmentTranscript.trim() && !isRecording && (
+            <View style={styles.currentSegmentContainer}>
+              <Text style={styles.currentSegmentLabel}>Current segment:</Text>
+              <Text style={styles.currentSegmentText}>{currentSegmentTranscript}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Unified Transcript Editor */}
+        {transcriptSegments.length > 0 && (
+          <View style={styles.transcriptCard}>
+            <View style={styles.transcriptHeader}>
+              <View style={styles.transcriptTitleContainer}>
+                <Ionicons name="document-text" size={24} color={theme.colors.primary} />
+                <Text style={styles.transcriptTitle}>Transcript</Text>
+              </View>
+              
+              {canAcceptTranscript && (
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    !canAcceptTranscript && styles.saveButtonDisabled,
+                  ]}
+                  onPress={handleAcceptTranscript}
+                  disabled={!canAcceptTranscript}
+                >
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={canAcceptTranscript ? theme.colors.success : theme.colors.disabled}
+                  />
+                  <Text
+                    style={[
+                      styles.saveButtonText,
+                      !canAcceptTranscript && styles.saveButtonTextDisabled,
+                    ]}
+                  >
+                    Save
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TextInput
+              style={styles.unifiedTranscriptInput}
+              value={fullTranscriptText}
+              onChangeText={handleFullTranscriptChange}
+              multiline
+              placeholder="Your transcribed text will appear here..."
+              placeholderTextColor={theme.colors.textDisabled}
+              textAlignVertical="top"
+            />
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 };
@@ -231,46 +436,93 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  mainContent: {
-    flex: 1,
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.lg,
-    width: '100%',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
   },
-  statusContainer: {
+  timerContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.lg,
   },
   timerText: {
-    fontSize: 48,
+    fontSize: 32,
     fontWeight: 'bold',
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.bold,
-    marginBottom: theme.spacing.xs,
   },
-  statusText: {
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.regular,
-    textAlign: 'center',
-  },
-  segmentStatusText: {
-    marginTop: theme.spacing.xs,
-    color: theme.colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  micAreaContainer: {
+  recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: theme.spacing.md,
+    backgroundColor: addAlpha(theme.colors.error, '20'),
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error,
+    marginRight: theme.spacing.xs,
+  },
+  recordingText: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.error,
+    fontFamily: theme.typography.fontFamilies.bold,
+    fontWeight: 'bold',
+  },
+  languageSettingsButton: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.card,
+    ...theme.shadows.sm,
+  },
+  recordingArea: {
+    alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
+  },
+  micAreaContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: theme.spacing.lg,
+  },
+  micButtonWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   micButtonContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
+    position: 'relative',
+  },
+  progressRing: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: addAlpha(theme.colors.primary, '20'),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressArc: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: 'transparent',
+    borderTopColor: theme.colors.primary,
+    borderRightColor: theme.colors.primary,
   },
   micButton: {
     width: 100,
@@ -279,154 +531,213 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    elevation: 10,
-    marginHorizontal: 20,
+    ...theme.shadows.lg,
   },
   micButtonActive: {
-    backgroundColor: theme.colors.error, 
-    shadowColor: theme.colors.error,
+    backgroundColor: theme.colors.error,
   },
   disabledButton: {
     backgroundColor: theme.colors.disabled,
-    shadowColor: theme.colors.disabled,
     opacity: 0.7,
   },
   soundWave: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    position: 'absolute',
+    borderRadius: 30,
+    backgroundColor: addAlpha(theme.colors.primary, '40'),
+  },
+  leftWave: {
+    width: 60,
+    height: 60,
+    left: -20,
+  },
+  centerWave: {
+    width: 80,
+    height: 80,
+    zIndex: -1,
+  },
+  rightWave: {
+    width: 60,
+    height: 60,
+    right: -20,
+  },
+  waveformContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 30,
+    marginBottom: theme.spacing.md,
+    gap: 2,
+  },
+  waveformBar: {
+    width: 3,
     backgroundColor: theme.colors.primary,
-    opacity: 0.4,
+    borderRadius: 1.5,
+    marginHorizontal: 1,
+  },
+  statusContainer: {
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  statusText: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    textAlign: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  statusSubtext: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+    textAlign: 'center',
+  },
+  currentSegmentContainer: {
+    backgroundColor: theme.colors.card,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.accent,
+    marginTop: theme.spacing.lg,
+    marginHorizontal: theme.spacing.lg,
+    maxWidth: '90%',
+  },
+  currentSegmentLabel: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.medium,
+    marginBottom: theme.spacing.xs,
+  },
+  currentSegmentText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
+    fontStyle: 'italic',
   },
   transcriptCard: {
-    width: '100%',
-    minHeight: 120,
-    maxHeight: 200,
     backgroundColor: theme.colors.card,
-    borderRadius: 12,
-    padding: theme.spacing.md,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    marginBottom: theme.spacing.lg,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    margin: theme.spacing.lg,
+    ...theme.shadows.md,
+    minHeight: 200,
   },
-  transcriptHeaderContainer: {
+  transcriptHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
   },
-  transcriptCardTitle: {
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.bold,
-  },
-  acceptIconContainer: {
-    padding: theme.spacing.xs,
-  },
-  saveButtonContent: {
+  transcriptTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  },
+  transcriptTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+    marginLeft: theme.spacing.sm,
+  },
+
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: addAlpha(theme.colors.success, '20'),
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: addAlpha(theme.colors.success, '40'),
+  },
+  saveButtonDisabled: {
+    backgroundColor: addAlpha(theme.colors.disabled, '20'),
+    borderColor: addAlpha(theme.colors.disabled, '40'),
   },
   saveButtonText: {
     fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.primary,
+    color: theme.colors.success,
     fontFamily: theme.typography.fontFamilies.semiBold,
-    marginLeft: 4,
+    marginLeft: theme.spacing.xs,
   },
-  disabledText: {
+  saveButtonTextDisabled: {
     color: theme.colors.disabled,
+  },
+  unifiedTranscriptInput: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
+    lineHeight: theme.typography.lineHeights.loose * theme.typography.fontSizes.md,
+    minHeight: 150,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   transcriptScroll: {
     flex: 1,
-    paddingTop: theme.spacing.xs,
   },
-  transcriptContentContainer: {
-    paddingTop: theme.spacing.xs,
-    paddingBottom: theme.spacing.sm,
-  },
-  transcriptText: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.regular,
-    lineHeight: theme.typography.fontSizes.sm * 1.8,
+  transcriptContent: {
+    paddingBottom: theme.spacing.lg,
   },
   processingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(250, 250, 250, 0.7)', 
+    backgroundColor: addAlpha(theme.colors.background, 'E6'),
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
   },
-  processingText: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.typography.fontSizes.md,
+  processingContent: {
+    backgroundColor: theme.colors.card,
+    padding: theme.spacing.xl,
+    borderRadius: theme.borderRadius.xl,
+    alignItems: 'center',
+    ...theme.shadows.lg,
+  },
+  processingTitle: {
+    fontSize: theme.typography.fontSizes.lg,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.semiBold,
-  },
-  segmentContainer: {
-    marginBottom: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.sm,
-    backgroundColor: theme.isDarkMode ? 'rgba(60, 60, 80, 0.2)' : 'rgba(240, 240, 250, 0.7)', 
-    borderRadius: 8,
-    borderLeftWidth: 2,
-    borderLeftColor: theme.colors.primary,
-  },
-  qualityContainer: {
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.sm,
-    backgroundColor: theme.colors.card,
-    borderRadius: 8,
-  },
-  qualityHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: theme.spacing.md,
     marginBottom: theme.spacing.xs,
   },
-  qualityDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: theme.spacing.xs,
-  },
-  qualityText: {
+  processingSubtext: {
     fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.regular,
-  },
-  alternativesButton: {
-    padding: theme.spacing.xs,
-  },
-  alternativesButtonText: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.primary,
-    fontFamily: theme.typography.fontFamilies.regular,
-  },
-  alternativesContainer: {
-    marginTop: theme.spacing.xs,
-  },
-  alternativeItem: {
-    padding: theme.spacing.xs,
-    backgroundColor: theme.colors.card,
-    borderRadius: 4,
-    marginBottom: theme.spacing.xs,
-  },
-  alternativeText: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.regular,
-  },
-  alternativeConfidence: {
-    fontSize: theme.typography.fontSizes.xs,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
+    textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    ...theme.shadows.lg,
+  },
+  modalTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontFamily: theme.typography.fontFamilies.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.lg,
+  },
+  modalCloseButton: {
+    marginTop: theme.spacing.lg,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.lg,
+  },
+  modalCloseButtonText: {
+    color: theme.colors.white,
+    fontFamily: theme.typography.fontFamilies.bold,
+    fontSize: theme.typography.fontSizes.md,
   },
 });
 

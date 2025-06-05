@@ -12,13 +12,16 @@ import {
   ScrollView,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
 import { JournalAPI, TagsAPI } from '../../services/api';
 import JournalCard from '../../components/JournalCard';
-import { JournalEntry, Tag, MainTabParamList, JournalStackParamList, RootStackParamList } from '../../types';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { JournalEntry, Tag } from '../../types';
+import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { AppTheme } from '../../config/theme';
@@ -29,15 +32,18 @@ const HIDDEN_ENTRY_TAG = "_hidden_entry";
 // ----------------------------------------------------
 
 // Define navigation prop types correctly
-type JournalScreenNavigationProp = StackNavigationProp<JournalStackParamList, 'JournalList'>;
-// If JournalScreen is used in a context where it can navigate to MainTab screens:
-type AppNavigationProp = StackNavigationProp<RootStackParamList>; // Assuming RootStackParamList has MainTabParamList
+type JournalScreenNavigationProp = CompositeNavigationProp<
+  StackNavigationProp<JournalStackParamList, 'JournalList'>,
+  CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList>,
+    StackNavigationProp<MainStackParamList>
+  >
+>;
 
 const JournalScreen = () => {
   const navigation = useNavigation<JournalScreenNavigationProp>();
-  const appNavigation = useNavigation<AppNavigationProp>(); // For navigating to other tabs like Record
   const { theme } = useAppTheme();
-  const { isHiddenModeActive } = useHiddenMode();
+  const { isHiddenMode } = useHiddenMode();
   const styles = getStyles(theme);
   
   // State
@@ -70,7 +76,7 @@ const JournalScreen = () => {
   // Filter entries whenever search query, selected tags, base entries, or hidden mode changes
   useEffect(() => {
     filterEntries();
-  }, [searchQuery, selectedTags, entries, isHiddenModeActive]);
+  }, [searchQuery, selectedTags, entries, isHiddenMode]);
   
   // Fetch journal entries from API
   const fetchEntries = async () => {
@@ -127,12 +133,12 @@ const JournalScreen = () => {
     }
 
     // Filter by hidden mode status
-    if (!isHiddenModeActive) {
+    if (!isHiddenMode) {
       processedEntries = processedEntries.filter(entry => 
         !entry.tags.some(tagObject => tagObject.name === HIDDEN_ENTRY_TAG)
       );
     }
-    // If isHiddenModeActive is true, all entries (that match search/tags) are shown
+    // If isHiddenMode is true, all entries (that match search/tags) are shown
     
     setFilteredEntries(processedEntries);
   };
@@ -148,10 +154,8 @@ const JournalScreen = () => {
   
   // Navigate to entry creation screen
   const handleCreateEntry = () => {
-    // Navigate to the 'Record' screen, assuming it's in the 'Main' tab navigator
-    // If 'Record' is a top-level screen in RootStackParamList, this might differ.
-    // This assumes 'Record' is part of MainTabParamList which is a screen in RootStackParamList called 'Main'
-    appNavigation.navigate('Main', { screen: 'Record', params: undefined } as any); // Use 'as any' to bypass complex type check for now, ensure types are aligned
+    // Navigate to Record modal in the parent MainStack
+    navigation.navigate('Record', { startRecording: true });
   };
   
   // Navigate to entry detail screen
@@ -270,7 +274,7 @@ const JournalScreen = () => {
               <Ionicons name="journal-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
               <Text style={styles.emptyText}>No journal entries found</Text>
               <Text style={styles.emptySubtext}>
-                {searchQuery || selectedTags.length > 0 || !isHiddenModeActive && entries.some(e => e.tags.some(t=>t.name === HIDDEN_ENTRY_TAG)) 
+                {searchQuery || selectedTags.length > 0 || !isHiddenMode && entries.some(e => e.tags.some(t=>t.name === HIDDEN_ENTRY_TAG)) 
                   ? 'Try changing your search or filters, or check hidden mode.'
                   : 'Tap the + button to create your first entry'}
               </Text>

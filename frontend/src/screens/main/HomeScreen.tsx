@@ -11,7 +11,9 @@ import {
   Platform
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
@@ -20,7 +22,7 @@ import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { api } from '../../services/api';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
-import { RootStackParamList } from '../../navigation/types';
+import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { logger } from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
@@ -30,13 +32,16 @@ import { AppTheme } from '../../config/theme';
 const HIDDEN_ENTRY_TAG = "_hidden_entry";
 // ----------------------------------------------------
 
-type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
+type HomeScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Home'>,
+  StackNavigationProp<MainStackParamList>
+>;
 
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const { user } = useAuth();
   const { theme } = useAppTheme();
-  const { isHiddenModeActive } = useHiddenMode();
+  const { isHiddenMode } = useHiddenMode();
   const styles = getStyles(theme);
   
   // Extract first name for greeting
@@ -58,14 +63,14 @@ const HomeScreen = () => {
 
   // Filter entries based on hidden mode
   const displayedEntries = useMemo(() => {
-    if (isHiddenModeActive) {
+    if (isHiddenMode) {
       return recentEntries;
     }
     // Correctly check if any tag object has a name matching HIDDEN_ENTRY_TAG
     return recentEntries.filter(entry => 
       !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG)
     );
-  }, [recentEntries, isHiddenModeActive]);
+  }, [recentEntries, isHiddenMode]);
 
   // Replace useEffect with useFocusEffect to fetch data whenever the screen comes into focus
   useFocusEffect(
@@ -137,21 +142,19 @@ const HomeScreen = () => {
   };
 
   const navigateToRecord = () => {
-    navigation.navigate('Main', { screen: 'Record', params: undefined });
+    // Navigate to Record modal in the parent MainStack
+    navigation.navigate('Record', { startRecording: true });
   };
 
   const navigateToJournalList = () => {
-    navigation.navigate('Main', { screen: 'Journal', params: { screen: 'JournalList' } });
+    navigation.navigate('Journal', { screen: 'JournalList' });
   };
 
   const navigateToDetail = (entryId: string) => {
-    // Navigate to JournalEntryDetail within the Journal stack, which is part of the Main tab
-    navigation.navigate('Main', { 
-      screen: 'Journal', 
-      params: { 
+    // Navigate to JournalEntryDetail within the Journal stack
+    navigation.navigate('Journal', { 
         screen: 'JournalEntryDetail', 
         params: { entryId: entryId } 
-      }
     });
   };
 

@@ -44,6 +44,7 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
   const startTimeRef = useRef<number>(0);
   const recordingInstanceRef = useRef<Audio.Recording | null>(null);
   const isRequestingPermissionRef = useRef(false);
+  const autoStartAttemptedRef = useRef(false); // Track if auto-start has been attempted
   
   // Effect to keep recordingInstanceRef updated with the latest recording object
   useEffect(() => {
@@ -317,15 +318,18 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
       // This part of the logic runs if: 
       // 1. Permissions were already granted on mount.
       // 2. Permissions became granted after a request, and the effect re-ran.
-      if (permissionGranted && mergedOptions.autoStart && !isRecording) {
+      if (permissionGranted && mergedOptions.autoStart && !isRecording && !autoStartAttemptedRef.current) {
         if (!didCancel) { // Check if component is still mounted
           logger.info('[useAudioRecording] Mount/PermissionEffect: Permissions granted. Auto-start conditions met. Calling startRecording.');
+          autoStartAttemptedRef.current = true; // Mark that we've attempted auto-start
           startRecording(); // Not awaiting, it's a fire-and-forget from this effect's perspective
         }
       } else if (permissionGranted && mergedOptions.autoStart && isRecording) {
         logger.debug('[useAudioRecording] Mount/PermissionEffect: Permissions granted and auto-start enabled, but already recording.');
       } else if (permissionGranted && !mergedOptions.autoStart) {
         logger.debug('[useAudioRecording] Mount/PermissionEffect: Permissions granted, but auto-start is not enabled.');
+      } else if (permissionGranted && mergedOptions.autoStart && autoStartAttemptedRef.current) {
+        logger.debug('[useAudioRecording] Mount/PermissionEffect: Auto-start already attempted, skipping to prevent infinite loop.');
       }
     };
 

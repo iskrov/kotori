@@ -2,17 +2,25 @@ import { Platform } from 'react-native';
 
 export interface AppColors {
   primary: string;
+  primaryLight: string;
+  primaryDark: string;
   secondary: string;
+  secondaryLight: string;
   background: string;
+  surface: string;
   card: string;
   text: string;
   textSecondary: string;
   textDisabled: string;
   border: string;
+  borderLight: string;
   notification: string;
   error: string;
+  errorLight: string;
   success: string;
+  successLight: string;
   warning: string;
+  warningLight: string;
   disabled: string;
   inputBackground: string;
   statusBar: 'auto' | 'dark-content' | 'light-content';
@@ -20,6 +28,11 @@ export interface AppColors {
   tabBarInactive: string;
   shadow: string;
   onPrimary: string;
+  onSurface: string;
+  overlay: string;
+  // Semantic colors for better UX
+  accent: string;
+  accentLight: string;
   // Grayscale
   black: string;
   white: string;
@@ -38,10 +51,10 @@ export interface AppColors {
 export interface AppTypography {
   fontFamilies: {
     regular: string;
-    bold: string;
+    medium: string;
     semiBold: string;
+    bold: string;
     light: string;
-    // Add more as needed (e.g., italic, specific display fonts)
   };
   fontSizes: {
     xs: number; // 12
@@ -51,14 +64,18 @@ export interface AppTypography {
     xl: number; // 20
     xxl: number; // 24
     xxxl: number; // 30
-    // Add more as needed
+    display: number; // 36
   };
   lineHeights: {
     tight: number; // 1.25
     normal: number; // 1.5
     loose: number; // 1.75
   };
-  // Potentially letterSpacing, textDecoration, etc.
+  letterSpacing: {
+    tight: number;
+    normal: number;
+    wide: number;
+  };
 }
 
 export interface AppSpacing {
@@ -69,38 +86,85 @@ export interface AppSpacing {
   lg: number;   // 24
   xl: number;   // 32
   xxl: number;  // 48
-  // Add more as needed
+  xxxl: number; // 64
+}
+
+export interface AppBorderRadius {
+  none: number;
+  sm: number;   // 4
+  md: number;   // 8
+  lg: number;   // 12
+  xl: number;   // 16
+  xxl: number;  // 24
+  full: number; // 9999
+}
+
+export interface AppShadows {
+  none: object;
+  sm: object;
+  md: object;
+  lg: object;
+  xl: object;
+}
+
+export interface AppAnimations {
+  duration: {
+    fast: number;
+    normal: number;
+    slow: number;
+  };
+  easing: {
+    ease: string;
+    easeIn: string;
+    easeOut: string;
+    easeInOut: string;
+  };
 }
 
 export interface AppTheme {
   colors: AppColors;
   typography: AppTypography;
   spacing: AppSpacing;
-  isDarkMode: boolean; // Add a flag to indicate current mode
-  // Potentially breakpoints for responsive design, borderRadii, shadows, etc.
+  borderRadius: AppBorderRadius;
+  shadows: AppShadows;
+  animations: AppAnimations;
+  isDarkMode: boolean;
 }
 
-// Current App Theme (derived from existing styles, can be swapped for B&W later)
-const currentColors: AppColors = {
-  primary: '#7D4CDB', // Purpleish color seen in HomeScreen
-  secondary: '#007bff', // A generic secondary, placeholder
-  background: '#f8f9fa', // Light gray background from HomeScreen
-  card: '#ffffff',       // White for cards
-  text: '#333333',       // Dark gray text from HomeScreen
-  textSecondary: '#666666', // Lighter gray text from HomeScreen
-  textDisabled: '#AEAEAE',
-  border: '#dddddd',
-  notification: '#ffc107', // Example notification color
-  error: '#e74c3c',       // Error color from App.tsx
-  success: '#28a745',     // Example success color
-  warning: '#FFC107',
-  disabled: '#cccccc',
+// Enhanced Light Theme with modern color palette
+export const lightModeColors: AppColors = {
+  primary: '#6366F1', // Modern indigo
+  primaryLight: '#A5B4FC',
+  primaryDark: '#4338CA',
+  secondary: '#06B6D4', // Cyan
+  secondaryLight: '#67E8F9',
+  background: '#FAFAFA',
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  text: '#111827',
+  textSecondary: '#6B7280',
+  textDisabled: '#9CA3AF',
+  border: '#E5E7EB',
+  borderLight: '#F3F4F6',
+  notification: '#EF4444',
+  error: '#EF4444',
+  errorLight: '#FEE2E2',
+  success: '#10B981',
+  successLight: '#D1FAE5',
+  warning: '#F59E0B',
+  warningLight: '#FEF3C7',
+  disabled: '#D1D5DB',
   inputBackground: '#FFFFFF',
-  statusBar: 'auto',
-  tabBarActive: '#7D4CDB',
-  tabBarInactive: '#8e8e93',
+  statusBar: 'dark-content',
   shadow: 'rgba(0, 0, 0, 0.1)',
   onPrimary: '#FFFFFF',
+  onSurface: '#111827',
+  overlay: 'rgba(0, 0, 0, 0.5)',
+  accent: '#8B5CF6', // Purple accent
+  accentLight: '#DDD6FE',
+  tabBarActive: '#6366F1',
+  tabBarInactive: '#9CA3AF',
+
   black: '#000000',
   white: '#FFFFFF',
   gray50: '#F9FAFB',
@@ -115,84 +179,61 @@ const currentColors: AppColors = {
   gray900: '#111827',
 };
 
-// Light Theme (Black & White)
-export const lightModeColors: AppColors = {
-  primary: '#7D4CDB', 
-  secondary: '#03DAC6', 
-  background: '#F5F5F5', 
-  card: '#FFFFFF', 
-  text: '#121212', 
-  textSecondary: '#757575', 
-  textDisabled: '#AEAEAE',
-  border: '#E0E0E0', 
-  notification: '#FF3B30', 
-  error: '#D32F2F', 
-  success: '#4CAF50', 
-  warning: '#FFC107', 
-  disabled: '#BDBDBD', 
-  inputBackground: '#FFFFFF', 
-  statusBar: 'dark-content',
-  shadow: 'rgba(0, 0, 0, 0.1)',
-  onPrimary: '#FFFFFF',
-  tabBarActive: '#7D4CDB',
-  tabBarInactive: '#8E8E93',
-
-  black: '#000000',
-  white: '#FFFFFF',
-  gray50: '#FAFAFA',
-  gray100: '#F5F5F5',
-  gray200: '#EEEEEE',
-  gray300: '#E0E0E0',
-  gray400: '#BDBDBD',
-  gray500: '#9E9E9E',
-  gray600: '#757575',
-  gray700: '#616161',
-  gray800: '#424242',
-  gray900: '#212121',
-};
-
-// Dark Theme
+// Enhanced Dark Theme
 export const darkModeColors: AppColors = {
-  primary: '#BB86FC', 
-  secondary: '#03DAC5', 
-  background: '#121212', 
-  card: '#1E1E1E', 
-  text: '#E0E0E0', 
-  textSecondary: '#B0B0B0', 
-  textDisabled: '#555555',
-  border: '#272727', 
-  notification: '#FF453A', 
-  error: '#CF6679', 
-  success: '#66BB6A', 
-  warning: '#FFEB3B', 
-  disabled: '#424242', 
-  inputBackground: '#2C2C2C', 
+  primary: '#818CF8', // Lighter indigo for dark mode
+  primaryLight: '#C7D2FE',
+  primaryDark: '#6366F1',
+  secondary: '#22D3EE',
+  secondaryLight: '#7DD3FC',
+  background: '#0F172A',
+  surface: '#1E293B',
+  card: '#1E293B',
+  text: '#F1F5F9',
+  textSecondary: '#94A3B8',
+  textDisabled: '#64748B',
+  border: '#334155',
+  borderLight: '#475569',
+  notification: '#F87171',
+  error: '#F87171',
+  errorLight: '#450A0A',
+  success: '#34D399',
+  successLight: '#064E3B',
+  warning: '#FBBF24',
+  warningLight: '#451A03',
+  disabled: '#475569',
+  inputBackground: '#334155',
   statusBar: 'light-content',
-  shadow: 'rgba(0, 0, 0, 0.4)',
-  onPrimary: '#000000',
-  tabBarActive: '#BB86FC',
-  tabBarInactive: '#707070',
+  shadow: 'rgba(0, 0, 0, 0.3)',
+  onPrimary: '#0F172A',
+  onSurface: '#F1F5F9',
+  overlay: 'rgba(0, 0, 0, 0.7)',
+  accent: '#A78BFA',
+  accentLight: '#312E81',
+  tabBarActive: '#818CF8',
+  tabBarInactive: '#64748B',
 
   black: '#000000',
   white: '#FFFFFF',
-  gray50: '#2A2A2A',
-  gray100: '#3C3C3C',
-  gray200: '#4A4A4A',
-  gray300: '#5E5E5E',
-  gray400: '#757575',
-  gray500: '#9E9E9E',
-  gray600: '#B0B0B0',
-  gray700: '#C7C7C7',
-  gray800: '#DEDEDE',
-  gray900: '#F5F5F5',
+  gray50: '#1E293B',
+  gray100: '#334155',
+  gray200: '#475569',
+  gray300: '#64748B',
+  gray400: '#94A3B8',
+  gray500: '#CBD5E1',
+  gray600: '#E2E8F0',
+  gray700: '#F1F5F9',
+  gray800: '#F8FAFC',
+  gray900: '#FFFFFF',
 };
 
 export const typography: AppTypography = {
   fontFamilies: {
-    regular: Platform.OS === 'ios' ? 'System' : 'Roboto', // Example, replace with your actual fonts
-    bold: Platform.OS === 'ios' ? 'System-Bold' : 'Roboto-Bold',
-    semiBold: Platform.OS === 'ios' ? 'System-Semibold' : 'Roboto-Medium',
-    light: Platform.OS === 'ios' ? 'System-Light' : 'Roboto-Light',
+    regular: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto',
+    medium: Platform.OS === 'ios' ? 'SF Pro Text Medium' : 'Roboto Medium',
+    semiBold: Platform.OS === 'ios' ? 'SF Pro Text Semibold' : 'Roboto Medium',
+    bold: Platform.OS === 'ios' ? 'SF Pro Text Bold' : 'Roboto Bold',
+    light: Platform.OS === 'ios' ? 'SF Pro Text Light' : 'Roboto Light',
   },
   fontSizes: {
     xs: 12,
@@ -202,11 +243,17 @@ export const typography: AppTypography = {
     xl: 20,
     xxl: 24,
     xxxl: 30,
+    display: 36,
   },
   lineHeights: {
     tight: 1.25,
     normal: 1.5,
     loose: 1.75,
+  },
+  letterSpacing: {
+    tight: -0.025,
+    normal: 0,
+    wide: 0.025,
   },
 };
 
@@ -218,14 +265,79 @@ export const spacing: AppSpacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
+  xxxl: 64,
 };
 
-// Default theme export (will be light mode initially)
-// This will be replaced by the ThemeProvider logic later.
+export const borderRadius: AppBorderRadius = {
+  none: 0,
+  sm: 4,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  xxl: 24,
+  full: 9999,
+};
+
+export const shadows: AppShadows = {
+  none: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  xl: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.25,
+    shadowRadius: 25,
+    elevation: 12,
+  },
+};
+
+export const animations: AppAnimations = {
+  duration: {
+    fast: 150,
+    normal: 300,
+    slow: 500,
+  },
+  easing: {
+    ease: 'ease',
+    easeIn: 'ease-in',
+    easeOut: 'ease-out',
+    easeInOut: 'ease-in-out',
+  },
+};
+
+// Default theme export
 const defaultTheme: AppTheme = {
-  colors: lightModeColors, 
+  colors: lightModeColors,
   typography,
   spacing,
+  borderRadius,
+  shadows,
+  animations,
   isDarkMode: false,
 };
 

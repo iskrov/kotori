@@ -6,7 +6,7 @@ export type RecordScreenParams = {
   journalId?: string; // If opening an existing entry for recording
 };
 
-// Journal stack params
+// Journal stack params (nested within Journal tab)
 export type JournalStackParamList = {
   JournalList: undefined;
   JournalEntryDetail: { entryId: string };
@@ -15,13 +15,18 @@ export type JournalStackParamList = {
   DeleteConfirmation: { entryId: string };
 };
 
-// Main stack params - Define Record screen params directly here
-export type MainStackParamList = {
+// Tab Navigator params - Only contains tab screens
+export type MainTabParamList = {
   Home: undefined;
   Journal: NavigatorScreenParams<JournalStackParamList>;
-  Record: RecordScreenParams | undefined; // Keep this definition
   Calendar: undefined;
   Settings: undefined;
+};
+
+// Main Stack Navigator (contains the tab navigator)
+export type MainStackParamList = {
+  MainTabs: NavigatorScreenParams<MainTabParamList>;
+  Record: RecordScreenParams | undefined;
 };
 
 // Auth stack params
@@ -31,11 +36,9 @@ export type AuthStackParamList = {
   ForgotPassword: undefined;
 };
 
-// Root navigator params - This is where the issue might be
-// Ensure that when navigating to Main, the nested params are correctly typed
+// Root navigator params - Top level navigation
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
-  // Specify that Main stack might have params, including Record's params
   Main: NavigatorScreenParams<MainStackParamList>; 
 };
 

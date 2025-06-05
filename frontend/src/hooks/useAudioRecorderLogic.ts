@@ -41,9 +41,14 @@ export interface TranscriptionResult {
 interface UseAudioRecorderLogicProps {
   onTranscriptionComplete: (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => void;
   onCancel: () => void;
+  autoStart?: boolean;
 }
 
-export const useAudioRecorderLogic = ({ onTranscriptionComplete, onCancel }: UseAudioRecorderLogicProps) => {
+export const useAudioRecorderLogic = ({ 
+  onTranscriptionComplete, 
+  onCancel,
+  autoStart = false
+}: UseAudioRecorderLogicProps) => {
   // Enhanced states for transcription
   const [transcriptSegments, setTranscriptSegments] = useState<string[]>([]);
   const [currentSegmentTranscript, setCurrentSegmentTranscript] = useState('');
@@ -71,7 +76,8 @@ export const useAudioRecorderLogic = ({ onTranscriptionComplete, onCancel }: Use
     permissionGranted,
     error: recordingError
   } = useAudioRecording({
-    requestPermissionOnMount: true
+    requestPermissionOnMount: true,
+    autoStart: autoStart
   });
 
   // Enhanced state management
@@ -151,7 +157,7 @@ export const useAudioRecorderLogic = ({ onTranscriptionComplete, onCancel }: Use
     onClose: (event) => logger.info('AudioRecorder: WebSocket connection closed.', event),
   });
 
-  // Effect 1: Mount/Unmount and Audio Mode Setup
+  // Effect 1: Mount/Unmount setup - should only run once
   useEffect(() => {
     isMountedRef.current = true;
     logger.info('AudioRecorder: Component did mount.');
@@ -171,15 +177,8 @@ export const useAudioRecorderLogic = ({ onTranscriptionComplete, onCancel }: Use
       logger.info('AudioRecorder: Component will unmount. Performing final cleanup.');
       isMountedRef.current = false;
       disconnectWebSocket();
-      
-      if (audioUri && !hasTranscribedAudio) { 
-         logger.info(`[AudioRecorder Cleanup on Unmount] Attempting to clean up URI: ${audioUri}`);
-         cleanupRecordingFile(audioUri).catch(err =>
-           logger.error('Error cleaning up recording file during unmount', err)
-         );
-       }
     };
-  }, [cleanupRecordingFile, disconnectWebSocket, audioUri, hasTranscribedAudio]);
+  }, []); // Empty dependency array - runs only on mount/unmount
 
   // Effect to set audio mode *after* permission is granted via the hook's request
   useEffect(() => {
@@ -236,7 +235,7 @@ export const useAudioRecorderLogic = ({ onTranscriptionComplete, onCancel }: Use
       `confidence: ${confidence.toFixed(2)}, language: ${detectedLanguage || 'unknown'}`
     );
 
-    onTranscriptionComplete(fullTranscript, audioUri, detectedLanguage, confidence);
+    onTranscriptionComplete(fullTranscript, audioUri || undefined, detectedLanguage, confidence);
   }, [transcriptSegments, lastTranscriptionResult, audioUri, onTranscriptionComplete]);
 
   // Simplified segment processing with single language support
@@ -396,6 +395,7 @@ export const useAudioRecorderLogic = ({ onTranscriptionComplete, onCancel }: Use
   return {
     // State
     transcriptSegments,
+    setTranscriptSegments,
     currentSegmentTranscript,
     isTranscribingSegment,
     lastTranscriptionResult,
@@ -427,4 +427,4 @@ export const useAudioRecorderLogic = ({ onTranscriptionComplete, onCancel }: Use
     formatDuration,
     sanitizeText,
   };
-}; 
+};

@@ -9,14 +9,16 @@ import {
   Alert
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 
 import { JournalAPI } from '../../services/api';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
-import { MainStackParamList, JournalStackParamList } from '../../navigation/types';
+import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { AppTheme } from '../../config/theme';
@@ -26,14 +28,15 @@ import { AppTheme } from '../../config/theme';
 const HIDDEN_ENTRY_TAG = "_hidden_entry";
 // ----------------------------------------------------
 
-type CalendarScreenNavigationProp = StackNavigationProp<MainStackParamList>;
-type JournalDetailNavigationProp = StackNavigationProp<JournalStackParamList, 'JournalEntryDetail'>;
+type CalendarScreenNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Calendar'>,
+  StackNavigationProp<MainStackParamList>
+>;
 
 const CalendarScreen = () => {
   const navigation = useNavigation<CalendarScreenNavigationProp>();
-  const journalNavigation = useNavigation<JournalDetailNavigationProp>();
   const { theme } = useAppTheme();
-  const { isHiddenModeActive } = useHiddenMode();
+  const { isHiddenMode } = useHiddenMode();
   const styles = getStyles(theme);
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -43,13 +46,13 @@ const CalendarScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   const visibleEntries = useMemo(() => {
-    if (isHiddenModeActive) {
+    if (isHiddenMode) {
       return allEntries;
     }
     return allEntries.filter(entry => 
       !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG)
     );
-  }, [allEntries, isHiddenModeActive]);
+  }, [allEntries, isHiddenMode]);
   
   useFocusEffect(
     React.useCallback(() => {
@@ -70,7 +73,7 @@ const CalendarScreen = () => {
       // Refresh filtered entries when hidden mode changes
       fetchEntriesForSelectedDate(selectedDate);
     }
-  }, [isHiddenModeActive]);
+  }, [isHiddenMode]);
   
   const getDaysInMonth = () => {
     const start = startOfMonth(currentMonth);
@@ -111,7 +114,7 @@ const CalendarScreen = () => {
       
       // Filter entries based on hidden mode
       const entries = response.data;
-      const filtered = isHiddenModeActive 
+      const filtered = isHiddenMode 
         ? entries 
         : entries.filter((entry: JournalEntry) => !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG));
       
@@ -144,7 +147,10 @@ const CalendarScreen = () => {
   };
   
   const handleEntryPress = (entry: JournalEntry) => {
-    journalNavigation.navigate('JournalEntryDetail', { entryId: entry.id });
+    navigation.navigate('Journal', { 
+      screen: 'JournalEntryDetail', 
+      params: { entryId: entry.id } 
+    });
   };
   
   const renderDay = (day: Date) => {

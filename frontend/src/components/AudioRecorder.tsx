@@ -5,16 +5,19 @@ import AudioRecorderUI from './AudioRecorderUI';
 interface AudioRecorderProps {
   onTranscriptionComplete: (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => void;
   onCancel: () => void;
+  startRecordingOnMount?: boolean;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onTranscriptionComplete,
   onCancel,
+  startRecordingOnMount = false,
 }) => {
   // Use the custom hook for all business logic
   const audioRecorderLogic = useAudioRecorderLogic({
     onTranscriptionComplete,
     onCancel,
+    autoStart: startRecordingOnMount,
   });
 
   // Handler for replacing transcript segments with alternatives
@@ -29,6 +32,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     <AudioRecorderUI
       // State props
       transcriptSegments={audioRecorderLogic.transcriptSegments}
+      setTranscriptSegments={audioRecorderLogic.setTranscriptSegments}
       currentSegmentTranscript={audioRecorderLogic.currentSegmentTranscript}
       isTranscribingSegment={audioRecorderLogic.isTranscribingSegment}
       lastTranscriptionResult={audioRecorderLogic.lastTranscriptionResult}
