@@ -29,6 +29,12 @@ const addAlpha = (color: string, alpha: string): string => {
   return color;
 };
 
+interface SaveButtonState {
+  text: string;
+  disabled: boolean;
+  isSaving: boolean;
+}
+
 interface AudioRecorderUIProps {
   // State props
   transcriptSegments: string[];
@@ -58,6 +64,9 @@ interface AudioRecorderUIProps {
   handleLanguageChange: (languageCode: string) => void;
   formatDuration: (seconds: number) => string;
   setShowAlternatives: (show: boolean) => void;
+  
+  // Save button state
+  saveButtonState?: SaveButtonState;
 }
 
 export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
@@ -82,6 +91,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   handleLanguageChange,
   formatDuration,
   setShowAlternatives,
+  saveButtonState,
 }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
@@ -103,6 +113,13 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   // Calculate progress for circular indicator (max 5 minutes = 300 seconds)
   const maxDuration = 300;
   const progress = Math.min(recordingDuration / maxDuration, 1);
+
+  // Get effective save button state
+  const effectiveSaveButtonState = saveButtonState || {
+    text: 'Save',
+    disabled: !canAcceptTranscript,
+    isSaving: false
+  };
 
   // Waveform visualization component
   const renderWaveform = () => {
@@ -390,27 +407,30 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
                 <Text style={styles.transcriptTitle}>Transcript</Text>
               </View>
               
-              {canAcceptTranscript && (
+              {(transcriptSegments.length > 0) && (
                 <TouchableOpacity
                   style={[
                     styles.saveButton,
-                    !canAcceptTranscript && styles.saveButtonDisabled,
+                    effectiveSaveButtonState.disabled && styles.saveButtonDisabled,
+                    effectiveSaveButtonState.isSaving && styles.saveButtonSaving,
                   ]}
                   onPress={handleAcceptTranscript}
-                  disabled={!canAcceptTranscript}
+                  disabled={effectiveSaveButtonState.disabled}
                 >
                   <Ionicons
-                    name="checkmark-circle"
+                    name={effectiveSaveButtonState.isSaving ? "time" : effectiveSaveButtonState.text === 'Saved' ? "checkmark-circle" : "save"}
                     size={16}
-                    color={canAcceptTranscript ? theme.colors.success : theme.colors.disabled}
+                    color={effectiveSaveButtonState.disabled ? theme.colors.disabled : 
+                           effectiveSaveButtonState.text === 'Saved' ? theme.colors.success : theme.colors.primary}
                   />
                   <Text
                     style={[
                       styles.saveButtonText,
-                      !canAcceptTranscript && styles.saveButtonTextDisabled,
+                      effectiveSaveButtonState.disabled && styles.saveButtonTextDisabled,
+                      effectiveSaveButtonState.text === 'Saved' && styles.saveButtonTextSaved,
                     ]}
                   >
-                    Save
+                    {effectiveSaveButtonState.text}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -566,7 +586,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     justifyContent: 'center',
     height: 30,
     marginBottom: theme.spacing.md,
-    gap: 2,
   },
   waveformBar: {
     width: 3,
@@ -661,6 +680,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   saveButtonTextDisabled: {
     color: theme.colors.disabled,
+  },
+  saveButtonSaving: {
+    backgroundColor: addAlpha(theme.colors.accent, '20'),
+    borderColor: addAlpha(theme.colors.accent, '40'),
+  },
+  saveButtonTextSaved: {
+    color: theme.colors.success,
   },
   unifiedTranscriptInput: {
     fontSize: theme.typography.fontSizes.md,

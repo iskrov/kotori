@@ -2,16 +2,26 @@ import React, { useCallback } from 'react';
 import { useAudioRecorderLogic } from '../hooks/useAudioRecorderLogic';
 import AudioRecorderUI from './AudioRecorderUI';
 
+interface SaveButtonState {
+  text: string;
+  disabled: boolean;
+  isSaving: boolean;
+}
+
 interface AudioRecorderProps {
   onTranscriptionComplete: (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => void;
   onCancel: () => void;
   startRecordingOnMount?: boolean;
+  onManualSave?: () => Promise<void>;
+  saveButtonState?: SaveButtonState;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onTranscriptionComplete,
   onCancel,
   startRecordingOnMount = false,
+  onManualSave,
+  saveButtonState,
 }) => {
   // Use the custom hook for all business logic
   const audioRecorderLogic = useAudioRecorderLogic({
@@ -26,6 +36,30 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     // For now, we'll just close the alternatives view
     audioRecorderLogic.setShowAlternatives(false);
   }, [audioRecorderLogic]);
+
+  // Custom save handler that passes transcript data to RecordScreen first
+  const handleSave = useCallback(async () => {
+    if (onManualSave) {
+      // First, pass the transcript data to RecordScreen via onTranscriptionComplete
+      const fullTranscript = audioRecorderLogic.transcriptSegments.join(' ').trim();
+      if (fullTranscript) {
+        const confidence = audioRecorderLogic.lastTranscriptionResult?.confidence || 0;
+        const detectedLanguage = audioRecorderLogic.lastTranscriptionResult?.detected_language_code as string | undefined;
+        
+        // Pass the transcript data to RecordScreen
+        onTranscriptionComplete(fullTranscript, undefined, detectedLanguage, confidence);
+        
+        // Small delay to ensure state update happens before save
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Now trigger the manual save
+        await onManualSave();
+      }
+    } else {
+      // Fallback to the original accept transcript logic
+      audioRecorderLogic.handleAcceptTranscript();
+    }
+  }, [onManualSave, audioRecorderLogic, onTranscriptionComplete]);
 
   // Render the UI component with all the state and handlers
   return (
@@ -54,10 +88,13 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       
       // Handlers
       handleMicPress={audioRecorderLogic.handleMicPress}
-      handleAcceptTranscript={audioRecorderLogic.handleAcceptTranscript}
+      handleAcceptTranscript={handleSave}
       handleLanguageChange={audioRecorderLogic.handleLanguageChange}
       formatDuration={audioRecorderLogic.formatDuration}
       setShowAlternatives={audioRecorderLogic.setShowAlternatives}
+      
+      // Save button state
+      saveButtonState={saveButtonState}
     />
   );
 };

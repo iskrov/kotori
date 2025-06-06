@@ -50,6 +50,7 @@ const RecordScreen: React.FC = () => {
   // UI states
   const [isLoading, setIsLoading] = useState(false);
   const [showRecorder, setShowRecorder] = useState(true); // Start with recorder visible
+  const [hasStartedSaving, setHasStartedSaving] = useState(false);
   
   // Data states for saving the entry
   const [title, setTitle] = useState('');
@@ -63,7 +64,8 @@ const RecordScreen: React.FC = () => {
     isSaving,
     isAutoSaving,
     autoSave,
-    cancelAutoSave, 
+    cancelAutoSave,
+    saveEntry,
   } = useJournalEntry(
     useMemo(() => {
       let currentTags = tags;
@@ -141,10 +143,31 @@ const RecordScreen: React.FC = () => {
     }
 
     logger.info('[RecordScreen] Data set for saving, triggering autoSave.');
+    setHasStartedSaving(true);
     autoSave(); 
     setIsLoading(true);
 
   }, [setContent, setAudioUri, setTitle, autoSave]);
+
+  // Handle manual save from AudioRecorder
+  const handleManualSave = useCallback(async () => {
+    if (!mountedRef.current) {
+      logger.debug('[RecordScreen] handleManualSave: Aborted (unmounted).');
+      return;
+    }
+    
+    logger.info('[RecordScreen] Manual save triggered.');
+    setHasStartedSaving(true);
+    
+    try {
+      const savedId = await saveEntry();
+      if (savedId) {
+        logger.info(`[RecordScreen] Manual save successful (ID: ${savedId}).`);
+      }
+    } catch (error) {
+      logger.error('[RecordScreen] Manual save failed:', error);
+    }
+  }, [saveEntry]);
 
   const handleRecorderCancel = useCallback(() => {
     if (!mountedRef.current) {
@@ -157,11 +180,50 @@ const RecordScreen: React.FC = () => {
     }
   }, [navigation]);
 
+  // Handle close button press
+  const handleClose = useCallback(() => {
+    if (!mountedRef.current) {
+      logger.debug('[RecordScreen] handleClose: Aborted (unmounted).');
+      return;
+    }
+    logger.info('[RecordScreen] Close button pressed.');
+    cancelAutoSave(); // Cancel any pending auto-save
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [navigation, cancelAutoSave]);
+
+  // Determine save button state
+  const getSaveButtonState = useCallback(() => {
+    if (isSaving || isAutoSaving) {
+      return { text: 'Saving...', disabled: true, isSaving: true };
+    }
+    if (hasStartedSaving && !isSaving && !isAutoSaving) {
+      return { text: 'Saved', disabled: true, isSaving: false };
+    }
+    return { text: 'Save', disabled: false, isSaving: false };
+  }, [isSaving, isAutoSaving, hasStartedSaving]);
+
   if (isLoading && !showRecorder) { // Show loading only if recorder isn't active yet
     return (
       <View style={styles.container}>
         <View style={styles.modalOverlay} />
         <View style={styles.recorderContainer}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHandle} />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close"
+                size={24}
+                color={theme.colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>Loading Recorder...</Text>
@@ -178,14 +240,50 @@ const RecordScreen: React.FC = () => {
       
       {showRecorder ? (
         <View style={styles.recorderContainer}>
-          <AudioRecorder
-            startRecordingOnMount={startRecordingOnMount}
-            onTranscriptionComplete={handleTranscriptionComplete}
-            onCancel={handleRecorderCancel}
-          />
+          {/* Modal Header with Drag Handle and Close Button */}
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHandle} />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close"
+                size={24}
+                color={theme.colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Audio Recorder Content */}
+          <View style={styles.recorderContent}>
+            <AudioRecorder
+              startRecordingOnMount={startRecordingOnMount}
+              onTranscriptionComplete={handleTranscriptionComplete}
+              onCancel={handleRecorderCancel}
+              onManualSave={handleManualSave}
+              saveButtonState={getSaveButtonState()}
+            />
+          </View>
         </View>
       ) : (
         <View style={styles.recorderContainer}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHandle} />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close"
+                size={24}
+                color={theme.colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>Processing Recording...</Text>
@@ -208,32 +306,59 @@ const RecordScreen: React.FC = () => {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'flex-end', // Align to bottom
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: Platform.OS === 'ios' ? 88 : 75, // Leave space for tab bar
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Lighter overlay
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 1,
   },
   recorderContainer: {
+    flex: 1,
     width: '100%',
-    height: '80%', // Take only 80% of screen height
     backgroundColor: theme.colors.background,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
     zIndex: 2,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: Platform.OS === 'ios' ? 60 : theme.spacing.xl, // Account for status bar
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: theme.colors.border,
+    borderRadius: 2,
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : theme.spacing.md,
+    left: '50%',
+    marginLeft: -20,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    ...theme.shadows.sm,
+  },
+  recorderContent: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: theme.spacing.xl,
   },
   savingOverlay: {
     ...StyleSheet.absoluteFillObject,
