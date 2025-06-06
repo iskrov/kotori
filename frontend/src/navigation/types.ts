@@ -4,6 +4,7 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 export type RecordScreenParams = {
   startRecording?: boolean;
   journalId?: string; // If opening an existing entry for recording
+  selectedDate?: string; // Date from calendar in YYYY-MM-DD format
 };
 
 // Journal stack params (nested within Journal tab)

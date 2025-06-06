@@ -6,7 +6,9 @@ import {
   ScrollView, 
   TouchableOpacity, 
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform,
+  SafeAreaView
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -91,8 +93,12 @@ const JournalEntryDetailScreen = () => {
   }
   
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <Text style={styles.dateText}>
             {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy')}
@@ -140,25 +146,27 @@ const JournalEntryDetailScreen = () => {
       
       <View style={styles.actionBar}>
         <TouchableOpacity 
-          style={styles.actionButton} 
+          style={[styles.actionButton, styles.editButton]} 
           onPress={handleEdit}
+          activeOpacity={0.8}
         >
-          <Ionicons name="create-outline" size={theme.typography.fontSizes.xxl} color={theme.colors.primary} />
-          <Text style={styles.actionText}>Edit</Text>
+          <Ionicons name="create" size={28} color={theme.colors.white} />
+          <Text style={[styles.actionText, styles.editButtonText]}>Edit Entry</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={styles.actionButton} 
+          style={[styles.actionButton, styles.deleteButton]} 
           onPress={() => {
             console.log('[JournalEntryDetailScreen] Delete button pressed!');
             handleDelete();
           }}
+          activeOpacity={0.8}
         >
-          <Ionicons name="trash-outline" size={theme.typography.fontSizes.xxl} color={theme.colors.error} />
-          <Text style={[styles.actionText, { color: theme.colors.error }]}>Delete</Text>
+          <Ionicons name="trash" size={28} color={theme.colors.white} />
+          <Text style={[styles.actionText, styles.deleteButtonText]}>Delete</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -167,6 +175,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    paddingBottom: Platform.OS === 'ios' ? 88 : 75, // Account for tab bar height
   },
   loadingContainer: {
     flex: 1,
@@ -174,58 +183,71 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
     padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
   },
   header: {
-    marginBottom: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    marginBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: theme.colors.card,
+    borderRadius: 16,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   dateText: {
-    fontSize: theme.typography.fontSizes.xl,
+    fontSize: theme.typography.fontSizes.xxl,
     fontWeight: 'bold',
     color: theme.colors.text,
     marginBottom: theme.spacing.xs,
     fontFamily: theme.typography.fontFamilies.bold,
+    letterSpacing: -0.5,
   },
   timeText: {
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.regular,
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    fontWeight: '600',
   },
   content: {
     backgroundColor: theme.colors.card,
-    borderRadius: 8,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    borderRadius: 16,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
     shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
-    shadowOpacity: theme.isDarkMode ? 0.2 : 0.1,
-    shadowRadius: theme.isDarkMode ? 2 : 4,
-    elevation: theme.isDarkMode ? 2 : 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: theme.isDarkMode ? 0.2 : 0.12,
+    shadowRadius: theme.isDarkMode ? 6 : 8,
+    elevation: theme.isDarkMode ? 4 : 6,
     borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
-    borderWidth: theme.isDarkMode ? 0.5 : 0,
+    borderWidth: theme.isDarkMode ? 1 : 0,
   },
   entryText: {
-    fontSize: theme.typography.fontSizes.md,
-    lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.md,
+    fontSize: theme.typography.fontSizes.lg,
+    lineHeight: theme.typography.lineHeights.loose * theme.typography.fontSizes.lg,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.regular,
+    letterSpacing: 0.2,
   },
   metadataContainer: {
     backgroundColor: theme.colors.card,
-    borderRadius: 8,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    borderRadius: 16,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
     shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: theme.isDarkMode ? 0.2 : 0.1,
-    shadowRadius: theme.isDarkMode ? 2 : 4,
-    elevation: theme.isDarkMode ? 2 : 3,
+    shadowRadius: theme.isDarkMode ? 4 : 6,
+    elevation: theme.isDarkMode ? 3 : 4,
     borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
-    borderWidth: theme.isDarkMode ? 0.5 : 0,
+    borderWidth: theme.isDarkMode ? 1 : 0,
   },
   metadataItem: {
     flexDirection: 'row',
@@ -250,35 +272,74 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flex: 1,
   },
   tag: {
-    backgroundColor: theme.colors.gray200,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: 15,
+    backgroundColor: theme.colors.primary + '15',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: 20,
     marginRight: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + '30',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   tagText: {
-    fontSize: theme.typography.fontSizes.xs,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.semiBold,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.bold,
+    fontWeight: 'bold',
+    letterSpacing: 0.3,
   },
   actionBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
+    justifyContent: 'space-between',
+    padding: theme.spacing.xl,
+    paddingTop: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
+    gap: theme.spacing.lg,
   },
   actionButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.sm,
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: 16,
+    flex: 1,
+    minHeight: 56,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  editButton: {
+    backgroundColor: theme.colors.primary,
+    borderWidth: 2,
+    borderColor: theme.colors.primary + '20',
+  },
+  deleteButton: {
+    backgroundColor: theme.colors.error,
+    borderWidth: 2,
+    borderColor: theme.colors.error + '20',
   },
   actionText: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.primary,
-    marginTop: theme.spacing.xs,
-    fontFamily: theme.typography.fontFamilies.regular,
+    fontSize: theme.typography.fontSizes.lg,
+    marginLeft: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.bold,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  editButtonText: {
+    color: theme.colors.white,
+  },
+  deleteButtonText: {
+    color: theme.colors.white,
   },
   errorContainer: {
     flex: 1,

@@ -321,7 +321,8 @@ export const JournalAPI = {
     page?: number, 
     limit?: number, 
     tags?: string[], 
-    entry_date?: string,
+    start_date?: string,  // Filter entries from this date (YYYY-MM-DD format)
+    end_date?: string,    // Filter entries to this date (YYYY-MM-DD format)
     include_hidden?: boolean  // Add support for hidden entries
   }) => api.get('/api/journals', { params }),
   

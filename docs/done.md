@@ -592,3 +592,152 @@ Major UX improvements successfully implemented:
 - **Component Reusability**: Improved component architecture for future enhancements
 
 **Status: ✅ PRODUCTION-READY - RecordScreen modal and save functionality fully operational**
+
+## 🐛 Critical Bug Fixes ✅ COMPLETED
+
+### Calendar Entry Creation UTC Date Fix ✅ COMPLETED
+**Issue**: Calendar entry creation was failing due to timezone conversion issues when using selectedDate
+**Root Cause**: When converting selectedDate (YYYY-MM-DD format) to ISO string, `new Date(selectedDate).toISOString()` was creating timezone-dependent timestamps that could shift the date by several hours
+**User Experience Problem**: Entries created for specific calendar dates were appearing on wrong dates or failing to save due to timezone differences
+
+**Solution Implemented**:
+- **UTC Date Conversion**: Replaced timezone-dependent date conversion with explicit UTC date creation
+- **Noon UTC Anchor**: Set selected dates to noon UTC (12:00:00) to ensure they fall within the correct day regardless of user timezone
+- **Date Component Parsing**: Parse selectedDate string into year, month, day components and use `Date.UTC()` for precise UTC timestamp creation
+- **Logging Enhancement**: Added logging to track date conversion process and verify UTC timestamps
+
+**Technical Changes**:
+- `useJournalEntry.ts`: Updated `performSave` function to use explicit UTC date parsing
+- **Before**: `new Date(selectedDate).toISOString()` (timezone-dependent)
+- **After**: `new Date(Date.UTC(year, month-1, day, 12, 0, 0, 0)).toISOString()` (UTC noon)
+- **Conversion Logic**: `"2025-04-24"` → `"2025-04-24T12:00:00.000Z"` (noon UTC)
+
+**Result**: Calendar entries now consistently use the correct selected date without timezone interference, ensuring reliable date-based filtering and display
+
+### Calendar Entry Creation Date Fix ✅ COMPLETED
+**Issue**: When creating entries from calendar view, entries were always dated with current date instead of selected calendar date
+**Root Cause**: Record screen didn't receive selected date information from calendar
+**User Experience Problem**: Selecting April 24, 2025 on calendar and clicking "Create Entry" would create entry dated today instead of April 24
+
+**Solution Implemented**:
+- **Navigation Parameter**: Added `selectedDate` parameter to `RecordScreenParams` type
+- **Calendar Integration**: Updated `CalendarScreen.handleCreateEntry()` to pass selected date to Record screen
+- **Hook Enhancement**: Updated `useJournalEntry` hook to accept and use `selectedDate` parameter
+- **Date Logic**: Modified entry creation to use selectedDate when provided, fallback to current date when not
+- **Logging**: Added logging to track when custom dates are being used
+
+**Technical Changes**:
+- `navigation/types.ts`: Added `selectedDate?: string` to `RecordScreenParams`
+- `CalendarScreen.tsx`: Updated `handleCreateEntry()` to pass `selectedDate` in navigation params
+- `useJournalEntry.ts`: Added `selectedDate` option and updated `performSave` to use custom date
+- `RecordScreen.tsx`: Extract `selectedDate` from route params and pass to hook
+
+**Result**: Calendar entries now correctly use the selected calendar date instead of always using today's date
+
+### Calendar Responsive Design Fix ✅ COMPLETED
+**Issue**: Calendar view worked perfectly on mobile but had layout problems on desktop/fullscreen
+**Root Cause**: Non-responsive design with fixed aspect ratios and percentages causing oversized calendar cells on desktop
+**Problems Identified**:
+- Calendar cells used `aspectRatio: 1` with `width: '100%'` making them enormous on desktop
+- No maximum width constraints causing calendar to spread across entire screen
+- No responsive breakpoints for different screen sizes
+- Entries list was cut off or not visible on desktop
+
+**Solution Implemented**:
+- **Responsive Breakpoints**: Added desktop (>768px), tablet (480-768px), and mobile (<480px) breakpoints
+- **Calendar Constraints**: Added maximum width (600px on desktop) and centered alignment
+- **Dynamic Cell Sizing**: Calculated day cell size based on available space with maximum constraints
+- **Adaptive Typography**: Smaller font sizes on desktop for better density
+- **ScrollView Integration**: Added ScrollView wrapper for better desktop accessibility
+- **Proper Layout**: Fixed inline width styles and improved responsive layout
+
+**Technical Changes**:
+- `CalendarScreen.tsx`: Added responsive styling with Dimensions API
+- **Responsive calculations**: Dynamic cell sizing based on screen width
+- **Desktop optimization**: Maximum widths and proper spacing for large screens
+- **Mobile compatibility**: Maintained mobile functionality and appearance
+- **ScrollView wrapper**: Ensured all content is accessible on desktop
+
+**Result**: Calendar now works perfectly on both mobile and desktop with appropriate sizing and full content visibility
+
+### Calendar Date Filtering Fix ✅ COMPLETED
+**Issue**: Calendar page was showing all posts instead of filtering by selected date
+**Root Cause Analysis**: 
+- **Primary Issue**: API parameter mismatch - frontend sending `entry_date` parameter but backend expecting `start_date` and `end_date`
+- **Secondary Issue**: Date vs DateTime comparison bug - comparing `date` objects against `datetime` database fields
+  - Database entries: `2025-06-05 22:37:12.102000-07:00` (full datetime with timezone)
+  - Filter parameters: `2025-06-05` (date only)
+  - Original logic: `entry_date <= 2025-06-05` matched only `2025-06-05 00:00:00`, missing all entries with timestamps
+
+**Solution Implemented**:
+- **Fixed API Parameters**: Updated frontend to use `start_date` and `end_date` instead of `entry_date`
+- **Fixed Date Filtering Logic**: Updated backend to convert date to datetime range:
+  - `start_date`: Convert to datetime at start of day (`00:00:00`)
+  - `end_date`: Convert to datetime at end of day (`23:59:59.999999`)
+- **Proper Date Filtering**: Both start_date and end_date set to same date for single-day filtering
+- **Added Documentation**: Added parameter documentation with YYYY-MM-DD format specification
+- **Consistent API Calls**: Updated both fetchEntries and fetchEntriesForSelectedDate functions
+- **Hidden Mode Support**: Added include_hidden parameter for consistent API behavior
+
+**Technical Changes**:
+- `frontend/src/services/api.ts`: Updated JournalAPI.getEntries parameter interface
+- `frontend/src/screens/main/CalendarScreen.tsx`: Updated date filtering functions
+- `backend/app/services/journal_service.py`: Fixed date vs datetime comparison logic
+- **Result**: Calendar now correctly shows only entries for the selected date
+
+### Console Warnings Cleanup ✅ COMPLETED
+**Issue**: Multiple console warnings appearing during app usage affecting development experience
+**Problems Identified**:
+- **Missing React Keys**: Calendar day rendering was missing unique `key` props causing React warnings
+- **setNativeProps Deprecation**: React Navigation components using deprecated setNativeProps method
+- **Unexpected Text Nodes**: Recurring "Unexpected text node" errors during audio recording
+
+**Solution Implemented**:
+- **Fixed Missing Keys**: Added proper `key` props to calendar day map function using `day.toISOString()`
+- **Calendar Day Rendering**: Wrapped calendar day components in keyed View containers
+- **Documentation**: Acknowledged setNativeProps warnings as React Navigation library issue (not user-fixable)
+
+**Technical Changes**:
+- `CalendarScreen.tsx`: Fixed missing keys in calendar day rendering
+  - **Before**: `{getDaysInMonth().map((day) => renderDay(day))}`
+  - **After**: `{getDaysInMonth().map((day) => <View key={day.toISOString()}>{renderDay(day)}</View>)}`
+
+**Result**: Reduced console warnings from React key prop violations, improving development experience
+
+#### 9. Journal Entry Detail Visual Enhancement ✅
+**Problem**: Journal Entry Detail screen had basic styling that looked outdated
+**Root Cause**: Simple, flat design with minimal visual hierarchy and basic styling
+
+**Solution**: 
+- **🎨 Modern Action Buttons**: 
+  - Larger, more prominent buttons (56px height) with premium shadows
+  - Enhanced visual feedback with activeOpacity and better touch targets
+  - Solid filled icons (create, trash) instead of outline versions
+  - Bold typography with letter spacing for better readability
+  - Subtle borders and enhanced elevation for depth
+
+- **📱 Enhanced Content Presentation**:
+  - Modern card design with 16px border radius and enhanced shadows
+  - Improved typography hierarchy with larger, more readable text
+  - Better spacing and padding throughout (xl spacing for premium feel)
+  - Enhanced header design with card background and subtle shadows
+
+- **✨ Visual Polish**:
+  - Improved tag styling with primary color theming and subtle shadows
+  - Enhanced text readability with improved line heights and letter spacing
+  - Modern shadow system with proper elevation levels
+  - Consistent border radius and spacing throughout
+
+**Result**: Journal Entry Detail screen now has a premium, modern appearance that enhances user experience ✅
+
+## 🎯 Current Status
+**All major calendar and navigation issues resolved + Enhanced visual design**
+- Calendar date filtering: ✅ Working perfectly
+- Calendar responsive design: ✅ Working on all devices  
+- Calendar entry creation: ✅ Uses correct selected date
+- Calendar entry refresh: ✅ Immediate updates after creation
+- Entry edit/delete UX: ✅ Modern, prominent buttons
+- Entry detail visuals: ✅ Premium modern design
+
+## 📋 Next Steps
+Ready for additional features or bug fixes as needed.

@@ -26,6 +26,7 @@ export interface JournalEntryHook {
 interface UseJournalEntryOptions {
   initialData?: Partial<JournalData>;
   autoSaveDelay?: number;
+  selectedDate?: string; // Date in YYYY-MM-DD format from calendar
   onSaveComplete?: (id: string | null) => void;
   onSaveError?: (error: Error) => void;
 }
@@ -36,7 +37,7 @@ const DEFAULT_OPTIONS: UseJournalEntryOptions = {
 
 const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): JournalEntryHook => {
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-  const { autoSaveDelay, onSaveComplete, onSaveError } = mergedOptions;
+  const { autoSaveDelay, selectedDate, onSaveComplete, onSaveError } = mergedOptions;
   const [journalId, setJournalId] = useState<string | null>(data.id);
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
@@ -85,11 +86,25 @@ const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): J
     } else if (currentData.audioUri) {
       logger.info('performSave: Detected blob URL for audio. This will not be sent to backend.');
     }
+    
+    // Use selectedDate if provided, otherwise use current date
+    let entryDate: string;
+    if (selectedDate) {
+      // Parse the selectedDate (YYYY-MM-DD format) and create a proper UTC date
+      // Set it to noon UTC to avoid timezone issues
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const utcDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+      entryDate = utcDate.toISOString();
+      logger.info(`performSave: Using selectedDate ${selectedDate}, converted to UTC: ${entryDate}`);
+    } else {
+      entryDate = new Date().toISOString();
+      logger.info(`performSave: Using current date: ${entryDate}`);
+    }
       
     const entryData = {
       title: currentData.title.trim() || `Journal - ${format(new Date(), 'yyyy-MM-dd HH:mm')}`,
       content: currentData.content.trim(),
-      entry_date: new Date().toISOString(),
+      entry_date: entryDate,
       audio_url: audioUrl || undefined, // Convert null to undefined for type compatibility
       tags: currentData.tags,
     };
@@ -132,7 +147,7 @@ const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): J
       // Rethrow so the caller knows it failed, even if state isn't updated
       throw err; 
     }
-  }, [onSaveError]);
+  }, [onSaveError, selectedDate]);
 
   // Create a stable reference to wrap the debounced function
   const debouncedAutoSaveRef = useRef<ReturnType<typeof debounce>>();

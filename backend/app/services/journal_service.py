@@ -87,10 +87,15 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         if not include_hidden:
             query = query.filter(JournalEntryModel.is_hidden == False)
 
+        # Fix date filtering to handle date vs datetime comparison
         if start_date:
-            query = query.filter(JournalEntryModel.entry_date >= start_date)
+            # Convert date to datetime at start of day
+            start_datetime = datetime.combine(start_date, datetime.min.time())
+            query = query.filter(JournalEntryModel.entry_date >= start_datetime)
         if end_date:
-            query = query.filter(JournalEntryModel.entry_date <= end_date)
+            # Convert date to datetime at end of day (23:59:59.999999)
+            end_datetime = datetime.combine(end_date, datetime.max.time())
+            query = query.filter(JournalEntryModel.entry_date <= end_datetime)
 
         if tags and len(tags) > 0:
             tag_subquery = (

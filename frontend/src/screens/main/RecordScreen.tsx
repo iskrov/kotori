@@ -46,6 +46,16 @@ const RecordScreen: React.FC = () => {
   const { isHiddenMode } = useHiddenMode();
   
   const startRecordingOnMount = route.params?.startRecording ?? false;
+  const selectedDate = route.params?.selectedDate; // Get selectedDate from route params
+  
+  // Log if using a custom date
+  useEffect(() => {
+    if (selectedDate) {
+      logger.info(`[RecordScreen] Using selected date from calendar: ${selectedDate}`);
+    } else {
+      logger.info('[RecordScreen] Using current date for new entry');
+    }
+  }, [selectedDate]);
 
   // UI states
   const [isLoading, setIsLoading] = useState(false);
@@ -84,6 +94,7 @@ const RecordScreen: React.FC = () => {
     }, [title, content, tags, audioUri, isHiddenMode]),
     {
       autoSaveDelay: 500,
+      selectedDate: selectedDate, // Pass selectedDate from route params
       onSaveComplete: useCallback((savedId: string | null) => {
         if (!mountedRef.current) {
           logger.debug('[RecordScreen] onSaveComplete: Aborted (unmounted).');
