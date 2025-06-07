@@ -201,6 +201,7 @@ const JournalEntryFormScreen = () => {
             <AudioRecorder 
               onTranscriptionComplete={handleTranscriptionComplete}
               onCancel={() => setShowRecorder(false)}
+              onAutoSave={() => {}} // No-op for manual transcription mode
             />
           </Modal>
         )}

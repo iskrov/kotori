@@ -155,7 +155,7 @@ const JournalScreen = () => {
   // Navigate to entry creation screen
   const handleCreateEntry = () => {
     // Navigate to Record modal in the parent MainStack
-    navigation.navigate('Record', { startRecording: true });
+    navigation.navigate('Record');
   };
   
   // Navigate to entry detail screen

@@ -155,7 +155,7 @@ const CalendarScreen = () => {
     // Pass the selected date to the Record screen
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     navigation.navigate('Record', { 
-      startRecording: true,
+
       selectedDate: formattedDate
     });
   };

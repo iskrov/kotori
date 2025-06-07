@@ -131,7 +131,7 @@ const useWebSocketTranscription = ({
           }
 
         } catch (e) {
-          logger.error('Failed to parse WebSocket message:', event.data, e);
+          logger.error('Failed to parse WebSocket message:', e);
           onTranscriptionError?.('Received malformed message from server.');
         }
       };
