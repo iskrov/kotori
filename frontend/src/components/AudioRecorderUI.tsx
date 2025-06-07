@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -67,6 +67,12 @@ interface AudioRecorderUIProps {
   
   // Save button state
   saveButtonState?: SaveButtonState;
+  
+  // Optional close handler for modal mode
+  onClose?: () => void;
+  
+  // Optional existing content to show as context
+  existingContent?: string;
 }
 
 export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
@@ -91,10 +97,17 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   formatDuration,
   setShowAlternatives,
   saveButtonState,
+  onClose,
+  existingContent,
 }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
+
+  // Debug transcript segments
+  useEffect(() => {
+    console.log('[AudioRecorderUI] transcriptSegments changed:', transcriptSegments, 'length:', transcriptSegments.length);
+  }, [transcriptSegments]);
 
   // Combine all transcript segments into one text for unified editing
   // Each segment starts on a new line
@@ -158,6 +171,26 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* Modal Header with Close Button (if onClose provided) */}
+      {onClose && (
+        <View style={styles.modalHeader}>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Voice Recording</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+              disabled={isRecording}
+            >
+              <Ionicons
+                name="close"
+                size={24}
+                color={isRecording ? theme.colors.disabled : theme.colors.text}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      
       {/* Language Selector Modal */}
       <Modal
         animationType="slide"
@@ -233,8 +266,28 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
       )}
 
       <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContent}>
+        {/* Existing Content (Read-only) */}
+        {existingContent && existingContent.trim() && (
+          <View style={styles.existingContentContainer}>
+            <View style={styles.existingContentTitleRow}>
+              <Ionicons name="document-text-outline" size={20} color={theme.colors.accent} />
+              <Text style={styles.existingContentTitle}>Existing Content</Text>
+              <View style={styles.readOnlyBadge}>
+                <Text style={styles.readOnlyBadgeText}>Read-only</Text>
+              </View>
+            </View>
+            <View style={styles.existingContentBox}>
+              <Text style={styles.existingContentText}>{existingContent}</Text>
+            </View>
+            <View style={styles.existingContentNoteContainer}>
+              <Ionicons name="arrow-down" size={16} color={theme.colors.accent} />
+              <Text style={styles.existingContentNote}>New recordings will be added below</Text>
+            </View>
+          </View>
+        )}
+
         {/* Recording Area */}
-        <View style={[styles.recordingArea, transcriptSegments.length === 0 && { flex: 1 }]}>
+        <View style={[styles.recordingArea, transcriptSegments.length === 0 && !existingContent && { flex: 1 }]}>
           {/* Waveform visualization */}
           {isRecording && (
             <View style={styles.waveformContainer}>
@@ -422,8 +475,6 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
               placeholderTextColor={theme.colors.textDisabled}
               textAlignVertical="top"
             />
-
-
 
             {/* Transcription Alternatives */}
             {showAlternatives && lastTranscriptionResult?.alternatives && lastTranscriptionResult.alternatives.length > 0 && (
@@ -773,6 +824,93 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
     marginLeft: theme.spacing.xs,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  headerTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontFamily: theme.typography.fontFamilies.bold,
+    color: theme.colors.text,
+  },
+  closeButton: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: 'transparent',
+  },
+  
+  // Existing Content Styles
+  existingContentContainer: {
+    backgroundColor: addAlpha(theme.colors.accent, '08'),
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    margin: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: addAlpha(theme.colors.accent, '20'),
+  },
+  existingContentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  existingContentTitle: {
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    color: theme.colors.accent,
+    marginLeft: theme.spacing.xs,
+    flex: 1,
+  },
+  readOnlyBadge: {
+    backgroundColor: addAlpha(theme.colors.warning, '20'),
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: addAlpha(theme.colors.warning, '40'),
+  },
+  readOnlyBadgeText: {
+    fontSize: theme.typography.fontSizes.xs,
+    fontFamily: theme.typography.fontFamilies.medium,
+    color: theme.colors.warning,
+  },
+  existingContentBox: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: theme.spacing.sm,
+  },
+  existingContentText: {
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.regular,
+    color: theme.colors.textSecondary,
+    lineHeight: theme.typography.lineHeights.loose * theme.typography.fontSizes.md,
+  },
+  existingContentNoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  existingContentNote: {
+    fontSize: theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.medium,
+    color: theme.colors.accent,
+    marginLeft: theme.spacing.xs,
+    fontStyle: 'italic',
   },
 });
 

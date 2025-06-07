@@ -15,6 +15,8 @@ interface AudioRecorderProps {
   onManualSave?: () => Promise<void>;
   saveButtonState?: SaveButtonState;
   onAutoSave: (currentTranscript: string) => void;
+  showCloseButton?: boolean; // Optional prop to show close button in modal mode
+  existingContent?: string; // Optional existing content to show as context
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
@@ -24,6 +26,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   onManualSave,
   saveButtonState,
   onAutoSave,
+  showCloseButton = false,
+  existingContent,
 }) => {
   // Use the custom hook for all business logic
   const audioRecorderLogic = useAudioRecorderLogic({
@@ -97,6 +101,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       
       // Save button state
       saveButtonState={saveButtonState}
+      
+      // Close button for modal mode
+      onClose={showCloseButton ? onCancel : undefined}
+      
+      // Existing content for context in edit mode
+      existingContent={existingContent}
     />
   );
 };

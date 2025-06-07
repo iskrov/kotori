@@ -288,8 +288,6 @@ export const useAudioRecorderLogic = ({
       if (transcript) {
         // Capitalize first letter of the transcript segment
         const capitalizedTranscript = transcript.charAt(0).toUpperCase() + transcript.slice(1);
-        setTranscriptSegments(prev => [...prev, capitalizedTranscript]);
-        setCurrentSegmentTranscript('');
         
         logger.info(
           `[processSegment] Transcription completed - ` +
@@ -304,14 +302,26 @@ export const useAudioRecorderLogic = ({
         if (qualityAssessment.recommendations.length > 0) {
           logger.info(`Quality recommendations: ${qualityAssessment.recommendations.join(', ')}`);
         }
-
-        // Build the complete transcript including the new segment  
-        const newTranscript = [...transcriptSegments, capitalizedTranscript].join('\n');
         
-        if (settings.autoSaveEnabled && onAutoSave) {
-          logger.info('[AutoSave] Triggering auto-save due to new segment.');
-          onAutoSave(newTranscript);
-        }
+        // Update transcript segments first
+        setTranscriptSegments(prev => {
+          const newSegments = [...prev, capitalizedTranscript];
+          logger.info(`[processSegment] Updated transcript segments: ${newSegments.length} segments, latest: "${capitalizedTranscript}"`);
+          
+          // Trigger auto-save with the complete transcript INSIDE the state update
+          if (settings.autoSaveEnabled && onAutoSave) {
+            const newTranscript = newSegments.join('\n');
+            logger.info(`[AutoSave] Triggering auto-save due to new segment. Full transcript: "${newTranscript}"`);
+            // Use setTimeout to ensure the state update completes first
+            setTimeout(() => {
+              onAutoSave(newTranscript);
+            }, 0);
+          }
+          
+          return newSegments;
+        });
+        
+        setCurrentSegmentTranscript('');
       } else {
         setCurrentSegmentTranscript('No speech detected in this segment.');
         logger.warn('[processSegment] No transcript received from service.');
