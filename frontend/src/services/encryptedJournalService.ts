@@ -8,6 +8,7 @@
 import { JournalAPI } from './api';
 import { zeroKnowledgeEncryption } from './zeroKnowledgeEncryption';
 import { hiddenModeManager } from './hiddenModeManager';
+import settingsService from './settingsService';
 import logger from '../utils/logger';
 
 export interface JournalEntryData {
@@ -29,7 +30,7 @@ export interface CreateEntryOptions {
 
 class EncryptedJournalService {
   /**
-   * Create a journal entry, automatically encrypting if in hidden mode
+   * Create a journal entry, automatically encrypting based on user preferences and hidden mode
    */
   async createEntry(
     entryData: Omit<JournalEntryData, 'id'>,
@@ -37,15 +38,39 @@ class EncryptedJournalService {
   ): Promise<JournalEntryData> {
     const { forceHidden, regularEntry } = options;
     
-    // Determine if entry should be hidden
-    const shouldHide = forceHidden || (!regularEntry && hiddenModeManager.isActive());
+    // Get user's default privacy setting
+    const settings = await settingsService.getSettings();
+    const defaultPrivacy = settings.defaultEntryPrivacy;
+    
+    // Determine if entry should be hidden based on:
+    // 1. Explicit force options
+    // 2. Hidden mode being active (overrides default privacy)
+    // 3. User's default privacy setting
+    let shouldHide = false;
+    
+    if (forceHidden) {
+      shouldHide = true;
+      logger.info('Creating hidden entry: forced by options');
+    } else if (regularEntry) {
+      shouldHide = false;
+      logger.info('Creating regular entry: forced by options');
+    } else if (hiddenModeManager.isActive()) {
+      shouldHide = true;
+      logger.info('Creating hidden entry: hidden mode is active');
+    } else if (defaultPrivacy === 'hidden') {
+      shouldHide = true;
+      logger.info('Creating hidden entry: user default privacy is hidden');
+    } else {
+      shouldHide = false;
+      logger.info('Creating regular entry: user default privacy is public');
+    }
     
     if (shouldHide && zeroKnowledgeEncryption.isReady()) {
       return this.createHiddenEntry(entryData);
     } else {
-      // Fall back to regular entry if encryption not ready or not in hidden mode
+      // Fall back to regular entry if encryption not ready
       if (shouldHide && !zeroKnowledgeEncryption.isReady()) {
-        logger.warn('Hidden mode active but encryption not ready, creating regular entry');
+        logger.warn('Entry should be hidden but encryption not ready, creating regular entry');
       }
       return this.createRegularEntry(entryData);
     }

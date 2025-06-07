@@ -5,11 +5,11 @@ import {
   StyleSheet,
   Animated,
   Platform,
-  Vibration,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
+import hapticService from '../services/hapticService';
 
 interface FloatingActionButtonProps {
   onPress: () => void;
@@ -67,19 +67,8 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   const handlePressIn = () => {
     if (disabled) return;
     
-    // Haptic feedback
-    if (Platform.OS === 'ios') {
-      // Use Haptics API if available
-      try {
-        const { Haptics } = require('expo-haptics');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch {
-        // Fallback to vibration
-        Vibration.vibrate(50);
-      }
-    } else if (Platform.OS === 'android') {
-      Vibration.vibrate(50);
-    }
+    // Haptic feedback using centralized service
+    hapticService.medium();
 
     Animated.parallel([
       Animated.spring(scaleAnim, {

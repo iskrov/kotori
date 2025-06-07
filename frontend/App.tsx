@@ -10,6 +10,7 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import Navigation from './src/navigation';
 import logger from './src/utils/logger';
 import { ThemeProvider, useAppTheme } from './src/contexts/ThemeContext';
+import { SettingsProvider } from './src/contexts/SettingsContext';
 import { HiddenModeProvider } from './src/contexts/HiddenModeContext';
 // import { initializeAppInsights } from './src/services/appInsights'; // Commented out to fix linter error
 
@@ -104,24 +105,26 @@ const AppContent = () => {
     <SafeAreaProvider>
       <AuthProvider>
         <ThemeProvider>
-          <HiddenModeProvider>
-            <NavigationContainer
-              onStateChange={() => {
-                if (__DEV__) {
-                  logger.debug('Navigation state changed');
+          <SettingsProvider>
+            <HiddenModeProvider>
+              <NavigationContainer
+                onStateChange={() => {
+                  if (__DEV__) {
+                    logger.debug('Navigation state changed');
+                  }
+                }}
+                fallback={
+                  // Use StyleSheet for initial loading
+                  <View style={styles.loadingContainer}> 
+                    <Text>Loading navigation...</Text>
+                  </View>
                 }
-              }}
-              fallback={
-                // Use StyleSheet for initial loading
-                <View style={styles.loadingContainer}> 
-                  <Text>Loading navigation...</Text>
-                </View>
-              }
-            >
-              <Navigation />
-              <StatusBar style={statusBarStyle} /> {/* Use mapped style */}
-            </NavigationContainer>
-          </HiddenModeProvider>
+              >
+                <Navigation />
+                <StatusBar style={statusBarStyle} /> {/* Use mapped style */}
+              </NavigationContainer>
+            </HiddenModeProvider>
+          </SettingsProvider>
         </ThemeProvider>
       </AuthProvider>
     </SafeAreaProvider>
@@ -135,9 +138,11 @@ export default function App() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
-          <HiddenModeProvider>
-            <AppContent />
-          </HiddenModeProvider>
+          <SettingsProvider>
+            <HiddenModeProvider>
+              <AppContent />
+            </HiddenModeProvider>
+          </SettingsProvider>
         </ThemeProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

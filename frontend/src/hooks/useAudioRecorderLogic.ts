@@ -3,10 +3,12 @@ import { Alert, Animated, Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import speechToTextService from '../services/speechToText';
 import logger from '../utils/logger';
+import hapticService from '../services/hapticService';
 
 // Import hooks
 import useAudioRecording from './useAudioRecording';
 import useWebSocketTranscription, { WebSocketStatus } from './useWebSocketTranscription';
+import { useSettings } from '../contexts/SettingsContext';
 
 // Import simplified config
 import { 
@@ -49,6 +51,9 @@ export const useAudioRecorderLogic = ({
   onCancel,
   autoStart = false
 }: UseAudioRecorderLogicProps) => {
+  // Get user settings for default language
+  const { settings } = useSettings();
+  
   // Enhanced states for transcription
   const [transcriptSegments, setTranscriptSegments] = useState<string[]>([]);
   const [currentSegmentTranscript, setCurrentSegmentTranscript] = useState('');
@@ -57,8 +62,14 @@ export const useAudioRecorderLogic = ({
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [transcriptionQuality, setTranscriptionQuality] = useState<'excellent' | 'good' | 'fair' | 'poor' | null>(null);
 
-  // Simplified language selection
-  const [selectedLanguage, setSelectedLanguage] = useState<string>(getDefaultLanguageCode());
+  // Use user's default language setting
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(settings.defaultLanguage);
+
+  // Update selected language when user changes default language setting
+  useEffect(() => {
+    setSelectedLanguage(settings.defaultLanguage);
+    logger.info(`[AudioRecorderLogic] Default language updated to: ${settings.defaultLanguage}`);
+  }, [settings.defaultLanguage]);
 
   // Animation refs
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -235,6 +246,7 @@ export const useAudioRecorderLogic = ({
       `confidence: ${confidence.toFixed(2)}, language: ${detectedLanguage || 'unknown'}`
     );
 
+    hapticService.success(); // Success haptic feedback for accepting transcript
     onTranscriptionComplete(fullTranscript, audioUri || undefined, detectedLanguage, confidence);
   }, [transcriptSegments, lastTranscriptionResult, audioUri, onTranscriptionComplete]);
 
@@ -344,6 +356,7 @@ export const useAudioRecorderLogic = ({
 
     if (isRecording) {
       logger.info('[AudioRecorder] Mic press: Stopping current recording segment.');
+      hapticService.medium(); // Medium haptic feedback for stop action
       try {
         await stopRecording();
       } catch (error) {
@@ -352,6 +365,7 @@ export const useAudioRecorderLogic = ({
     } else { // Not recording
       if (isTranscribingSegment) {
         logger.info('[AudioRecorder] Mic press: Still transcribing previous segment. Please wait.');
+        hapticService.warning(); // Warning haptic for blocked action
         Alert.alert('Processing', 'Still processing the previous audio. Please wait a moment.');
         return;
       }
@@ -360,6 +374,7 @@ export const useAudioRecorderLogic = ({
       callbackCalledRef.current = false;
       
       logger.info('[AudioRecorder] Mic press: Starting new recording segment.');
+      hapticService.heavy(); // Heavy haptic feedback for start recording action
       try {
         await startRecording();
       } catch (error) {

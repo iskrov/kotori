@@ -5,9 +5,11 @@ import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-import { AuthAPI } from '../services/api';
+import { AuthAPI, api } from '../services/api';
 import { User } from '../types';
 import logger from '../utils/logger';
+
+// Security: Remove debug storage function - not safe for production
 
 // Ensure web browser redirect results are handled
 WebBrowser.maybeCompleteAuthSession();
@@ -61,18 +63,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const checkAuthStatus = async () => {
       try {
         logger.info('Checking authentication status');
+        
         const token = await AsyncStorage.getItem('access_token');
+        const storedUser = await AsyncStorage.getItem('user');
         
         if (token) {
           logger.info('Access token found. Assuming authenticated for now.');
+          // Set authorization header for API requests
+          api.defaults.headers.common.Authorization = `Bearer ${token}`;
           // Mark as authenticated. We can add profile fetching later.
           setIsAuthenticated(true);
           // Optionally load stored user data if available
-          const storedUser = await AsyncStorage.getItem('user');
           if (storedUser) {
             try {
-              setUser(JSON.parse(storedUser));
-              logger.info('Loaded user data from storage.');
+              const userData = JSON.parse(storedUser);
+              setUser(userData);
+              logger.info('Loaded user data from storage:', { userId: userData.id });
             } catch (parseError) {
               logger.error('Failed to parse stored user data', parseError);
               setUser(null); // Clear user if parsing fails
@@ -85,6 +91,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // No token found, ensure logged out state
           setIsAuthenticated(false);
           setUser(null);
+          delete api.defaults.headers.common.Authorization;
           logger.info('No authentication token found');
         }
       } catch (error) {
@@ -93,8 +100,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           await AsyncStorage.removeItem('access_token');
           await AsyncStorage.removeItem('refresh_token');
+          await AsyncStorage.removeItem('user');
+          delete api.defaults.headers.common.Authorization;
         } catch (e) {
-          logger.error('Failed to clear tokens:', e);
+          logger.error('Failed to clear auth data:', e);
         }
       } finally {
         setIsLoading(false);
@@ -130,6 +139,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       logger.info('Login successful', { userId: response.data.user?.id });
       await AsyncStorage.setItem('access_token', response.data.access_token);
       await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
+      
+      // Set authorization header for API requests
+      api.defaults.headers.common.Authorization = `Bearer ${response.data.access_token}`;
       
       setUser(response.data.user);
       setIsAuthenticated(true);
@@ -170,6 +182,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.setItem('access_token', response.data.access_token);
       await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
       
+      // Set authorization header for API requests
+      api.defaults.headers.common.Authorization = `Bearer ${response.data.access_token}`;
+      
       setUser(response.data.user);
       setIsAuthenticated(true);
       // Save user data to storage
@@ -197,6 +212,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.setItem('access_token', response.data.access_token);
       await AsyncStorage.setItem('refresh_token', response.data.refresh_token);
       
+      // Set authorization header for API requests
+      api.defaults.headers.common.Authorization = `Bearer ${response.data.access_token}`;
+      
       setUser(response.data.user);
       setIsAuthenticated(true);
       // Save user data to storage
@@ -219,14 +237,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       logger.info('Logging out user', { userId: user?.id });
       setIsLoading(true);
+      
       await AuthAPI.logout();
       
+      // Clear all authentication data from storage
       await AsyncStorage.removeItem('access_token');
       await AsyncStorage.removeItem('refresh_token');
+      await AsyncStorage.removeItem('user');
+      
+      // Clear API authorization header
+      delete api.defaults.headers.common.Authorization;
+      logger.info('API authorization header cleared');
       
       setUser(null);
       setIsAuthenticated(false);
-      logger.info('Logout successful - local state cleared');
+      logger.info('Logout successful - all auth data cleared');
     } catch (error: any) {
       logger.error('Logout failed:', { 
         userId: user?.id,
@@ -234,13 +259,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         message: error.message
       });
       
-      // Even if server logout fails, remove tokens
+      // Even if server logout fails, remove all auth data
       await AsyncStorage.removeItem('access_token');
       await AsyncStorage.removeItem('refresh_token');
+      await AsyncStorage.removeItem('user');
+      
+      // Clear API authorization header
+      delete api.defaults.headers.common.Authorization;
       
       setUser(null);
       setIsAuthenticated(false);
-      logger.info('Logout successful - local state cleared');
+      logger.info('Logout successful - all auth data cleared (fallback)');
     } finally {
       setIsLoading(false);
     }
