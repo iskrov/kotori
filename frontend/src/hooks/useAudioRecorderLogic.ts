@@ -62,7 +62,7 @@ export const useAudioRecorderLogic = ({
   const [isTranscribingSegment, setIsTranscribingSegment] = useState(false);
   const [lastTranscriptionResult, setLastTranscriptionResult] = useState<TranscriptionResult | null>(null);
   const [showAlternatives, setShowAlternatives] = useState(false);
-  const [transcriptionQuality, setTranscriptionQuality] = useState<'excellent' | 'good' | 'fair' | 'poor' | null>(null);
+
 
   // Use user's default language setting
   const [selectedLanguage, setSelectedLanguage] = useState<string>(settings.defaultLanguage);
@@ -181,7 +181,6 @@ export const useAudioRecorderLogic = ({
     setIsTranscribingSegment(false);
     setLastTranscriptionResult(null);
     setShowAlternatives(false);
-    setTranscriptionQuality(null);
 
     callbackCalledRef.current = false;
     setHasTranscribedAudio(false);
@@ -284,7 +283,6 @@ export const useAudioRecorderLogic = ({
       
       // Get quality assessment
       const qualityAssessment = speechToTextService.getQualityAssessment(result);
-      setTranscriptionQuality(qualityAssessment.overall);
 
       const transcript = result.transcript?.trim();
       if (transcript) {
@@ -321,7 +319,6 @@ export const useAudioRecorderLogic = ({
       logger.error('[processSegment] Transcription failed:', error);
       if (isMountedRef.current) {
         setCurrentSegmentTranscript(`Error: ${error.message || 'Transcription failed'}`);
-        setTranscriptionQuality('poor');
       }
     } finally {
       if (isMountedRef.current) {
@@ -427,7 +424,6 @@ export const useAudioRecorderLogic = ({
     lastTranscriptionResult,
     showAlternatives,
     setShowAlternatives,
-    transcriptionQuality,
     selectedLanguage,
     isProcessing,
     hasTranscribedAudio,

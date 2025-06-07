@@ -43,7 +43,7 @@ interface AudioRecorderUIProps {
   isTranscribingSegment: boolean;
   lastTranscriptionResult: TranscriptionResult | null;
   showAlternatives: boolean;
-  transcriptionQuality: 'excellent' | 'good' | 'fair' | 'poor' | null;
+
   selectedLanguage: string;
   isProcessing: boolean;
   canAcceptTranscript: boolean;
@@ -76,7 +76,6 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   isTranscribingSegment,
   lastTranscriptionResult,
   showAlternatives,
-  transcriptionQuality,
   selectedLanguage,
   isProcessing,
   canAcceptTranscript,
@@ -423,21 +422,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
               textAlignVertical="top"
             />
 
-            {/* Transcription Quality Indicator */}
-            {transcriptionQuality && (
-              <View style={styles.qualityContainer}>
-                <Text style={styles.qualityLabel}>Quality: </Text>
-                <Text style={[
-                  styles.qualityValue,
-                  transcriptionQuality === 'excellent' && styles.qualityExcellent,
-                  transcriptionQuality === 'good' && styles.qualityGood,
-                  transcriptionQuality === 'fair' && styles.qualityFair,
-                  transcriptionQuality === 'poor' && styles.qualityPoor,
-                ]}>
-                  {transcriptionQuality.charAt(0).toUpperCase() + transcriptionQuality.slice(1)}
-                </Text>
-              </View>
-            )}
+
 
             {/* Transcription Alternatives */}
             {showAlternatives && lastTranscriptionResult?.alternatives && lastTranscriptionResult.alternatives.length > 0 && (
@@ -761,34 +746,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.bold,
     fontSize: theme.typography.fontSizes.md,
   },
-  qualityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  qualityLabel: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.regular,
-  },
-  qualityValue: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-  },
-  qualityExcellent: {
-    color: theme.colors.success,
-  },
-  qualityGood: {
-    color: theme.colors.accent,
-  },
-  qualityFair: {
-    color: theme.colors.primary,
-  },
-  qualityPoor: {
-    color: theme.colors.error,
-  },
+
   alternativesContainer: {
     marginTop: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,

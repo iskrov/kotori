@@ -74,7 +74,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       isTranscribingSegment={audioRecorderLogic.isTranscribingSegment}
       lastTranscriptionResult={audioRecorderLogic.lastTranscriptionResult}
       showAlternatives={audioRecorderLogic.showAlternatives}
-      transcriptionQuality={audioRecorderLogic.transcriptionQuality}
       selectedLanguage={audioRecorderLogic.selectedLanguage}
       isProcessing={audioRecorderLogic.isProcessing}
       canAcceptTranscript={audioRecorderLogic.canAcceptTranscript}
