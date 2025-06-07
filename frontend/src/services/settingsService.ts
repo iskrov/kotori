@@ -25,6 +25,7 @@ export interface UserSettings {
   
   // Additional (FUNCTIONAL)
   autoSaveEnabled: boolean;
+  autoRecordingEnabled: boolean;
 }
 
 // Default settings with sensible defaults
@@ -50,6 +51,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   
   // Additional
   autoSaveEnabled: true,
+  autoRecordingEnabled: true,
 };
 
 const SETTINGS_STORAGE_KEY = '@vibes_user_settings';

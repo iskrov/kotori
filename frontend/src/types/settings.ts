@@ -3,4 +3,8 @@ export interface Settings {
   defaultLanguage: string;
   defaultEntryPrivacy: 'private' | 'public';
   autoSaveEnabled: boolean;
-} 
+  autoRecordingEnabled: boolean;
+}
+
+// Re-export UserSettings from service for consistency
+export type { UserSettings } from '../services/settingsService'; 

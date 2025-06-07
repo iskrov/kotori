@@ -233,6 +233,15 @@ const SettingsScreen: React.FC = () => {
               updateSetting('autoSaveEnabled', value)
             }
           />
+          <SettingsToggle
+            title="Auto-Start Recording"
+            subtitle="Automatically start recording when opening record screen"
+            leftIcon="mic-outline"
+            value={settings.autoRecordingEnabled}
+            onValueChange={(value) =>
+              updateSetting('autoRecordingEnabled', value)
+            }
+          />
         </SettingsSection>
       </SettingsSection>
 

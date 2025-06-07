@@ -113,7 +113,7 @@ const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
     }
     
     // Navigate to the Record screen using the navigation prop from the parent StackNavigator
-    navigation.navigate('Record', { startRecording: true });
+    navigation.navigate('Record');
   }, [navigation]);
 
   return (

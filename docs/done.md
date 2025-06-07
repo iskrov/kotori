@@ -741,3 +741,39 @@ Major UX improvements successfully implemented:
 
 ## 📋 Next Steps
 Ready for additional features or bug fixes as needed.
+
+## ⚙️ Settings Overhaul & Critical Bug Fixes (January 2025) ✅ COMPLETED
+
+### 1. Settings Page Enhancement ✅
+**Summary**: The settings page was completely overhauled to remove non-functional placeholders and implement a clean, intuitive, and fully functional interface.
+
+- **UI Simplification**: Removed over 15 placeholder settings, focusing the UI on ~6 fully implemented feature sets. This resolved user confusion and created a cleaner experience.
+- **Functional Implementation**:
+    - **Haptic Feedback**: A new centralized `hapticService.ts` was created to provide tactile feedback for key interactions, respecting the user's `hapticFeedbackEnabled` setting.
+    - **Default Language**: The audio recorder now seamlessly uses the `defaultLanguage` from settings, simplifying the transcription workflow.
+    - **Default Entry Privacy**: New journal entries now automatically respect the `defaultEntryPrivacy` setting.
+    - **Notification Framework**: Built a foundational `notificationService.ts` that is aware of and responsive to user settings.
+- **UX Refinement**: Fixed a confusing UI issue where "Auto-detect" language was presented as both a toggle and a dropdown option, simplifying it to a single control.
+
+### 2. Critical Sign-Out Bug Fix ✅
+**Summary**: A major security flaw that prevented users from properly signing out was identified and resolved.
+
+- **Root Cause**: The logout function was only clearing auth tokens, leaving user data in `AsyncStorage` and the `Authorization` header in the API instance, which made the app believe the user was still logged in on restart.
+- **Comprehensive Fix**:
+    1.  Ensured `AsyncStorage.removeItem('user')` is called on logout.
+    2.  Cleared the `Authorization` header from the global `api` instance.
+    3.  Hardened the authentication state management on login, logout, and in error scenarios to prevent state inconsistencies.
+- **Web Compatibility Fix**: Resolved a debugging issue where `Alert.alert` was used, which doesn't work on the web platform, by implementing platform-specific alerts (`window.confirm` for web).
+
+### 3. Security & Code Quality Improvements ✅
+**Summary**: A security audit was performed, and several code quality improvements were made to enhance application security and maintainability.
+
+- **Removed Debug Backdoor**: Deleted a `debugStorage()` function that could expose all `AsyncStorage` content.
+- **Sanitized Logs**: Removed all `console.log` statements that could expose sensitive user data like tokens or email addresses in production builds.
+- **Platform-Specific Alerts**: Implemented platform-aware alerts to ensure proper functionality on both native and web.
+
+### 4. Console Warning Resolution ✅
+**Summary**: Investigated and resolved several console warnings to improve the development experience.
+
+- **`SettingsService` Validation Fix**: Corrected a type mismatch warning by ensuring the validation logic targets only the `settings` object, not the entire storage container.
+- **`setNativeProps` Deprecation**: Identified a `setNativeProps` warning as a known, cosmetic issue within the `react-native-reanimated` library on the web platform. It does not affect functionality and was documented as such.

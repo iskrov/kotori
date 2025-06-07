@@ -23,6 +23,7 @@ import AudioRecorder from '../../components/AudioRecorder';
 import useJournalEntry from '../../hooks/useJournalEntry'; // Removed JournalData import as it's implicitly used
 import { getLanguageName } from '../../config/languageConfig';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
+import { useSettings } from '../../contexts/SettingsContext';
 
 // Utils
 import logger from '../../utils/logger';
@@ -44,8 +45,19 @@ const RecordScreen: React.FC = () => {
   const navigation = useNavigation<RecordScreenNavigationProp>();
   const route = useRoute<RecordScreenRouteProp>();
   const { isHiddenMode } = useHiddenMode();
+  const { settings } = useSettings();
   
-  const startRecordingOnMount = route.params?.startRecording ?? false;
+  // Use the Auto Recording setting instead of route parameter
+  const startRecordingOnMount = settings.autoRecordingEnabled;
+  
+  // Log the auto-recording behavior
+  useEffect(() => {
+    if (startRecordingOnMount) {
+      logger.info('[RecordScreen] Auto-recording is enabled - recording will start automatically');
+    } else {
+      logger.info('[RecordScreen] Auto-recording is disabled - user must manually start recording');
+    }
+  }, [startRecordingOnMount]);
   const selectedDate = route.params?.selectedDate; // Get selectedDate from route params
   
   // Log if using a custom date
