@@ -1,4 +1,4 @@
-# Zero-Knowledge Architecture Implementation Guide
+# Zero-Knowledge Architecture Implementation Guide (before secret tags)
 
 ## Overview
 
