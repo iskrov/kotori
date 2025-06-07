@@ -22,6 +22,9 @@ export interface UserSettings {
   // Advanced (FUNCTIONAL)
   analyticsEnabled: boolean;
   crashReportsEnabled: boolean;
+  
+  // Additional (FUNCTIONAL)
+  autoSaveEnabled: boolean;
 }
 
 // Default settings with sensible defaults
@@ -44,6 +47,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   // Advanced
   analyticsEnabled: true,
   crashReportsEnabled: true,
+  
+  // Additional
+  autoSaveEnabled: true,
 };
 
 const SETTINGS_STORAGE_KEY = '@vibes_user_settings';

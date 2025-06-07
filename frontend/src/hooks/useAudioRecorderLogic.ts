@@ -44,12 +44,14 @@ interface UseAudioRecorderLogicProps {
   onTranscriptionComplete: (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => void;
   onCancel: () => void;
   autoStart?: boolean;
+  onAutoSave: (currentTranscript: string) => void;
 }
 
 export const useAudioRecorderLogic = ({ 
   onTranscriptionComplete, 
   onCancel,
-  autoStart = false
+  autoStart = false,
+  onAutoSave,
 }: UseAudioRecorderLogicProps) => {
   // Get user settings for default language
   const { settings } = useSettings();
@@ -302,10 +304,19 @@ export const useAudioRecorderLogic = ({
         if (qualityAssessment.recommendations.length > 0) {
           logger.info(`Quality recommendations: ${qualityAssessment.recommendations.join(', ')}`);
         }
+
+        // Build the complete transcript including the new segment
+        const newTranscript = [...transcriptSegments, transcript].join(' ');
+        
+        if (settings.autoSaveEnabled && onAutoSave) {
+          logger.info('[AutoSave] Triggering auto-save due to new segment.');
+          onAutoSave(newTranscript);
+        }
       } else {
         setCurrentSegmentTranscript('No speech detected in this segment.');
         logger.warn('[processSegment] No transcript received from service.');
       }
+
     } catch (error: any) {
       logger.error('[processSegment] Transcription failed:', error);
       if (isMountedRef.current) {

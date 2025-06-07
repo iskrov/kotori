@@ -121,40 +121,6 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
     isSaving: false
   };
 
-  // Waveform visualization component
-  const renderWaveform = () => {
-    if (!isRecording) return null;
-
-    const bars = Array.from({ length: 20 }, (_, index) => {
-      const animValue = index % 2 === 0 ? waveAnim1 : waveAnim2;
-      
-      return (
-        <Animated.View
-          key={index}
-          style={[
-            styles.waveformBar,
-            {
-              height: animValue.interpolate({
-                inputRange: [0, 1],
-                outputRange: [4, 24],
-              }),
-              opacity: animValue.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.3, 1],
-              }),
-            },
-          ]}
-        />
-      );
-    });
-
-    return (
-      <View style={styles.waveformContainer}>
-        {bars}
-      </View>
-    );
-  };
-
   // Get recording status for display
   const getRecordingStatus = () => {
     if (!permissionGranted) {
@@ -261,9 +227,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
           <View style={styles.processingContent}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.processingTitle}>Processing Audio</Text>
-            <Text style={styles.processingSubtext}>
-              Converting your speech to text...
-            </Text>
+            <Text style={styles.processingSubtext}>Converting your speech to text...</Text>
           </View>
         </View>
       )}
@@ -272,7 +236,32 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
         {/* Recording Area */}
         <View style={[styles.recordingArea, transcriptSegments.length === 0 && { flex: 1 }]}>
           {/* Waveform visualization */}
-          {renderWaveform()}
+          {isRecording && (
+            <View style={styles.waveformContainer}>
+              {Array.from({ length: 20 }, (_, index) => {
+                const animValue = index % 2 === 0 ? waveAnim1 : waveAnim2;
+                
+                return (
+                  <Animated.View
+                    key={index}
+                    style={[
+                      styles.waveformBar,
+                      {
+                        height: animValue.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [4, 24],
+                        }),
+                        opacity: animValue.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.3, 1],
+                        }),
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          )}
 
           {/* Main microphone button with animations */}
           <View style={styles.micAreaContainer}>
@@ -344,7 +333,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
                         styles.progressArc,
                         {
                           transform: [
-                            { rotate: `${progress * 360}deg` }
+                            { rotate: `${(progress || 0) * 360}deg` }
                           ]
                         }
                       ]}
@@ -353,11 +342,9 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
                 )}
                 
                 <Animated.View
-                  style={[
-                    {
-                      transform: [{ scale: pulseAnim }],
-                    },
-                  ]}
+                  style={{
+                    transform: [{ scale: pulseAnim }],
+                  }}
                 >
                   <TouchableOpacity
                     style={[
@@ -379,7 +366,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
             </View>
           </View>
 
-          {/* Recording Status - positioned right under the mic button */}
+          {/* Recording Status */}
           <View style={styles.statusContainer}>
             <Text style={[styles.statusText, { color: recordingStatus.color }]}>
               {recordingStatus.text}
@@ -388,14 +375,6 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
               {recordingStatus.subtext}
             </Text>
           </View>
-
-          {/* Current segment preview */}
-          {currentSegmentTranscript && currentSegmentTranscript.trim() && !isRecording && (
-            <View style={styles.currentSegmentContainer}>
-              <Text style={styles.currentSegmentLabel}>Current segment:</Text>
-              <Text style={styles.currentSegmentText}>{currentSegmentTranscript}</Text>
-            </View>
-          )}
         </View>
 
         {/* Unified Transcript Editor */}
@@ -407,33 +386,31 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
                 <Text style={styles.transcriptTitle}>Transcript</Text>
               </View>
               
-              {(transcriptSegments.length > 0) && (
-                <TouchableOpacity
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  effectiveSaveButtonState.disabled && styles.saveButtonDisabled,
+                  effectiveSaveButtonState.isSaving && styles.saveButtonSaving,
+                ]}
+                onPress={handleAcceptTranscript}
+                disabled={effectiveSaveButtonState.disabled}
+              >
+                <Ionicons
+                  name={effectiveSaveButtonState.isSaving ? "time" : effectiveSaveButtonState.text === 'Saved' ? "checkmark-circle" : "save"}
+                  size={16}
+                  color={effectiveSaveButtonState.disabled ? theme.colors.disabled : 
+                         effectiveSaveButtonState.text === 'Saved' ? theme.colors.success : theme.colors.primary}
+                />
+                <Text
                   style={[
-                    styles.saveButton,
-                    effectiveSaveButtonState.disabled && styles.saveButtonDisabled,
-                    effectiveSaveButtonState.isSaving && styles.saveButtonSaving,
+                    styles.saveButtonText,
+                    effectiveSaveButtonState.disabled && styles.saveButtonTextDisabled,
+                    effectiveSaveButtonState.text === 'Saved' && styles.saveButtonTextSaved,
                   ]}
-                  onPress={handleAcceptTranscript}
-                  disabled={effectiveSaveButtonState.disabled}
                 >
-                  <Ionicons
-                    name={effectiveSaveButtonState.isSaving ? "time" : effectiveSaveButtonState.text === 'Saved' ? "checkmark-circle" : "save"}
-                    size={16}
-                    color={effectiveSaveButtonState.disabled ? theme.colors.disabled : 
-                           effectiveSaveButtonState.text === 'Saved' ? theme.colors.success : theme.colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.saveButtonText,
-                      effectiveSaveButtonState.disabled && styles.saveButtonTextDisabled,
-                      effectiveSaveButtonState.text === 'Saved' && styles.saveButtonTextSaved,
-                    ]}
-                  >
-                    {effectiveSaveButtonState.text}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                  {effectiveSaveButtonState.text}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <TextInput
@@ -445,6 +422,47 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
               placeholderTextColor={theme.colors.textDisabled}
               textAlignVertical="top"
             />
+
+            {/* Transcription Quality Indicator */}
+            {transcriptionQuality && (
+              <View style={styles.qualityContainer}>
+                <Text style={styles.qualityLabel}>Quality: </Text>
+                <Text style={[
+                  styles.qualityValue,
+                  transcriptionQuality === 'excellent' && styles.qualityExcellent,
+                  transcriptionQuality === 'good' && styles.qualityGood,
+                  transcriptionQuality === 'fair' && styles.qualityFair,
+                  transcriptionQuality === 'poor' && styles.qualityPoor,
+                ]}>
+                  {transcriptionQuality.charAt(0).toUpperCase() + transcriptionQuality.slice(1)}
+                </Text>
+              </View>
+            )}
+
+            {/* Transcription Alternatives */}
+            {showAlternatives && lastTranscriptionResult?.alternatives && lastTranscriptionResult.alternatives.length > 0 && (
+              <View style={styles.alternativesContainer}>
+                <Text style={styles.alternativesTitle}>Alternative transcriptions:</Text>
+                {lastTranscriptionResult.alternatives.map((alternative, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.alternativeItem}
+                    onPress={() => {
+                      if (alternative.transcript && alternative.transcript.trim()) {
+                        setTranscriptSegments([alternative.transcript]);
+                      }
+                    }}
+                  >
+                    <Text style={styles.alternativeText}>{alternative.transcript}</Text>
+                    {alternative.confidence !== undefined && (
+                      <Text style={styles.alternativeConfidence}>
+                        {Math.round(alternative.confidence * 100)}%
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -610,28 +628,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
     textAlign: 'center',
   },
-  currentSegmentContainer: {
-    backgroundColor: theme.colors.card,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: theme.colors.accent,
-    marginTop: theme.spacing.lg,
-    marginHorizontal: theme.spacing.lg,
-    maxWidth: '90%',
-  },
-  currentSegmentLabel: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.medium,
-    marginBottom: theme.spacing.xs,
-  },
-  currentSegmentText: {
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.regular,
-    fontStyle: 'italic',
-  },
   transcriptCard: {
     backgroundColor: theme.colors.card,
     borderRadius: theme.borderRadius.xl,
@@ -764,6 +760,60 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.white,
     fontFamily: theme.typography.fontFamilies.bold,
     fontSize: theme.typography.fontSizes.md,
+  },
+  qualityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  qualityLabel: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+  },
+  qualityValue: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  qualityExcellent: {
+    color: theme.colors.success,
+  },
+  qualityGood: {
+    color: theme.colors.accent,
+  },
+  qualityFair: {
+    color: theme.colors.primary,
+  },
+  qualityPoor: {
+    color: theme.colors.error,
+  },
+  alternativesContainer: {
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  alternativesTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+    marginBottom: theme.spacing.xs,
+  },
+  alternativeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  alternativeText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
+  },
+  alternativeConfidence: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+    marginLeft: theme.spacing.xs,
   },
 });
 

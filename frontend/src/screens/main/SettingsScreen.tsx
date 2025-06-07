@@ -214,13 +214,26 @@ const SettingsScreen: React.FC = () => {
           onValueChange={setUseSystemTheme}
         />
 
-        <SettingsToggle
-          title="Haptic Feedback"
-          subtitle="Vibration feedback for interactions"
-          leftIcon="phone-portrait"
-          value={settings.hapticFeedbackEnabled}
-          onValueChange={(value) => updateSetting('hapticFeedbackEnabled', value)}
-        />
+        <SettingsSection title="App Behavior">
+          <SettingsToggle
+            title="Haptic Feedback"
+            subtitle="Enable subtle vibrations for interactions"
+            leftIcon="pulse-outline"
+            value={settings.hapticFeedbackEnabled}
+            onValueChange={(value) =>
+              updateSetting('hapticFeedbackEnabled', value)
+            }
+          />
+          <SettingsToggle
+            title="Auto-Save Entry"
+            subtitle="Automatically save during recording"
+            leftIcon="save-outline"
+            value={settings.autoSaveEnabled}
+            onValueChange={(value) =>
+              updateSetting('autoSaveEnabled', value)
+            }
+          />
+        </SettingsSection>
       </SettingsSection>
 
       {/* Notifications Section */}

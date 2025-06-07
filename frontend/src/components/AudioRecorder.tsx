@@ -14,6 +14,7 @@ interface AudioRecorderProps {
   startRecordingOnMount?: boolean;
   onManualSave?: () => Promise<void>;
   saveButtonState?: SaveButtonState;
+  onAutoSave: (currentTranscript: string) => void;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
@@ -22,12 +23,14 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   startRecordingOnMount = false,
   onManualSave,
   saveButtonState,
+  onAutoSave,
 }) => {
   // Use the custom hook for all business logic
   const audioRecorderLogic = useAudioRecorderLogic({
     onTranscriptionComplete,
     onCancel,
     autoStart: startRecordingOnMount,
+    onAutoSave,
   });
 
   // Handler for replacing transcript segments with alternatives

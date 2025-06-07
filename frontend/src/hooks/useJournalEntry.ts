@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { format } from 'date-fns';
-import debounce from 'lodash.debounce';
 import { encryptedJournalService } from '../services/encryptedJournalService';
 import { JournalEntry } from '../types';
 import logger from '../utils/logger';
@@ -13,34 +12,32 @@ export interface JournalData {
   audioUri: string | null;
 }
 
+export interface SaveOptions {
+  silent?: boolean; // If true, no navigation or error callbacks
+  navigateOnSuccess?: boolean; // If true, trigger navigation on success
+}
+
 export interface JournalEntryHook {
   journalId: string | null;
   isSaving: boolean;
-  isAutoSaving: boolean;
-  saveEntry: () => Promise<string | null>;
-  autoSave: () => void;
-  cancelAutoSave: () => void;
+  save: (data?: Partial<JournalData>, options?: SaveOptions) => Promise<string | null>;
   error: Error | null;
 }
 
 interface UseJournalEntryOptions {
   initialData?: Partial<JournalData>;
-  autoSaveDelay?: number;
   selectedDate?: string; // Date in YYYY-MM-DD format from calendar
   onSaveComplete?: (id: string | null) => void;
   onSaveError?: (error: Error) => void;
 }
 
-const DEFAULT_OPTIONS: UseJournalEntryOptions = {
-  autoSaveDelay: 2500,
-};
+const DEFAULT_OPTIONS: UseJournalEntryOptions = {};
 
 const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): JournalEntryHook => {
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-  const { autoSaveDelay, selectedDate, onSaveComplete, onSaveError } = mergedOptions;
+  const { selectedDate, onSaveComplete, onSaveError } = mergedOptions;
   const [journalId, setJournalId] = useState<string | null>(data.id);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const isMounted = useRef(true);
   const isNavigatingRef = useRef(false);
@@ -149,166 +146,82 @@ const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): J
     }
   }, [onSaveError, selectedDate]);
 
-  // Create a stable reference to wrap the debounced function
-  const debouncedAutoSaveRef = useRef<ReturnType<typeof debounce>>();
-  
-  // Create the debounced function only once
-  useEffect(() => {
-    // Create the debounce function once
-    debouncedAutoSaveRef.current = debounce(async () => {
-      // Double-check isMounted at the start of execution
-      if (!isMounted.current || isNavigatingRef.current) {
-        logger.info('Auto-save cancelled: component unmounted or navigation in progress');
-        return;
-      }
-      
-      if (isSaving) {
-        logger.debug('Auto-save skipped (manual save in progress)');
-        return;
-      }
-      
-      logger.info('Attempting auto-save...');
-      setIsAutoSaving(true);
-      try {
-        // Check again before API call
-        if (!isMounted.current || isNavigatingRef.current) {
-          logger.info('Auto-save cancelled: component unmounted before API call');
-          return;
-        }
-        
-        // Access the latest data from ref
-        const currentData = currentDataRef.current;
-        
-        const savedId = await performSave(currentData);
-        
-        // And check once more after API call
-        if (!isMounted.current || isNavigatingRef.current) {
-          logger.info('Auto-save completed but component unmounted during API call');
-          return;
-        }
-        
-        logger.debug('Auto-save successful');
-        if (savedId) {
-          setJournalId(savedId);
-        }
-      } catch (error) {
-        if (isMounted.current && !isNavigatingRef.current) {
-          logger.error('Auto-save failed', error);
-        }
-      } finally {
-        if (isMounted.current && !isNavigatingRef.current) {
-          setIsAutoSaving(false);
-        }
-      }
-    }, autoSaveDelay);
-    
-    // Clean up on unmount or when autoSaveDelay changes
-    return () => {
-      if (debouncedAutoSaveRef.current) {
-        debouncedAutoSaveRef.current.cancel();
-      }
-    };
-  }, [autoSaveDelay, isSaving, performSave]);
-
-  // Function to trigger auto-save with current data
-  const autoSave = useCallback(() => {
-    // Don't schedule new auto-saves if the component is unmounted or navigating
-    if (!isMounted.current || isNavigatingRef.current) {
-      logger.debug('Ignoring autoSave request - component unmounted or navigation in progress');
-      return;
-    }
-    
-    // Access the latest data and check if there's content
-    const currentData = currentDataRef.current;
-    if (currentData.content.trim() || currentData.title.trim() || currentData.audioUri) {
-      logger.debug("Content changed, scheduling auto-save");
-      debouncedAutoSaveRef.current?.();
-    } else {
-      debouncedAutoSaveRef.current?.cancel();
-    }
-  }, []); // No dependencies needed since we're using refs
-
-  // Cancel any pending auto-save
-  const cancelAutoSave = useCallback(() => {
-    logger.debug('Explicitly cancelling auto-save');
-    debouncedAutoSaveRef.current?.cancel();
-  }, []);
-
   // Immediate save function
-  const saveEntry = useCallback(async (): Promise<string | null> => {
-    // Check if already saving or auto-saving
-    if (isSaving || isAutoSaving) {
-      logger.debug('saveEntry: Save skipped: Another save operation is in progress.');
+  const save = useCallback(async (dataOverride?: Partial<JournalData>, options?: SaveOptions): Promise<string | null> => {
+    const { silent = false, navigateOnSuccess = false } = options || {};
+    
+    // Check if already saving
+    if (isSaving) {
+      logger.debug('save: Save skipped: Another save operation is in progress.');
       return null;
     }
 
-    // isNavigatingRef is set by the caller (RecordScreen) before calling saveEntry
-    // cancelAutoSave(); // Caller should handle cancelling auto-save if needed
-    logger.info('saveEntry: Attempting immediate save...');
-    
     // Check mounted status before proceeding
-    if (!isMounted.current) {
-      logger.warn('saveEntry: Immediate save aborted: Component already unmounted');
+    if (!isMounted.current || isNavigatingRef.current) {
+      logger.warn('save: Save aborted: Component unmounting or navigation in progress');
       return null;
     }
+    
+    logger.info(`save: Starting ${silent ? 'silent' : 'manual'} save operation...`);
     
     setIsSaving(true);
     setError(null);
     let savedId: string | null = null;
     
     try {
-      // Get the most up-to-date data from ref just before saving
+      // Merge current data with any overrides
       const currentData = currentDataRef.current;
+      const finalData: JournalData = {
+        ...currentData,
+        ...dataOverride,
+      };
       
-      // *** Await the actual save operation ***
-      savedId = await performSave(currentData);
-      logger.info(`saveEntry: performSave completed. Result ID: ${savedId}.`);
+      // Perform the save operation
+      savedId = await performSave(finalData);
+      logger.info(`save: performSave completed. Result ID: ${savedId}.`);
       
-      // State update and callback call happen *after* performSave completes
-      if (isMounted.current) { // Check mounted status again after await
-         if (savedId !== null) {
-           // No need to call setJournalId here, performSave does it on create
-           // setJournalId(savedId);
-         }
-         if (onSaveComplete) {
-           onSaveComplete(savedId);
-         }
-       } else {
-           logger.warn('saveEntry: Save completed but component unmounted after await. Callback skipped.');
-       }
+      // Handle success callbacks only if component is still mounted
+      if (isMounted.current && !isNavigatingRef.current) {
+        if (savedId !== null) {
+          setJournalId(savedId);
+          
+          // Only trigger navigation callback for non-silent saves
+          if (!silent && navigateOnSuccess && onSaveComplete) {
+            logger.info('save: Triggering navigation callback.');
+            onSaveComplete(savedId);
+          } else {
+            logger.info(`save: Success (${silent ? 'silent' : 'manual'}) - no navigation.`);
+          }
+        }
+      }
       
       return savedId;
     } catch (err) {
-      // Error handling is mostly done within performSave now
-      // We just log that the overall saveEntry call failed.
-      logger.error('saveEntry: Immediate save failed (error thrown by performSave).', err);
-      // Ensure onSaveComplete is called with null on failure IF the component is still mounted
-      // and the error wasn't already handled by performSave's onSaveError call.
-      if (isMounted.current && onSaveComplete) {
-          // Check if onSaveError was already called within performSave for this error
-          // This is tricky, maybe simpler to rely on onSaveError always being called
-          // Let's assume onSaveError was called if err occurred and component was mounted.
-          // If we *still* call onSaveComplete(null), the caller might navigate incorrectly.
-          // Let's REMOVE this call to onSaveComplete(null) here.
-          // onSaveComplete(null); 
-      } else if (!isMounted.current) {
-          logger.warn('saveEntry: Save failed and component unmounted after await. Callback skipped.');
+      logger.error('save: Save operation failed:', err);
+      
+      // Only trigger error callback for non-silent saves
+      if (!silent && isMounted.current && !isNavigatingRef.current && onSaveError) {
+        const error = err instanceof Error ? err : new Error('Error saving journal entry');
+        setError(error);
+        onSaveError(error);
+      } else if (silent) {
+        logger.info('save: Silent save failed - no error callback triggered.');
       }
-      return null; // Indicate failure
+      
+      return null;
     } finally {
       // Ensure isSaving is set to false only if the component is still mounted
       if (isMounted.current) {
         setIsSaving(false);
       }
     }
-  }, [performSave, isSaving, isAutoSaving, onSaveComplete]); // Removed cancelAutoSave, onSaveError from deps - handled elsewhere or within performSave
+  }, [performSave, isSaving, onSaveComplete, onSaveError]);
 
   // Add a comprehensive unmount cleanup at the end of the hook, after all functions are defined
   useEffect(() => {
     return () => {
       // This will run when the component unmounts
-      logger.info('Final cleanup: Cancelling any pending auto-saves on unmount');
-      debouncedAutoSaveRef.current?.cancel();
+      logger.info('Final cleanup on unmount');
       
       // Ensure we're marked as unmounted and navigating
       isMounted.current = false;
@@ -319,10 +232,7 @@ const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): J
   return {
     journalId,
     isSaving,
-    isAutoSaving,
-    saveEntry,
-    autoSave,
-    cancelAutoSave,
+    save,
     error,
   };
 };

@@ -72,10 +72,7 @@ const RecordScreen: React.FC = () => {
 
   const {
     isSaving,
-    isAutoSaving,
-    autoSave,
-    cancelAutoSave,
-    saveEntry,
+    save,
   } = useJournalEntry(
     useMemo(() => {
       let currentTags = tags;
@@ -93,7 +90,6 @@ const RecordScreen: React.FC = () => {
       };
     }, [title, content, tags, audioUri, isHiddenMode]),
     {
-      autoSaveDelay: 500,
       selectedDate: selectedDate, // Pass selectedDate from route params
       onSaveComplete: useCallback((savedId: string | null) => {
         if (!mountedRef.current) {
@@ -132,9 +128,8 @@ const RecordScreen: React.FC = () => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      cancelAutoSave();
     };
-  }, [cancelAutoSave]);
+  }, []);
 
   const handleTranscriptionComplete = useCallback((transcript: string, transcribedAudioUri?: string, detectedLanguage?: string | null, confidence?: number) => {
     if (!mountedRef.current) {
@@ -153,12 +148,12 @@ const RecordScreen: React.FC = () => {
       setTitle(generatedTitle);
     }
 
-    logger.info('[RecordScreen] Data set for saving, triggering autoSave.');
+    logger.info('[RecordScreen] Data set for saving, triggering save with navigation.');
     setHasStartedSaving(true);
-    autoSave(); 
+    save(undefined, { navigateOnSuccess: true }); 
     setIsLoading(true);
 
-  }, [setContent, setAudioUri, setTitle, autoSave]);
+  }, [setContent, setAudioUri, setTitle, save]);
 
   // Handle manual save from AudioRecorder
   const handleManualSave = useCallback(async () => {
@@ -171,14 +166,14 @@ const RecordScreen: React.FC = () => {
     setHasStartedSaving(true);
     
     try {
-      const savedId = await saveEntry();
+      const savedId = await save(undefined, { navigateOnSuccess: true });
       if (savedId) {
         logger.info(`[RecordScreen] Manual save successful (ID: ${savedId}).`);
       }
     } catch (error) {
       logger.error('[RecordScreen] Manual save failed:', error);
     }
-  }, [saveEntry]);
+  }, [save]);
 
   const handleRecorderCancel = useCallback(() => {
     if (!mountedRef.current) {
@@ -198,22 +193,63 @@ const RecordScreen: React.FC = () => {
       return;
     }
     logger.info('[RecordScreen] Close button pressed.');
-    cancelAutoSave(); // Cancel any pending auto-save
     if (navigation.canGoBack()) {
       navigation.goBack();
     }
-  }, [navigation, cancelAutoSave]);
+  }, [navigation]);
+
+  // Handle auto-save from AudioRecorder
+  const handleAutoSave = useCallback(async (currentTranscript: string) => {
+    if (!mountedRef.current) {
+      logger.debug('[RecordScreen] handleAutoSave: Aborted (unmounted).');
+      return;
+    }
+    logger.info('[RecordScreen] Auto-save triggered by new segment.');
+    
+    // Auto-generate title from the first few words if not already set
+    let newTitle = title;
+    if (!title && currentTranscript) {
+      const words = currentTranscript.split(' ');
+      const generatedTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      newTitle = generatedTitle;
+      setTitle(generatedTitle);
+    }
+    
+    // Update content state (for UI display)
+    setContent(currentTranscript);
+    
+    // Prepare data for save
+    const saveData = {
+      title: newTitle,
+      content: currentTranscript,
+    };
+    
+    // Use new save function with explicit data and silent mode
+    try {
+      const savedId = await save(saveData, { 
+        silent: true // Silent save - no navigation or error dialogs
+      });
+      
+      if (savedId) {
+        logger.info(`[RecordScreen] Auto-save successful. Entry ID: ${savedId}`);
+      } else {
+        logger.warn('[RecordScreen] Auto-save completed but no ID returned.');
+      }
+    } catch (error) {
+      logger.error('[RecordScreen] Auto-save failed:', error);
+    }
+  }, [save, title]);
 
   // Determine save button state
   const getSaveButtonState = useCallback(() => {
-    if (isSaving || isAutoSaving) {
+    if (isSaving) {
       return { text: 'Saving...', disabled: true, isSaving: true };
     }
-    if (hasStartedSaving && !isSaving && !isAutoSaving) {
+    if (hasStartedSaving && !isSaving) {
       return { text: 'Saved', disabled: true, isSaving: false };
     }
     return { text: 'Save', disabled: false, isSaving: false };
-  }, [isSaving, isAutoSaving, hasStartedSaving]);
+  }, [isSaving, hasStartedSaving]);
 
   if (isLoading && !showRecorder) { // Show loading only if recorder isn't active yet
     return (
@@ -270,11 +306,12 @@ const RecordScreen: React.FC = () => {
           {/* Audio Recorder Content */}
           <View style={styles.recorderContent}>
             <AudioRecorder
-              startRecordingOnMount={startRecordingOnMount}
               onTranscriptionComplete={handleTranscriptionComplete}
               onCancel={handleRecorderCancel}
               onManualSave={handleManualSave}
+              onAutoSave={handleAutoSave}
               saveButtonState={getSaveButtonState()}
+              startRecordingOnMount={startRecordingOnMount}
             />
           </View>
         </View>
@@ -302,11 +339,11 @@ const RecordScreen: React.FC = () => {
         </View>
       )}
 
-      {(isSaving || isAutoSaving) && (
+      {isSaving && (
         <View style={styles.savingOverlay}> 
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>
-            {isSaving ? 'Saving Entry...' : 'Saving Entry...'}
+            Saving Entry...
           </Text>
         </View>
       )}
