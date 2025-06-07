@@ -97,7 +97,8 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   const [isLanguageModalVisible, setLanguageModalVisible] = useState(false);
 
   // Combine all transcript segments into one text for unified editing
-  const fullTranscriptText = transcriptSegments.join(' ');
+  // Each segment starts on a new line
+  const fullTranscriptText = transcriptSegments.join('\n');
   
   const handleFullTranscriptChange = (text: string) => {
     // Split the text back into segments based on sentences or paragraphs

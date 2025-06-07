@@ -230,7 +230,7 @@ export const useAudioRecorderLogic = ({
   const handleAcceptTranscript = useCallback(() => {
     if (!isMountedRef.current || callbackCalledRef.current) return;
 
-    const fullTranscript = transcriptSegments.join(' ').trim();
+    const fullTranscript = transcriptSegments.join('\n').trim();
     if (!fullTranscript) {
       logger.warn('No transcript to accept.');
       return;
@@ -286,7 +286,9 @@ export const useAudioRecorderLogic = ({
 
       const transcript = result.transcript?.trim();
       if (transcript) {
-        setTranscriptSegments(prev => [...prev, transcript]);
+        // Capitalize first letter of the transcript segment
+        const capitalizedTranscript = transcript.charAt(0).toUpperCase() + transcript.slice(1);
+        setTranscriptSegments(prev => [...prev, capitalizedTranscript]);
         setCurrentSegmentTranscript('');
         
         logger.info(
@@ -303,8 +305,8 @@ export const useAudioRecorderLogic = ({
           logger.info(`Quality recommendations: ${qualityAssessment.recommendations.join(', ')}`);
         }
 
-        // Build the complete transcript including the new segment
-        const newTranscript = [...transcriptSegments, transcript].join(' ');
+        // Build the complete transcript including the new segment  
+        const newTranscript = [...transcriptSegments, capitalizedTranscript].join('\n');
         
         if (settings.autoSaveEnabled && onAutoSave) {
           logger.info('[AutoSave] Triggering auto-save due to new segment.');

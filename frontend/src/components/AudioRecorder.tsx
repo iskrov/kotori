@@ -44,7 +44,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const handleSave = useCallback(async () => {
     if (onManualSave) {
       // First, pass the transcript data to RecordScreen via onTranscriptionComplete
-      const fullTranscript = audioRecorderLogic.transcriptSegments.join(' ').trim();
+      const fullTranscript = audioRecorderLogic.transcriptSegments.join('\n').trim();
       if (fullTranscript) {
         const confidence = audioRecorderLogic.lastTranscriptionResult?.confidence || 0;
         const detectedLanguage = audioRecorderLogic.lastTranscriptionResult?.detected_language_code as string | undefined;
