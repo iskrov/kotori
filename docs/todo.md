@@ -364,6 +364,12 @@
 - [ ] Performance testing of simplified language selection
 - [ ] Documentation updates for deployment procedures
 
+### 🐛 **Current Issues to Address:**
+- [ ] **Discard Button Functionality**: Discard button in Edit Entry screen doesn't work as expected
+  - **Status**: Buttons are now visible but discard logic needs investigation
+  - **Priority**: Medium - affects user experience when canceling edits
+  - **Location**: `JournalEntryFormScreen.tsx` - discard button behavior
+
 ## 🎉 **Project Status: FEATURE-COMPLETE & PRODUCTION-READY**
 
 The Vibes app now has:
