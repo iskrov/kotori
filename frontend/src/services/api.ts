@@ -323,15 +323,16 @@ export const JournalAPI = {
     tags?: string[], 
     start_date?: string,  // Filter entries from this date (YYYY-MM-DD format)
     end_date?: string,    // Filter entries to this date (YYYY-MM-DD format)
-    include_hidden?: boolean  // Add support for hidden entries
-  }) => api.get('/api/journals', { params }),
+    secret_tag_hashes?: string[],  // Filter by secret tag hashes
+    include_public?: boolean       // Include public entries (default: true)
+  }) => api.get('/api/journals/', { params }),
   
-  getEntry: (id: string) => 
+  getEntry: (id: number) => 
     api.get(`/api/journals/${id}`),
   
-  createEntry: (data: JournalEntryCreate) => api.post('/api/journals', data),
+  createEntry: (data: JournalEntryCreate) => api.post('/api/journals/', data),
 
-  // New method for creating encrypted hidden entries
+  // Enhanced method for creating encrypted secret tag entries
   createEncryptedEntry: (data: {
     title?: string;
     encrypted_content: string;    // Base64 encrypted content
@@ -343,10 +344,11 @@ export const JournalAPI = {
     entry_date?: string;
     audio_url?: string;
     tags?: string[];
-  }) => api.post('/api/journals', {
+    secret_tag_id?: string;       // Secret tag ID
+    secret_tag_hash?: string;     // Secret tag hash for server filtering
+  }) => api.post('/api/journals/', {
     title: data.title || '',
-    content: "",  // No plaintext content for hidden entries
-    is_hidden: true,
+    content: "",  // No plaintext content for secret tag entries
     encrypted_content: data.encrypted_content,
     encryption_iv: data.iv,
     encryption_salt: data.salt,
@@ -357,9 +359,11 @@ export const JournalAPI = {
     entry_date: data.entry_date || new Date().toISOString(),
     audio_url: data.audio_url,
     tags: data.tags || [],
+    secret_tag_id: data.secret_tag_id,
+    secret_tag_hash: data.secret_tag_hash,
   }),
   
-  updateEntry: (id: string, data: JournalEntryUpdate) => {
+  updateEntry: (id: number, data: JournalEntryUpdate) => {
     console.log('JournalAPI.updateEntry called with data:', JSON.stringify(data));
     // Make a defensive copy of data
     const sanitizedData = { ...data };
@@ -422,7 +426,7 @@ export const JournalAPI = {
     }
   },
   
-  deleteEntry: (id: string) => {
+  deleteEntry: (id: number) => {
     console.log(`[JournalAPI.deleteEntry] Deleting entry with ID: ${id}`);
     const deletePromise = api.delete(`/api/journals/${id}`);
     deletePromise.then(result => {
@@ -433,16 +437,32 @@ export const JournalAPI = {
     return deletePromise;
   },
   
-  searchEntries: (query: string, includeHidden?: boolean) => 
-    api.get(`/api/journals/search?q=${query}${includeHidden ? '&include_hidden=true' : ''}`),
+  searchEntries: (query: string, options?: {
+    secret_tag_hashes?: string[];
+    include_public?: boolean;
+  }) => {
+    const params = new URLSearchParams({ q: query });
+    
+    if (options?.secret_tag_hashes && options.secret_tag_hashes.length > 0) {
+      options.secret_tag_hashes.forEach(hash => {
+        params.append('secret_tag_hash', hash);
+      });
+    }
+    
+    if (options?.include_public !== undefined) {
+      params.append('include_public', options.include_public.toString());
+    }
+    
+    return api.get(`/api/journals/search?${params.toString()}`);
+  },
 
-  // Get only hidden entries (encrypted content)
-  getHiddenEntries: (params?: { skip?: number, limit?: number }) =>
-    api.get('/api/journals/hidden', { params }),
+  // Get entries by secret tag (for specific tag filtering)
+  getEntriesBySecretTag: (secretTagHash: string, params?: { skip?: number, limit?: number }) =>
+    api.get(`/api/journals/secret-tag/${secretTagHash}`, { params }),
 };
 
 // Helper function to process tags and send the update
-const processUpdateWithTags = (id: string, sanitizedData: JournalEntryUpdate) => {
+const processUpdateWithTags = (id: number, sanitizedData: JournalEntryUpdate) => {
   // Ensure tags is properly formatted as string[]
   if (sanitizedData.tags) {
     // Make sure tags is an array of strings by extracting tag names
@@ -490,7 +510,7 @@ export const ReminderAPI = {
 
 // Tags
 export const TagsAPI = {
-  getTags: () => api.get('/api/journals/tags/'),
+  getTags: () => api.get('/api/journals/tags'),
   
   getEntriesByTag: (tagName: string) => api.get(`/api/journals/tags/${tagName}/entries`),
 };
@@ -510,6 +530,13 @@ export const TranscriptionAPI = {
   },
 };
 
+export const SecretTagAPI = {
+  delete: (tagId: string) => {
+    logger.info(`Sending API request to delete secret tag: ${tagId}`);
+    return api.delete(`/api/secret-tags/${tagId}`);
+  },
+};
+
 export default {
   auth: AuthAPI,
   user: UserAPI,
@@ -517,4 +544,5 @@ export default {
   tags: TagsAPI,
   transcription: TranscriptionAPI,
   reminder: ReminderAPI,
+  secretTag: SecretTagAPI,
 };

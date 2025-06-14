@@ -22,13 +22,8 @@ import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
-import { useHiddenMode } from '../../contexts/HiddenModeContext';
+import { secretTagManager } from '../../services/secretTagManager';
 import { AppTheme } from '../../config/theme';
-
-// --- Special Tag for Hidden Entries (Client-Side) ---
-// TODO: Move this to a shared constants file
-const HIDDEN_ENTRY_TAG = "_hidden_entry";
-// ----------------------------------------------------
 
 type CalendarScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Calendar'>,
@@ -38,7 +33,6 @@ type CalendarScreenNavigationProp = CompositeNavigationProp<
 const CalendarScreen = () => {
   const navigation = useNavigation<CalendarScreenNavigationProp>();
   const { theme } = useAppTheme();
-  const { isHiddenMode } = useHiddenMode();
   const styles = getStyles(theme);
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -46,15 +40,25 @@ const CalendarScreen = () => {
   const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
   const [filteredEntriesForSelectedDate, setFilteredEntriesForSelectedDate] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasActiveSecretTags, setHasActiveSecretTags] = useState(false);
+  
+  // Check for active secret tags
+  useEffect(() => {
+    const checkActiveSecretTags = () => {
+      setHasActiveSecretTags(secretTagManager.hasActiveSecretTags());
+    };
+    
+    checkActiveSecretTags();
+    // Check periodically for secret tag changes
+    const interval = setInterval(checkActiveSecretTags, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   const visibleEntries = useMemo(() => {
-    if (isHiddenMode) {
-      return allEntries;
-    }
-    return allEntries.filter(entry => 
-      !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG)
-    );
-  }, [allEntries, isHiddenMode]);
+    // Filter entries based on active secret tags
+    return secretTagManager.filterEntriesByActiveTags(allEntries);
+  }, [allEntries, hasActiveSecretTags]);
   
   useFocusEffect(
     React.useCallback(() => {
@@ -73,13 +77,13 @@ const CalendarScreen = () => {
     }
   }, [selectedDate]);
 
-  // Keep a separate effect for when visibility mode changes
+  // Keep a separate effect for when secret tag visibility changes
   useEffect(() => {
     if (selectedDate && allEntries.length > 0) {
-      // Refresh filtered entries when hidden mode changes
+      // Refresh filtered entries when secret tags change
       fetchEntriesForSelectedDate(selectedDate);
     }
-  }, [isHiddenMode]);
+  }, [hasActiveSecretTags]);
   
   const getDaysInMonth = () => {
     const start = startOfMonth(currentMonth);
@@ -90,12 +94,20 @@ const CalendarScreen = () => {
   const fetchEntries = async () => {
     try {
       setIsLoading(true);
+      
+      // Get active secret tag hashes for filtering
+      const activeTagHashes = await secretTagManager.getActiveTagHashes();
+      
       // Fetch all entries for date indicators in the calendar
       const allEntriesResponse = await JournalAPI.getEntries({
         limit: 100,  // Fetch more entries to show indicators properly
-        include_hidden: isHiddenMode
+        secret_tag_hashes: activeTagHashes,
+        include_public: true
       });
-      setAllEntries(allEntriesResponse.data);
+      const entries = Array.isArray(allEntriesResponse.data) 
+        ? allEntriesResponse.data 
+        : allEntriesResponse.data.entries || [];
+      setAllEntries(entries as JournalEntry[]);
       
       // Also trigger filtering for the selected date
       await fetchEntriesForSelectedDate(selectedDate);
@@ -113,19 +125,21 @@ const CalendarScreen = () => {
       // Format date as YYYY-MM-DD for API query
       const formattedDate = format(date, 'yyyy-MM-dd');
       
+      // Get active secret tag hashes for filtering
+      const activeTagHashes = await secretTagManager.getActiveTagHashes();
+      
       // Use start_date and end_date parameters to filter by exact date
       const response = await JournalAPI.getEntries({
         // Filter by the specific date using both start_date and end_date
         start_date: formattedDate,
         end_date: formattedDate,
-        include_hidden: isHiddenMode
+        secret_tag_hashes: activeTagHashes,
+        include_public: true
       });
       
-      // Filter entries based on hidden mode (additional client-side filtering)
-      const entries = response.data;
-      const filtered = isHiddenMode 
-        ? entries 
-        : entries.filter((entry: JournalEntry) => !entry.tags.some((tag: Tag) => tag.name === HIDDEN_ENTRY_TAG));
+      // Filter entries based on active secret tags (additional client-side filtering)
+      const entries = response.data as JournalEntry[];
+      const filtered = secretTagManager.filterEntriesByActiveTags(entries);
       
       setFilteredEntriesForSelectedDate(filtered);
     } catch (error) {
@@ -155,7 +169,6 @@ const CalendarScreen = () => {
     // Pass the selected date to the Record screen
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     navigation.navigate('Record', { 
-
       selectedDate: formattedDate
     });
   };
@@ -210,10 +223,11 @@ const CalendarScreen = () => {
     );
   };
   
-  const renderEntry = ({ item }: { item: JournalEntry }) => (
+  const renderEntry = ({ item, index }: { item: JournalEntry; index: number }) => (
     <JournalCard 
       entry={item}
       onPress={() => handleEntryPress(item)}
+      key={`calendar-entry-${item.id}-${index}`}
     />
   );
   
@@ -221,6 +235,12 @@ const CalendarScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Calendar</Text>
+        {hasActiveSecretTags && (
+          <View style={styles.secretTagIndicator}>
+            <Ionicons name="shield-checkmark" size={16} color={theme.colors.primary} />
+            <Text style={styles.secretTagText}>Secret Tags Active</Text>
+          </View>
+        )}
       </View>
       
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
@@ -276,9 +296,9 @@ const CalendarScreen = () => {
             {filteredEntriesForSelectedDate.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="calendar-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
-                            <Text style={styles.emptyText}>
-                {"No entries for this date"}
-              </Text>
+                <Text style={styles.emptyText}>
+                  {"No entries for this date"}
+                </Text>
                 <TouchableOpacity 
                   style={styles.createButton}
                   onPress={handleCreateEntry}
@@ -291,7 +311,7 @@ const CalendarScreen = () => {
                 <FlatList
                   data={filteredEntriesForSelectedDate}
                   renderItem={renderEntry}
-                  keyExtractor={item => item.id}
+                  keyExtractor={(item, index) => `calendar-list-${item.id}-${index}`}
                   contentContainerStyle={styles.listContent}
                   scrollEnabled={false} // Let parent ScrollView handle scrolling
                 />
@@ -338,6 +358,21 @@ const getStyles = (theme: AppTheme) => {
       fontWeight: 'bold',
       color: theme.colors.text,
       fontFamily: theme.typography.fontFamilies.bold,
+    },
+    secretTagIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.sm,
+      paddingVertical: theme.spacing.xs,
+      backgroundColor: theme.colors.primaryLight || theme.colors.primary + '20',
+      borderRadius: 12,
+    },
+    secretTagText: {
+      fontSize: theme.typography.fontSizes.xs,
+      color: theme.colors.primary,
+      marginLeft: theme.spacing.xs,
+      fontFamily: theme.typography.fontFamilies.medium,
     },
     calendarHeader: {
       flexDirection: 'row',

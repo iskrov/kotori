@@ -10,7 +10,7 @@ from app.main import app
 from app.models.base import Base
 
 # Use an in-memory SQLite database for tests
-TEST_SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+TEST_SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(
     TEST_SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )

@@ -22,11 +22,7 @@ class User(Base, TimestampMixin):
     google_id = Column(String, unique=True, nullable=True)
     profile_picture = Column(String, nullable=True)
 
-    # Hidden mode security fields
-    unlock_phrase_hash = Column(String, nullable=True)  # SHA-256 hash of unlock phrase
-    decoy_phrase_hash = Column(String, nullable=True)  # SHA-256 hash of decoy phrase
-    panic_phrase_hash = Column(String, nullable=True)  # SHA-256 hash of panic/self-destruct phrase
-
     # Relationships
     journal_entries = relationship("JournalEntry", back_populates="user")
     reminders = relationship("Reminder", back_populates="user")
+    secret_tags = relationship("SecretTag", back_populates="user", cascade="all, delete-orphan")

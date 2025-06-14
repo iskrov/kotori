@@ -10,64 +10,103 @@ Vibes is a voice-controlled journaling application that allows users to record v
 - **Calendar View**: Browse entries by date
 - **Authentication**: Secure login with email/password or Google Sign-In
 - **Reminder System**: Set reminders to maintain journaling habits
-- **🔒 Zero-Knowledge Privacy**: Hidden entries with end-to-end encryption where only you can access your private data
+- **🔒 Zero-Knowledge Privacy**: Multi-level secret tags with end-to-end encryption where only you can access your private data
 
 ## 🛡️ Privacy & Security Architecture
 
-### 🔒 Zero-Knowledge Encryption (IMPLEMENTED)
+### 🔒 Zero-Knowledge Encryption with Phrase-Based Secret Tags
 
-Vibes implements **true zero-knowledge encryption** where the server cannot decrypt any user data under any circumstances. This provides mathematical guarantees of privacy that don't depend on trusting the service provider.
+Vibes implements **true zero-knowledge encryption** with **phrase-based secret tags**, allowing users to create multiple privacy levels where the server cannot decrypt any user data under any circumstances.
+
+#### 🏷️ Phrase-Based Secret Tags System:
+
+**Multiple Privacy Levels with Voice Activation**
+- **Custom Secret Tags**: Users define 2-5 privacy levels (e.g., "work private", "personal deep", "family sensitive")
+- **Phrase-Based Access**: Each secret tag unlocked by speaking its unique code phrase during entry creation
+- **One Tag Per Entry**: Simple model - each entry belongs to one secret tag or is public
+- **Progressive Access**: Activate different secret tags to access different sets of private entries
+
+**Example Setup:**
+```
+📝 Public Entries (always visible)
+🔒 "work private" → Activated by phrase detection during recording
+🔒 "personal deep" → Activated by phrase detection during recording
+🔒 "family sensitive" → Activated by phrase detection during recording
+```
+
+#### Voice Activation Examples:
+
+```typescript
+// User speaks: "work private thoughts about the meeting..."
+// → Phrase detected, entry encrypted with "work private" key
+// → Only visible when "work private" tag is active
+
+// User speaks: "personal deep feelings about..."  
+// → Phrase detected, entry encrypted with "personal deep" key
+// → Only visible when "personal deep" tag is active
+
+// Regular entry: "had a great day today..."
+// → No phrase detected, public entry, always visible
+```
 
 #### Key Security Features:
 
 **✅ Hardware-Backed Key Storage**
-- Keys stored in iOS Secure Enclave / Android Keystore
+- Secret tag phrases stored in iOS Secure Enclave / Android Keystore
+- Each secret tag phrase becomes an independent encryption key
 - Biometric authentication required for key access
 - Keys never leave the secure hardware environment
 
 **✅ Per-Entry Encryption with Forward Secrecy**
-- Each journal entry encrypted with unique key
-- Entry keys wrapped with user's master key
-- Deleted entries cannot be recovered even with master key
+- Each journal entry encrypted with unique key derived from detected phrase
+- Entry keys wrapped with appropriate secret tag master key
+- Phrase-to-key derivation using Argon2 hashing
+- Deleted entries cannot be recovered even with phrase access
 
-**✅ Client-Side Hidden Mode**
-- Code phrase detection happens entirely on device
-- Hidden entries filtered client-side only
-- Server never sees code phrases or hidden mode state
+**✅ Client-Side Phrase Detection and Management**
+- Code phrase detection happens entirely on device during recording
+- Secret tag filtering client-side only
+- Server never sees secret tag names or phrases
+- Simple active/inactive state per tag
 
 **✅ Coercion Resistance**
-- Decoy mode shows fake entries under duress
-- Panic mode securely deletes all hidden data
+- Each secret tag can be independently activated/deactivated
+- Panic phrases can delete specific secret tag data
+- Progressive disclosure - reveal only what's necessary
 - Invisible activation prevents detection
 
 #### Security Guarantees:
 
-- **Database Breach Protection**: Encrypted data is useless without client keys
+- **Database Breach Protection**: Encrypted data is useless without client phrase keys
 - **Server Compromise Protection**: No server-side decryption capability exists
 - **Admin Access Protection**: No backdoors or master keys on server
-- **Device Seizure Protection**: Hidden entries invisible without code phrases
-- **Forward Secrecy**: Past entries remain secure even if current keys compromised
+- **Device Seizure Protection**: Secret tag entries invisible without specific code phrases
+- **Forward Secrecy**: Past entries remain secure even if current phrases compromised
 
 #### Technical Implementation:
 
 ```typescript
-// Master key derived from user secret + device entropy
-const masterKey = await deriveKey(userSecret + deviceEntropy, salt, 100000);
+// Secret tag master keys derived from phrases independently
+const workTagKey = await deriveSecretTagKey("work-private-phrase", userSecret, salt, 100000);
+const personalTagKey = await deriveSecretTagKey("personal-deep-phrase", userSecret, salt, 100000);
 
 // Each entry gets unique encryption key
 const entryKey = await generateKey();
 const encryptedContent = await encrypt(content, entryKey);
-const wrappedKey = await wrapKey(entryKey, masterKey);
 
-// Server only stores encrypted blobs
+// Entry key wrapped with appropriate secret tag master key (derived from phrase)
+const wrappedKey = await wrapKey(entryKey, workTagKey); // if phrase "work-private" detected
+
+// Server only stores encrypted blobs with phrase hash reference
 await api.post('/entries', {
   encrypted_content: encryptedContent,
   encrypted_key: wrappedKey,
+  secret_tag_hash: hashPhrase("work-private-phrase"), // Only hash, not actual phrase
   // ... other encrypted fields
 });
 ```
 
-The zero-knowledge architecture ensures that even if the server is compromised, user data remains completely secure and private.
+The zero-knowledge phrase-based secret tags architecture ensures that even if the server is compromised, user data remains completely secure and private with granular access control through voice-activated phrases.
 
 ## Tech Stack
 

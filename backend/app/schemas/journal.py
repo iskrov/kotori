@@ -34,8 +34,9 @@ class JournalEntryCreate(JournalEntryBase):
     audio_url: Optional[str] = None
     tags: Optional[List[str]] = []
     
-    # Hidden entry support with client-side encryption
-    is_hidden: Optional[bool] = False
+    # Secret tag support with client-side encryption
+    secret_tag_id: Optional[int] = None      # ID of secret tag for this entry
+    secret_tag_hash: Optional[str] = None    # Hash of secret tag for verification
     encrypted_content: Optional[str] = None  # Base64 encoded encrypted content
     encryption_iv: Optional[str] = None      # Base64 encoded initialization vector
     encryption_salt: Optional[str] = None    # Base64 encoded salt for key derivation
@@ -56,8 +57,9 @@ class JournalEntryUpdate(BaseModel):
     audio_url: Optional[str] = None
     tags: Optional[List[str]] = None
     
-    # Hidden entry updates
-    is_hidden: Optional[bool] = None
+    # Secret tag updates
+    secret_tag_id: Optional[int] = None
+    secret_tag_hash: Optional[str] = None
     encrypted_content: Optional[str] = None
     encryption_iv: Optional[str] = None
     encryption_salt: Optional[str] = None
@@ -75,8 +77,9 @@ class JournalEntryInDBBase(JournalEntryBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
-    # Hidden entry fields
-    is_hidden: bool = False
+    # Secret tag fields
+    secret_tag_id: Optional[int] = None
+    secret_tag_hash: Optional[str] = None
     encrypted_content: Optional[str] = None
     encryption_iv: Optional[str] = None
     encryption_salt: Optional[str] = None
@@ -99,10 +102,10 @@ class JournalEntryInDB(JournalEntryInDBBase):
     pass
 
 
-# Response for hidden entries (with encryption metadata)
-class HiddenJournalEntry(JournalEntryInDBBase):
+# Response for secret tag entries (with encryption metadata)
+class SecretTagJournalEntry(JournalEntryInDBBase):
     """
-    Response schema for hidden entries.
+    Response schema for secret tag entries.
     Contains encrypted content that can only be decrypted client-side.
     """
     tags: List[Tag] = []

@@ -27,6 +27,7 @@ export type MainTabParamList = {
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Record: RecordScreenParams | undefined;
+  SecretTagManager: undefined;
 };
 
 // Auth stack params

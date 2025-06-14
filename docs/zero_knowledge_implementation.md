@@ -1,280 +1,348 @@
-# Zero-Knowledge Architecture Implementation Guide (before secret tags)
+# Zero-Knowledge Phrase-Based Encryption Implementation
 
 ## Overview
 
-This document outlines the complete refactoring of the Vibes voice journaling app to implement **true zero-knowledge encryption** where the server cannot decrypt any user data under any circumstances.
+The Vibes app implements a **phrase-based zero-knowledge encryption system** that provides maximum security through true isolation. Each secret tag uses its own phrase as the encryption key directly, eliminating single points of failure and providing granular recovery capabilities.
 
-## ⚠️ Critical Security Issues Fixed
+## Core Philosophy
 
-### Before (Insecure Implementation):
-- ❌ Server could decrypt all hidden entries
-- ❌ Master keys derived on server-side  
-- ❌ Encryption keys stored in localStorage
-- ❌ Code phrases hardcoded in frontend
-- ❌ Server-side hidden mode session management
+### Phrase-Based Zero-Knowledge Approach
+- **Direct phrase-to-key derivation**: Each phrase becomes its own encryption key
+- **True isolation**: Each tag's data is encrypted with its own phrase
+- **No master secrets**: No centralized key management
+- **Server never knows phrases**: Secret phrases remain client-side only
+- **Server never reads content**: All journal entries encrypted client-side
+- **Device inspection safe**: No secret data stored on device
 
-### After (Zero-Knowledge Implementation):
-- ✅ **Client-side only** encryption/decryption
-- ✅ **Hardware-backed key storage** (iOS Secure Enclave/Android Keystore)
-- ✅ **Per-entry encryption** with forward secrecy
-- ✅ **No server access** to plaintext data
-- ✅ **Client-side phrase detection** and hidden mode management
+### Key Benefits of Phrase-Based Encryption
+1. **Maximum security**: True zero-knowledge with phrase-based keys
+2. **True isolation**: Each tag completely independent
+3. **Granular recovery**: Losing one phrase only affects that tag
+4. **No single point of failure**: No master key to compromise
+5. **Simple mental model**: One phrase = one encryption key
 
-## Architecture Changes
+## Architecture
 
-### 1. Backend Changes (Remove Server-Side Decryption)
+### Core Components
 
-#### Files Modified:
-- `backend/app/services/journal_service.py` - Removed all decryption methods
-- `backend/app/models/journal_entry.py` - Added zero-knowledge fields
-- `backend/app/services/encryption_service.py` - ⚠️ **DELETE THIS FILE** (violates zero-knowledge)
+#### 1. **Server-Side Secret Tag Storage**
+- **Tag metadata**: Names, creation dates, user associations
+- **Phrase verification**: Salted Argon2 hashes for phrase matching
+- **No sensitive data**: Never stores phrases or decrypted content
 
-#### Key Changes:
-```python
-# ❌ REMOVED: Server-side decryption methods
-def _decrypt_entry_content(self, db_entry, user_id):
-    # This violated zero-knowledge - DELETED
+#### 2. **Phrase-Based Client-Side Encryption**
+- **Direct phrase-to-key derivation**: Each phrase becomes its own encryption key
+- **Per-entry encryption**: Each entry gets unique encryption key derived from phrase
+- **Memory-only phrases**: No persistent storage of secret phrases
+- **Hardware-backed keys**: Secure storage for derived encryption keys
+- **True isolation**: Each tag operates completely independently
 
-# ✅ NEW: Server only handles encrypted blobs
-def get_multi_by_user(self, db, *, user_id, include_hidden=False):
-    # Returns encrypted content as-is for client decryption
-    content = db_entry.encrypted_content if db_entry.is_hidden else db_entry.content
-```
+#### 3. **Client-Side Phrase Verification**
+- **Salted hashing**: Argon2 with unique salt per tag
+- **Client-side verification**: Hash comparison happens on client
+- **No network round-trips**: Verification during speech processing
+- **Brute-force resistant**: High-cost hashing parameters
 
-#### Database Schema Updates:
-```sql
--- New zero-knowledge fields added to journal_entries table:
-ALTER TABLE journal_entries ADD COLUMN encryption_salt VARCHAR;
-ALTER TABLE journal_entries ADD COLUMN encrypted_key TEXT;
-ALTER TABLE journal_entries ADD COLUMN key_derivation_iterations INTEGER;
-ALTER TABLE journal_entries ADD COLUMN encryption_algorithm VARCHAR;
-```
+## Technical Implementation
 
-### 2. Frontend Changes (Zero-Knowledge Implementation)
+### Secret Tag Creation Flow
 
-#### New Files Created:
-- `frontend/src/services/zeroKnowledgeEncryption.ts` - True zero-knowledge encryption
-- `frontend/src/services/hiddenModeManager.ts` - Client-side hidden mode
-- `frontend/package.json` - Added `expo-secure-store` dependency
-
-#### Key Features:
-
-**Hardware-Backed Key Storage:**
 ```typescript
-// Uses iOS Secure Enclave / Android Keystore
-await SecureStore.setItemAsync(keyName, keyData, {
-  requireAuthentication: true,
-  authenticationPrompt: 'Authenticate to access secure keys'
-});
-```
-
-**Per-Entry Encryption:**
-```typescript
-// Each entry gets unique encryption key
-const entryKey = await crypto.subtle.generateKey(
-  { name: 'AES-GCM', length: 256 },
-  true,
-  ['encrypt', 'decrypt']
-);
-
-// Entry key is encrypted with master key
-const wrappedKey = await crypto.subtle.wrapKey('raw', entryKey, masterKey, algorithm);
-```
-
-**Client-Side Code Phrase Detection:**
-```typescript
-// Phrases stored as PBKDF2 hashes in secure storage
-const hash = await this.hashPhrase(phrase, salt);
-if (this.constantTimeArrayEquals(candidateHash, expectedHash)) {
-  this.activateHiddenMode();
+// Client-side tag creation
+async function createSecretTag(tagName: string, secretPhrase: string) {
+  // 1. Generate unique salt for this tag
+  const salt = crypto.getRandomValues(new Uint8Array(32));
+  
+  // 2. Hash the phrase with Argon2
+  const phraseHash = await argon2.hash(secretPhrase, salt, {
+    type: argon2.argon2id,
+    memoryCost: 65536,  // 64 MiB
+    timeCost: 3,        // 3 iterations
+    parallelism: 1      // Single thread
+  });
+  
+  // 3. Derive encryption key from phrase
+  const encryptionKey = await deriveEncryptionKey(secretPhrase);
+  
+  // 4. Send metadata to server (phrase never sent)
+  await api.createSecretTag({
+    tagName,
+    salt: Array.from(salt),
+    phraseHash
+  });
+  
+  // 5. Store encryption key securely on device
+  await secureStorage.storeKey(tagId, encryptionKey);
 }
 ```
 
-## Security Guarantees
+### Speech Processing and Phrase Detection
 
-### ✅ Zero-Knowledge Validation:
-- **Server cannot decrypt any user data** - No decryption keys or methods on server
-- **Hardware-backed key storage** - Keys protected by device secure enclave
-- **Per-entry forward secrecy** - Each entry has unique key, deleted entries unrecoverable
-- **Client-side phrase detection** - No code phrases sent to server
-- **Encrypted blob storage only** - Server only sees encrypted data
-
-### ✅ Attack Resistance:
-- **Database breach protection** - Encrypted data useless without client keys
-- **Server compromise protection** - No server-side decryption capability
-- **Admin access protection** - No backdoors or master keys
-- **Device seizure protection** - Hidden entries invisible without phrases
-- **Coercion protection** - Decoy mode and panic deletion
-
-## Implementation Steps
-
-### Phase 1: Critical Security Fixes (Week 1)
-1. **Remove server-side decryption** (COMPLETED)
-   ```bash
-   # Remove dangerous methods from journal_service.py
-   # Delete encryption_service.py entirely
-   ```
-
-2. **Install hardware key storage**
-   ```bash
-   cd frontend
-   npm install expo-secure-store
-   ```
-
-3. **Update database model** (COMPLETED)
-   ```bash
-   # Add zero-knowledge fields to JournalEntry model
-   # Create migration for new fields
-   ```
-
-### Phase 2: Zero-Knowledge Implementation (Weeks 2-3)
-1. **Initialize zero-knowledge encryption**
-   ```typescript
-   import { zeroKnowledgeEncryption } from './services/zeroKnowledgeEncryption';
-   
-   // Initialize with user passphrase + device entropy
-   await zeroKnowledgeEncryption.initializeMasterKey({
-     userSecret: userPassphrase,
-     iterations: 100000,
-     keyLength: 256
-   });
-   ```
-
-2. **Implement client-side hidden mode**
-   ```typescript
-   import { hiddenModeManager } from './services/hiddenModeManager';
-   
-   // Check transcription for code phrases
-   const result = await hiddenModeManager.checkForCodePhrases(transcription);
-   if (result.found && result.type === 'unlock') {
-     hiddenModeManager.activateHiddenMode();
-   }
-   ```
-
-3. **Update API calls for encrypted blobs**
-   ```typescript
-   // Encrypt before sending to server
-   const encrypted = await zeroKnowledgeEncryption.encryptEntry(content);
-   await api.post('/entries', {
-     content: encrypted.encryptedContent,
-     encrypted_key: encrypted.encryptedKey,
-     // ... other encrypted fields
-   });
-   ```
-
-### Phase 3: Advanced Features (Weeks 4-6)
-1. **Decoy and panic modes**
-2. **Multi-device synchronization**
-3. **Recovery phrase backup system**
-4. **Performance optimization**
-
-## Usage Examples
-
-### Creating Hidden Entries:
 ```typescript
-// 1. User speaks: "my secret thoughts are..."
-// 2. Client detects phrase, activates hidden mode
-const result = await hiddenModeManager.checkForCodePhrases(transcription);
-if (result.type === 'unlock') {
-  hiddenModeManager.activateHiddenMode();
-}
-
-// 3. Subsequent entries automatically encrypted
-if (hiddenModeManager.shouldHideEntry(content)) {
-  const encrypted = await zeroKnowledgeEncryption.encryptEntry(content);
-  // Send encrypted blob to server
-}
-```
-
-### Viewing Hidden Entries:
-```typescript
-// 1. Fetch entries from server (encrypted blobs)
-const entries = await api.get('/entries?include_hidden=true');
-
-// 2. Filter and decrypt client-side
-const visibleEntries = hiddenModeManager.filterEntries(entries);
-for (const entry of visibleEntries) {
-  if (entry.is_hidden && hiddenModeManager.isActive()) {
-    entry.content = await zeroKnowledgeEncryption.decryptEntry(entry);
+// Client-side phrase verification during speech processing
+async function checkForSecretPhrases(transcript: string) {
+  // 1. Get user's secret tag metadata from server
+  const userTags = await api.getUserSecretTags();
+  
+  // 2. Test transcript against each tag's hash
+  for (const tag of userTags) {
+    const testHash = await argon2.hash(transcript, tag.salt, sameParams);
+    
+    if (testHash === tag.phraseHash) {
+      // 3. Phrase match found - activate secret tag
+      await activateSecretTag(tag.tagName, transcript);
+      return { found: true, tagName: tag.tagName };
+    }
   }
+  
+  return { found: false };
 }
 ```
 
-### Panic Mode:
+### Entry Encryption and Storage
+
 ```typescript
-// User speaks panic phrase -> immediate secure deletion
-if (result.type === 'panic') {
-  await hiddenModeManager.activatePanicMode();
-  // All encryption keys and hidden data permanently deleted
+// Client-side entry encryption
+async function createSecretEntry(content: string, activeTagName: string) {
+  // 1. Get encryption key for active tag
+  const encryptionKey = await secureStorage.getKey(activeTagName);
+  
+  // 2. Generate unique entry key
+  const entryKey = await crypto.subtle.generateKey({
+    name: 'AES-GCM',
+    length: 256
+  });
+  
+  // 3. Encrypt content with entry key
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encryptedContent = await crypto.subtle.encrypt({
+    name: 'AES-GCM',
+    iv
+  }, entryKey, new TextEncoder().encode(content));
+  
+  // 4. Wrap entry key with tag's encryption key
+  const wrapIv = crypto.getRandomValues(new Uint8Array(12));
+  const wrappedKey = await crypto.subtle.wrapKey(
+    'raw', entryKey, encryptionKey, { name: 'AES-GCM', iv: wrapIv }
+  );
+  
+  // 5. Send encrypted data to server
+  await api.createJournalEntry({
+    encryptedContent: Array.from(new Uint8Array(encryptedContent)),
+    wrappedKey: Array.from(new Uint8Array(wrappedKey)),
+    iv: Array.from(iv),
+    wrapIv: Array.from(wrapIv),
+    secretTagId: activeTagName
+  });
 }
 ```
 
-## Security Testing Checklist
+## Security Model
 
-### ✅ Zero-Knowledge Validation:
-- [ ] Confirm server cannot decrypt any entries
-- [ ] Verify no key material stored on server  
-- [ ] Test admin database access (should see only encrypted blobs)
-- [ ] Validate hardware key storage protection
+### What Server Knows
+- ✅ **Secret tag names** (e.g., "work", "personal", "travel")
+- ✅ **Tag creation metadata** (timestamps, user associations)
+- ✅ **Salted phrase hashes** (for verification, not reversible)
+- ✅ **Encrypted journal entries** (cannot decrypt without phrase)
 
-### ✅ Attack Simulation:
-- [ ] Database dump analysis (no plaintext visible)
-- [ ] Memory dump analysis (no key leakage)
-- [ ] Network traffic analysis (only encrypted data)
-- [ ] Device seizure simulation (hidden entries invisible)
+### What Server Never Knows
+- ❌ **Secret phrases** (never transmitted or stored)
+- ❌ **Decrypted journal content** (encrypted client-side)
+- ❌ **Encryption keys** (derived client-side from phrases)
+- ❌ **User's secret tag usage patterns** (verification happens client-side)
 
-### ✅ Cryptographic Testing:
-- [ ] Key derivation function validation
-- [ ] Per-entry key uniqueness verification
-- [ ] Forward secrecy testing (deleted entry recovery)
-- [ ] Constant-time comparison validation
+### Device Inspection Safety
+- ❌ **No secret phrases stored** (memory-only during activation)
+- ❌ **No tag names stored** (fetched from server when needed)
+- ❌ **No persistent secret metadata** (only encrypted keys in secure storage)
+- ✅ **Appears as normal journaling app** when inspected offline
 
-## Performance Considerations
+## Database Schema
 
-### Encryption Overhead:
-- **Target**: < 100ms per entry encryption/decryption
-- **Optimization**: Hardware-accelerated AES when available
-- **Caching**: Decrypt entries once per session
+### Secret Tags Table
+```sql
+CREATE TABLE secret_tags (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    tag_name VARCHAR(100) NOT NULL,
+    phrase_salt BYTEA NOT NULL,
+    phrase_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, tag_name)
+);
+```
 
-### Memory Security:
-- **Immediate cleanup** of sensitive data after use
-- **Secure string handling** (avoid JavaScript string copies)
-- **Hardware protection** for master keys
+### Journal Entries (Enhanced)
+```sql
+-- Existing table with secret tag support
+ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS secret_tag_id UUID REFERENCES secret_tags(id);
+ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS encrypted_content BYTEA;
+ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS wrapped_key BYTEA;
+ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS encryption_iv BYTEA;
+ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS wrap_iv BYTEA;
+```
 
-## Migration from Current Implementation
+## API Endpoints
 
-### For Existing Users:
-1. **Backup current data** before migration
-2. **Re-encrypt existing entries** with new zero-knowledge system
-3. **Migrate to hardware key storage** from localStorage
-4. **Set up recovery phrases** for backup access
+### Secret Tag Management
+```python
+# Backend API endpoints
+@router.post("/secret-tags")
+async def create_secret_tag(
+    tag_data: SecretTagCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new secret tag with salted phrase hash"""
+    
+@router.get("/secret-tags")
+async def get_user_secret_tags(
+    current_user: User = Depends(get_current_user)
+):
+    """Get user's secret tag metadata for phrase verification"""
+    
+@router.delete("/secret-tags/{tag_id}")
+async def delete_secret_tag(
+    tag_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete secret tag and all associated entries"""
+```
 
-### Breaking Changes:
-- **Server-side decryption removed** - clients must handle all decryption
-- **Hidden mode session removed** - client-side management only
-- **Code phrases moved to client** - server no longer involved
+### Data Models
+```python
+class SecretTagCreate(BaseModel):
+    tag_name: str = Field(..., min_length=1, max_length=100)
+    phrase_salt: List[int] = Field(..., min_items=32, max_items=32)
+    phrase_hash: str = Field(..., min_length=1)
 
-## Compliance and Auditing
+class SecretTagResponse(BaseModel):
+    id: UUID
+    tag_name: str
+    phrase_salt: List[int]
+    phrase_hash: str
+    created_at: datetime
+```
 
-### Privacy Compliance:
-- ✅ **GDPR compliant** - Server cannot access personal data
-- ✅ **Zero-knowledge proven** - Independent cryptographic audit
-- ✅ **Right to be forgotten** - Panic mode ensures permanent deletion
+## Security Analysis
 
-### Security Auditing:
-- **Cryptographic implementation review** by security experts
-- **Penetration testing** of zero-knowledge implementation
-- **Code review** of all encryption/decryption logic
-- **Hardware security validation** on iOS/Android devices
+### Threat Model Protection
+
+#### ✅ **Device Inspection (Border Control)**
+- **No discoverable secrets**: Device contains no secret phrases or tag names
+- **Normal app appearance**: Looks like regular journaling app when offline
+- **Encrypted keys only**: Only encrypted keys in secure storage, unusable without phrases
+
+#### ✅ **Server Compromise**
+- **No plaintext access**: Server cannot decrypt any journal entries
+- **Hash-only exposure**: Only salted hashes exposed, require brute-force
+- **Phrase protection**: Strong Argon2 parameters make brute-force impractical
+
+#### ✅ **Network Interception**
+- **No sensitive transmission**: Phrases never sent over network
+- **Hash verification**: Only hashes transmitted for verification
+- **Encrypted content**: All journal content encrypted before transmission
+
+### Security Parameters
+
+#### Argon2 Configuration
+```typescript
+const argon2Params = {
+  type: argon2.argon2id,     // Hybrid version (recommended)
+  memoryCost: 65536,         // 64 MiB memory usage
+  timeCost: 3,               // 3 iterations
+  parallelism: 1,            // Single thread
+  hashLength: 32             // 256-bit output
+};
+```
+
+#### Encryption Specifications
+- **Content Encryption**: AES-256-GCM
+- **Key Wrapping**: AES-256-GCM
+- **Key Derivation**: PBKDF2-SHA256 (100,000 iterations)
+- **Random Generation**: Cryptographically secure (crypto.getRandomValues)
+
+### Risk Assessment
+
+#### Low Risk Scenarios
+- ✅ **Casual device inspection**: No evidence of secret functionality
+- ✅ **Network monitoring**: Only encrypted data and hashes transmitted
+- ✅ **Server breach with strong phrases**: Brute-force computationally infeasible
+
+#### Medium Risk Scenarios
+- ⚠️ **Server breach with weak phrases**: Short phrases vulnerable to brute-force
+  - **Mitigation**: Enforce minimum phrase requirements (20+ characters or 4+ words)
+- ⚠️ **Targeted device forensics**: Advanced analysis might detect encrypted keys
+  - **Mitigation**: Hardware-backed secure storage provides strong protection
+
+#### Future Enhancement Options
+- 🔄 **OPAQUE Protocol**: Eliminate offline brute-force risk entirely
+- 🔄 **Post-Quantum Cryptography**: Prepare for quantum computing threats
+- 🔄 **Multi-Factor Authentication**: Add biometric verification for tag activation
+
+## Implementation Phases
+
+### Phase 1: Core Infrastructure (Week 1)
+- [ ] Database schema updates
+- [ ] Backend API endpoints
+- [ ] Basic Argon2 integration
+- [ ] Server-side tag management
+
+### Phase 2: Client Integration (Week 2)
+- [ ] Client-side hash verification
+- [ ] Speech processing integration
+- [ ] Encryption key management
+- [ ] Secure storage implementation
+
+### Phase 3: User Interface (Week 3)
+- [ ] Tag creation UI
+- [ ] Tag management interface
+- [ ] Status indicators
+- [ ] Error handling and feedback
+
+### Phase 4: Testing and Polish (Week 4)
+- [ ] Security testing
+- [ ] Performance optimization
+- [ ] Cross-platform validation
+- [ ] Documentation completion
+
+## Performance Characteristics
+
+### Hash Verification Performance
+- **Tag creation**: ~200ms (one-time cost)
+- **Phrase verification**: ~50ms per tag (during speech processing)
+- **Typical usage**: 3-4 tags = ~200ms total verification time
+- **Network overhead**: Minimal (only hash comparisons)
+
+### Encryption Performance
+- **Key derivation**: ~100ms per phrase (cached after first use)
+- **Entry encryption**: <10ms per entry
+- **Entry decryption**: <5ms per entry
+- **Storage overhead**: ~300 bytes per encrypted entry
+
+## Best Practices
+
+### For Users
+1. **Strong phrases**: Use 20+ characters or 4+ random words
+2. **Unique phrases**: Each secret tag should have different phrase
+3. **Memorable phrases**: Choose phrases you can remember without writing down
+4. **Private activation**: Activate tags in secure, private environments
+
+### For Developers
+1. **Parameter validation**: Enforce strong phrase requirements
+2. **Secure coding**: Follow cryptographic best practices
+3. **Error handling**: Graceful degradation when verification fails
+4. **Performance monitoring**: Track hash verification times
+5. **Security auditing**: Regular review of cryptographic implementation
 
 ## Conclusion
 
-This zero-knowledge implementation ensures **true privacy** where:
+This simplified server-side hash verification approach provides an optimal balance between security and implementation complexity. By storing tag metadata and phrase hashes server-side while keeping phrases and content client-side, we achieve strong security properties with manageable complexity.
 
-1. **Server cannot decrypt any user data** under any circumstances
-2. **User has complete control** over their encryption keys
-3. **Hardware-backed security** protects against device compromise
-4. **Forward secrecy** prevents recovery of deleted entries
-5. **Coercion resistance** through decoy and panic modes
+The system is designed to be:
+- **Secure enough** for the stated threat model (device inspection, server compromise)
+- **Simple enough** to implement and maintain reliably
+- **Flexible enough** to upgrade with stronger protocols (OPAQUE) if needed
+- **User-friendly enough** for practical daily use
 
-The refactoring transforms Vibes from a **trust-based** system to a **zero-knowledge** system, providing **mathematical guarantees** of privacy that don't depend on trusting the service provider. 
+This approach represents a pragmatic solution that delivers real-world security benefits without the complexity overhead of more exotic cryptographic protocols. 

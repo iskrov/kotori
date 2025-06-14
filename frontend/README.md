@@ -1,6 +1,6 @@
 # Vibes - Voice Journal App
 
-A modern, secure voice journaling application built with React Native and FastAPI, featuring zero-knowledge encryption and AI-powered transcription.
+A modern, secure voice journaling application built with React Native and FastAPI, featuring zero-knowledge phrase-based encryption and AI-powered transcription.
 
 ## 🎯 Project Status: PRODUCTION READY
 
@@ -8,7 +8,7 @@ A modern, secure voice journaling application built with React Native and FastAP
 
 ### ✅ Core Features Implemented
 - **Voice Recording & Transcription**: Google Cloud Speech-to-Text V2 integration with multi-language support
-- **Zero-Knowledge Encryption**: Client-side encryption with hidden mode and coercion resistance
+- **Zero-Knowledge Phrase-Based Encryption**: Client-side encryption with voice-activated secret tags and coercion resistance
 - **Modern UI/UX**: Floating tab navigation, modern forms, and professional recording interface
 - **Journal Management**: Full CRUD operations with tags, search, and calendar integration
 - **Authentication**: Google Sign-in with secure session management
@@ -19,63 +19,45 @@ A modern, secure voice journaling application built with React Native and FastAP
 **Frontend**: React Native with TypeScript
 - Cross-platform (iOS, Android, Web)
 - Modern navigation with floating tabs
-- Zero-knowledge encryption client
-- Google Speech-to-Text integration
+- Zero-knowledge encryption client with phrase detection
+- Backend API integration for transcription
 
 **Backend**: FastAPI with Python
 - RESTful API design
 - PostgreSQL database with encryption metadata
-- Secure environment configuration
+- Google Cloud Speech-to-Text API integration
 - Production-ready deployment structure
 
-**Security**: Zero-Knowledge Architecture
+**Security**: Zero-Knowledge Phrase-Based Architecture
 - Client-side encryption with hardware-backed key storage
-- Hidden mode with voice activation
+- Voice-activated secret tags with phrase detection
 - Coercion resistance features
 - No server-side decryption capability
 
-## Google Cloud Speech-to-Text Setup
+## Backend API Integration
 
-This application uses Google Cloud Speech-to-Text API for transcribing voice recordings. Follow these steps to set up the required credentials:
+**Note**: This application uses a backend API for Google Cloud Speech-to-Text integration. The frontend no longer directly accesses Google Cloud APIs.
 
-1. **Create a Google Cloud Project**:
-   - Go to the [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Note your Project ID
+### API Configuration
+- The backend handles all Google Cloud Speech-to-Text API communication
+- Frontend sends audio data to `/api/speech/transcribe` endpoint
+- No Google Cloud credentials needed in frontend environment
+- Secure, centralized API management
 
-2. **Enable the Speech-to-Text API**:
-   - In the Cloud Console, go to "APIs & Services" > "Library"
-   - Search for "Speech-to-Text API" and enable it for your project
-
-3. **Create API Credentials**:
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create credentials" and select "API key"
-   - Copy your new API key
-
-4. **Configure the Application**:
-   - Copy the `.env.example` file to `.env`
-   - Replace the placeholder values with your actual Project ID and API key:
-     ```
-     GOOGLE_CLOUD_PROJECT_ID=your-actual-project-id
-     GOOGLE_SPEECH_API_KEY=your-actual-api-key
-     ```
-   - These credentials will be used for all users of the application
-
-5. **Security Best Practices**:
-   - Never commit your `.env` file to version control
-   - Restrict your API key in the Google Cloud Console to only the necessary APIs
-   - Consider setting up API key restrictions based on IP, HTTP referrers, etc.
-   - For production, use more secure authentication methods like service accounts
-
-The application supports multiple languages for voice transcription with automatic language detection capabilities.
+### Environment Configuration
+Copy `.env.example` to `.env` and configure:
+```bash
+# Frontend environment variables
+EXPO_PUBLIC_API_URL=http://localhost:8001  # Backend API URL
+# No Google Cloud credentials needed in frontend
+```
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 - Node.js (v16 or higher)
-- Python 3.8+
-- PostgreSQL
-- Google Cloud Project with Speech-to-Text API enabled
+- Backend API server running (see main README.md)
+- Expo CLI for development
 
 ### Frontend Setup
 ```bash
@@ -84,36 +66,14 @@ npm install
 npm start
 ```
 
-### Backend Setup
-```bash
-cd backend
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn main:app --reload
-```
+### Backend Dependency
+The frontend requires the backend API to be running for:
+- Speech-to-text transcription
+- Journal entry storage and retrieval
+- User authentication
+- Secret tags management
 
-### Environment Configuration
-Copy `.env.example` to `.env` and configure:
-- Google Cloud credentials
-- Database connection strings
-- JWT secrets and encryption keys
-
-## Testing the Speech-to-Text API
-
-To verify that your Google Cloud Speech-to-Text API configuration is working correctly, you can use the included test script:
-
-```bash
-# From the frontend directory
-node scripts/test-speech-api.js
-```
-
-This script will:
-1. Check if your API key and project ID are configured
-2. Attempt to connect to the Google Cloud Speech-to-Text API
-3. Report whether the connection was successful
-4. Provide troubleshooting steps if the connection failed
-
-If the test fails, the app will automatically fall back to text-only input and inform users that voice recording is temporarily unavailable.
+Refer to the main project README.md for backend setup instructions.
 
 ## 🔧 Recent Updates (January 2025)
 
@@ -128,23 +88,24 @@ If the test fails, the app will automatically fall back to text-only input and i
 - **Enhanced Journal Management**: Improved list navigation and search capabilities
 - **Audio Recording Stability**: Fixed transcript display and save functionality
 - **Navigation Architecture**: Modal-based recording screen with proper flow
+- **Phrase-Based Encryption**: Voice-activated secret tags with real-time phrase detection
 
 ### Troubleshooting Common Issues
 
-1. **API Key Issues**
-   - Ensure your `GOOGLE_SPEECH_API_KEY` is set correctly in `.env`
-   - Verify that the API key has the correct permissions
-   - Check if the API key has any restrictions (IP, referrers, etc.)
+1. **Backend Connection Issues**
+   - Ensure the backend API server is running on the configured URL
+   - Verify `EXPO_PUBLIC_API_URL` is set correctly in `.env`
+   - Check network connectivity between frontend and backend
 
-2. **Project Configuration**
-   - Confirm that the Speech-to-Text API is enabled for your project
-   - Verify that your `GOOGLE_CLOUD_PROJECT_ID` is correct in `.env`
-   - Check if your project has billing enabled (required for the Speech-to-Text API)
+2. **Speech Transcription Issues**
+   - Verify backend has proper Google Cloud credentials configured
+   - Check backend logs for Speech-to-Text API errors
+   - Ensure microphone permissions are granted
 
-3. **Network Issues**
-   - Ensure your device has internet connectivity
-   - Check if any firewalls or proxies might be blocking requests
-   - Try running the test from a different network
+3. **Authentication Issues**
+   - Verify Google Sign-in configuration in backend
+   - Check if authentication tokens are being properly stored
+   - Clear app data and re-authenticate if needed
 
 4. **UI Layout Issues**
    - Clear browser cache and restart development server
@@ -153,15 +114,17 @@ If the test fails, the app will automatically fall back to text-only input and i
 
 ## 🔒 Security Features
 
-### Zero-Knowledge Encryption
+### Zero-Knowledge Phrase-Based Encryption
 - All journal entries encrypted client-side before storage
 - Server cannot decrypt user data even under compromise
 - Hardware-backed key storage on supported devices
+- Phrase-to-key derivation using Argon2 hashing
 
-### Hidden Mode
-- Voice-activated hidden journal entries
-- Coercion resistance with decoy entries
-- Panic mode for secure key deletion
+### Voice-Activated Secret Tags
+- Real-time phrase detection during recording
+- Automatic encryption with phrase-derived keys
+- Coercion resistance with independent tag activation
+- Progressive disclosure of private content
 
 ### Authentication
 - Google Sign-in integration
@@ -176,7 +139,7 @@ If the test fails, the app will automatically fall back to text-only input and i
 
 ## 🏆 Project Achievements
 
-- **Production-Ready Security**: Zero-knowledge architecture implemented
+- **Production-Ready Security**: Zero-knowledge phrase-based architecture implemented
 - **Modern UI/UX**: Contemporary design following mobile-first principles  
 - **Cross-Platform**: Consistent experience across all platforms
 - **Performance Optimized**: 60fps animations and efficient data handling

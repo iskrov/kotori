@@ -21,7 +21,31 @@ from ..services.session_service import session_service
 router = APIRouter()
 
 
-@router.get("/", response_model=list[JournalEntry])
+def _read_journal_entries_impl(
+    *,
+    db: Session,
+    current_user: User,
+    skip: int = 0,
+    limit: int = 100,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    tags: list[str] | None = None,
+    include_hidden: bool = False,
+) -> Any:
+    """Implementation for reading journal entries."""
+    return journal_service.get_multi_by_user(
+        db=db,
+        user_id=current_user.id,
+        skip=skip,
+        limit=limit,
+        start_date=start_date,
+        end_date=end_date,
+        tags=tags,
+        include_hidden=include_hidden,
+    )
+
+
+@router.get("", response_model=list[JournalEntry])
 def read_journal_entries(
     *,
     db: Session = Depends(get_db),
@@ -38,9 +62,9 @@ def read_journal_entries(
     Optional filtering by date range and tags.
     Automatically filters hidden entries based on session state.
     """
-    return journal_service.get_multi_by_user(
+    return _read_journal_entries_impl(
         db=db,
-        user_id=current_user.id,
+        current_user=current_user,
         skip=skip,
         limit=limit,
         start_date=start_date,
@@ -50,7 +74,48 @@ def read_journal_entries(
     )
 
 
-@router.post("/", response_model=JournalEntry)
+@router.get("/", response_model=list[JournalEntry])
+def read_journal_entries_with_slash(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 100,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    tags: list[str] | None = Query(None),
+    include_hidden: bool = False,
+) -> Any:
+    """
+    Retrieve journal entries for the current user (with trailing slash).
+    Optional filtering by date range and tags.
+    Automatically filters hidden entries based on session state.
+    """
+    return _read_journal_entries_impl(
+        db=db,
+        current_user=current_user,
+        skip=skip,
+        limit=limit,
+        start_date=start_date,
+        end_date=end_date,
+        tags=tags,
+        include_hidden=include_hidden,
+    )
+
+
+def _create_journal_entry_impl(
+    *,
+    db: Session,
+    entry_in: JournalEntryCreate,
+    current_user: User,
+) -> Any:
+    """Implementation for creating journal entries."""
+    return journal_service.create_with_user(
+        db=db, obj_in=entry_in, user_id=current_user.id
+    )
+
+
+@router.post("", response_model=JournalEntry)
 def create_journal_entry(
     *,
     db: Session = Depends(get_db),
@@ -60,8 +125,23 @@ def create_journal_entry(
     """
     Create new journal entry for the current user.
     """
-    return journal_service.create_with_user(
-        db=db, obj_in=entry_in, user_id=current_user.id
+    return _create_journal_entry_impl(
+        db=db, entry_in=entry_in, current_user=current_user
+    )
+
+
+@router.post("/", response_model=JournalEntry)
+def create_journal_entry_with_slash(
+    *,
+    db: Session = Depends(get_db),
+    entry_in: JournalEntryCreate,
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Create new journal entry for the current user (with trailing slash).
+    """
+    return _create_journal_entry_impl(
+        db=db, entry_in=entry_in, current_user=current_user
     )
 
 
@@ -74,16 +154,12 @@ def create_hidden_journal_entry(
 ) -> Any:
     """
     Create new hidden/encrypted journal entry for the current user.
-    Requires active hidden mode session.
+    Legacy endpoint - use secret tags instead.
     """
-    if not session_service.is_hidden_mode_active(current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Hidden mode not active. Use code phrase to activate."
-        )
-    
+    # Legacy support - just create a regular entry
+    # Client should use secret tags for privacy
     return journal_service.create_with_user(
-        db=db, obj_in=entry_in, user_id=current_user.id, is_hidden=True
+        db=db, obj_in=entry_in, user_id=current_user.id
     )
 
 
@@ -202,7 +278,7 @@ def delete_journal_entry(
     return {"message": "Journal entry deleted successfully", "id": id}
 
 
-@router.get("/tags/", response_model=list[Tag])
+@router.get("/tags", response_model=list[Tag])
 def read_tags(
     *, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ) -> Any:

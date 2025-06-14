@@ -90,8 +90,32 @@ const HomeScreen = () => {
         'HomeScreen: recentEntries IDs for key check:',
         recentEntries.map(entry => entry.id)
       );
+      
+      // Check for duplicate IDs
+      const ids = recentEntries.map(entry => entry.id);
+      const uniqueIds = [...new Set(ids)];
+      if (ids.length !== uniqueIds.length) {
+        logger.warn('HomeScreen: Duplicate entry IDs detected!', { ids, uniqueIds });
+      }
     }
   }, [recentEntries]);
+
+  // Log displayedEntries IDs when they change, for debugging key prop warning
+  useEffect(() => {
+    if (displayedEntries.length > 0) {
+      logger.info(
+        'HomeScreen: displayedEntries IDs for key check:',
+        displayedEntries.map(entry => entry.id)
+      );
+      
+      // Check for duplicate IDs in displayed entries
+      const displayedIds = displayedEntries.map(entry => entry.id);
+      const uniqueDisplayedIds = [...new Set(displayedIds)];
+      if (displayedIds.length !== uniqueDisplayedIds.length) {
+        logger.warn('HomeScreen: Duplicate displayed entry IDs detected!', { displayedIds, uniqueDisplayedIds });
+      }
+    }
+  }, [displayedEntries]);
 
   const fetchData = async () => {
     try {
@@ -109,8 +133,8 @@ const HomeScreen = () => {
       });
       
       // Fetch recent entries, ensuring descending order by entry_date
-      logger.info("HomeScreen: Fetching recent journals from /api/journals...");
-      const entriesResponse = await api.get('/api/journals', {
+              logger.info("HomeScreen: Fetching recent journals from /api/journals/...");
+        const entriesResponse = await api.get('/api/journals/', {
         params: { 
           limit: 3, // Only show 3 most recent entries on the home screen
           sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
@@ -150,7 +174,7 @@ const HomeScreen = () => {
     navigation.navigate('Journal', { screen: 'JournalList' });
   };
 
-  const navigateToDetail = (entryId: string) => {
+  const navigateToDetail = (entryId: number) => {
     // Navigate to JournalEntryDetail within the Journal stack
     navigation.navigate('Journal', { 
         screen: 'JournalEntryDetail', 
@@ -205,9 +229,9 @@ const HomeScreen = () => {
       </View>
 
       {displayedEntries.length > 0 ? (
-        displayedEntries.map((entry) => (
+        displayedEntries.map((entry, index) => (
           <JournalCard 
-            key={String(entry.id)} 
+            key={`home-entry-${entry.id}-${index}`} 
             entry={entry} 
             onPress={() => navigateToDetail(entry.id)}
           />

@@ -37,7 +37,12 @@ export interface TranscriptionResult {
     low_confidence_words: number;
     total_words: number;
   };
-  hidden_mode_activated?: boolean;
+  secret_tag_detected?: {
+    found: boolean;
+    tagId?: string;
+    tagName?: string;
+    action?: 'activate' | 'deactivate' | 'panic';
+  };
 }
 
 interface UseAudioRecorderLogicProps {
@@ -251,6 +256,30 @@ export const useAudioRecorderLogic = ({
     onTranscriptionComplete(fullTranscript, audioUri || undefined, detectedLanguage, confidence);
   }, [transcriptSegments, lastTranscriptionResult, audioUri, onTranscriptionComplete]);
 
+  // Function to determine if secret tag detection should be treated as a command or normal content
+  const shouldTreatAsSecretTagCommand = (transcript: string, secretTagDetected: any): boolean => {
+    if (!secretTagDetected?.tagName) return false;
+    
+    // Normalize function: lowercase, remove punctuation and spaces, keep only letters and numbers
+    const normalize = (text: string): string => {
+      return text.toLowerCase().replace(/[^a-z0-9]/g, '');
+    };
+    
+    const normalizedTranscript = normalize(transcript);
+    const normalizedPhrase = normalize(secretTagDetected.tagName);
+    
+    // Secret tag activation requires exact match after normalization
+    const isExactMatch = normalizedTranscript === normalizedPhrase;
+    
+    if (isExactMatch) {
+      logger.info(`[shouldTreatAsSecretTagCommand] Exact match found - transcript: "${normalizedTranscript}" matches phrase: "${normalizedPhrase}"`);
+    } else {
+      logger.info(`[shouldTreatAsSecretTagCommand] No exact match - transcript: "${normalizedTranscript}" vs phrase: "${normalizedPhrase}"`);
+    }
+    
+    return isExactMatch;
+  };
+
   // Simplified segment processing with single language support
   const processSegment = async (uri: string, languageCode: string) => {
     if (!isMountedRef.current || processedUris.has(uri)) {
@@ -265,12 +294,13 @@ export const useAudioRecorderLogic = ({
     try {
       logger.info(`[processSegment] Starting transcription for ${uri} with language: ${languageCode}`);
       
-      // Use speech service with single language code (or auto-detect)
+      // Use speech service with single language code (or auto-detect) and secret tag detection
       const languageCodes = languageCode === 'auto' ? undefined : [languageCode];
       const result = await speechToTextService.transcribeAudio(uri, {
         languageCodes,
         maxAlternatives: 3,
-        enableWordConfidence: true
+        enableWordConfidence: true,
+        enableSecretTagDetection: true
       });
 
       if (!isMountedRef.current) {
@@ -286,6 +316,30 @@ export const useAudioRecorderLogic = ({
 
       const transcript = result.transcript?.trim();
       if (transcript) {
+        // Check if a secret tag was detected
+        if (result.secret_tag_detected?.found) {
+          // Determine if this should be treated as a secret tag command or normal content
+          const isSecretTagCommand = shouldTreatAsSecretTagCommand(transcript, result.secret_tag_detected);
+          
+          if (isSecretTagCommand) {
+            logger.info(`[processSegment] Secret tag command detected - not adding "${transcript}" to transcript segments`);
+            const action = result.secret_tag_detected.action === 'activate' ? 'activated' : 'deactivated';
+            setCurrentSegmentTranscript(`Secret tag ${action} successfully`);
+            
+            // Show brief success message then clear
+            setTimeout(() => {
+              if (isMountedRef.current) {
+                setCurrentSegmentTranscript('');
+              }
+            }, 2000);
+            
+            return; // Exit early - don't add to segments or trigger auto-save
+          } else {
+            logger.info(`[processSegment] Secret tag detected but treating as normal content: "${transcript}"`);
+            // Continue with normal processing - this will create an entry
+          }
+        }
+        
         // Capitalize first letter of the transcript segment
         const capitalizedTranscript = transcript.charAt(0).toUpperCase() + transcript.slice(1);
         

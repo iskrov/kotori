@@ -151,6 +151,14 @@ const SettingsScreen: React.FC = () => {
         icon="shield-checkmark"
       >
         <SettingsRow
+          title="Secret Tags"
+          subtitle="Manage multi-level privacy tags"
+          leftIcon="shield"
+          onPress={() => navigation.navigate('SecretTagManager')}
+          showChevron={true}
+        />
+
+        <SettingsRow
           title="Hidden Mode Status"
           subtitle={settings.hiddenModeEnabled ? "Configured" : "Not configured"}
           leftIcon="eye-off"

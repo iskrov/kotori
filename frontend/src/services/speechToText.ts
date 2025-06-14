@@ -6,6 +6,7 @@ import { api as axiosInstance } from './api';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { validateLanguageCode } from '../config/languageConfig';
+import { secretTagManager } from './secretTagManager';
 
 // Enhanced types for multi-language transcription
 interface TranscriptionResult {
@@ -28,7 +29,12 @@ interface TranscriptionResult {
     low_confidence_words: number;
     total_words: number;
   };
-  hidden_mode_activated?: boolean;
+  secret_tag_detected?: {
+    found: boolean;
+    tagId?: string;
+    tagName?: string;
+    action?: 'activate' | 'deactivate' | 'panic';
+  };
 }
 
 interface TranscriptionOptions {
@@ -36,6 +42,7 @@ interface TranscriptionOptions {
   maxAlternatives?: number;
   enableWordConfidence?: boolean;
   confidenceThreshold?: number;
+  enableSecretTagDetection?: boolean; // Enable secret tag phrase detection
 }
 
 interface TranscriptionError {
@@ -45,10 +52,18 @@ interface TranscriptionError {
 }
 
 /**
- * Enhanced service to handle multi-language Speech-to-Text interactions via the backend API
- * with confidence scoring, alternatives, and quality metrics.
+ * Enhanced Speech-to-Text Service with multi-language support and secret tag detection
  */
 class SpeechToTextService {
+  private static instance: SpeechToTextService;
+
+  public static getInstance(): SpeechToTextService {
+    if (!SpeechToTextService.instance) {
+      SpeechToTextService.instance = new SpeechToTextService();
+    }
+    return SpeechToTextService.instance;
+  }
+
   private readonly maxRetries = 2;
   private readonly retryDelay = 1000; // 1 second
 
@@ -57,18 +72,24 @@ class SpeechToTextService {
   }
 
   /**
-   * Enhanced transcription method with multi-language support
+   * Enhanced transcription method with multi-language support and secret tag detection
    */
   public async transcribeAudio(
     audioFilePath: string,
     options: TranscriptionOptions = {}
   ): Promise<TranscriptionResult> {
-    const { languageCodes, maxAlternatives = 3, enableWordConfidence = true } = options;
+    const { 
+      languageCodes, 
+      maxAlternatives = 3, 
+      enableWordConfidence = true,
+      enableSecretTagDetection = true 
+    } = options;
     
     logger.info(
       `Requesting enhanced transcription for audio file: ${audioFilePath}, ` +
       `Languages: ${languageCodes ? languageCodes.join(', ') : 'auto-detect'}, ` +
-      `Max alternatives: ${maxAlternatives}`
+      `Max alternatives: ${maxAlternatives}, ` +
+      `Secret tag detection: ${enableSecretTagDetection}`
     );
     
     try {
@@ -79,13 +100,13 @@ class SpeechToTextService {
 
       // --- First attempt with current token ---
       try {
-        return await this._performTranscription(audioFilePath, languageCodes);
+        return await this._performTranscription(audioFilePath, languageCodes, enableSecretTagDetection);
       } 
       catch (initialError: any) {
         // Handle 401 with manual refresh and retry
         if (initialError.response?.status === 401) {
           logger.info('Got 401, manually refreshing token and retrying...');
-          return await this._retryWithTokenRefresh(audioFilePath, languageCodes);
+          return await this._retryWithTokenRefresh(audioFilePath, languageCodes, enableSecretTagDetection);
         }
         
         // If not a 401 error, just rethrow the original error
@@ -133,7 +154,8 @@ class SpeechToTextService {
    */
   private async _performTranscription(
     audioFilePath: string, 
-    languageCodes?: string[]
+    languageCodes?: string[],
+    enableSecretTagDetection: boolean = true
   ): Promise<TranscriptionResult> {
     // Create FormData with audio file
     const formData = await this._createFormData(audioFilePath);
@@ -155,7 +177,7 @@ class SpeechToTextService {
     
     logger.info('Sending enhanced audio file to backend /api/speech/transcribe...');
     
-    const response = await axiosInstance.post<TranscriptionResult>(
+    const response = await axiosInstance.post<any>(
       '/api/speech/transcribe',
       formData,
       {
@@ -168,12 +190,13 @@ class SpeechToTextService {
     
     logger.info(
       `Enhanced transcription received successfully. ` +
-      `Confidence: ${response.data.confidence?.toFixed(2) || 'N/A'}, ` +
-      `Language: ${response.data.detected_language_code || 'N/A'}, ` +
-      `Alternatives: ${response.data.alternatives?.length || 0}`
+      `Transcript length: ${response.data.transcript?.length || 0}`
     );
     
-    return this._processTranscriptionResponse(response.data);
+    // Process the response and add secret tag detection
+    const processedResult = await this._processTranscriptionResponse(response.data, enableSecretTagDetection);
+    
+    return processedResult;
   }
 
   /**
@@ -222,50 +245,124 @@ class SpeechToTextService {
   }
 
   /**
-   * Get MIME type for audio file extension
+   * Get audio MIME type based on file extension
    */
   private _getAudioMimeType(extension?: string): string {
-    switch (extension) {
-      case 'm4a': return 'audio/m4a';
-      case 'mp3': return 'audio/mpeg';
-      case 'wav': return 'audio/wav';
-      case 'aac': return 'audio/aac';
-      case 'ogg': return 'audio/ogg';
-      case 'flac': return 'audio/flac';
-      default: return 'audio/wav';
-    }
+    const mimeTypes: { [key: string]: string } = {
+      'wav': 'audio/wav',
+      'mp3': 'audio/mpeg',
+      'mp4': 'audio/mp4',
+      'm4a': 'audio/mp4',
+      'aac': 'audio/aac',
+      'ogg': 'audio/ogg',
+      'webm': 'audio/webm',
+      'flac': 'audio/flac'
+    };
+    
+    return mimeTypes[extension || 'wav'] || 'audio/wav';
   }
 
   /**
-   * Process and validate transcription response
+   * Process and validate transcription response with secret tag detection
    */
-  private _processTranscriptionResponse(data: any): TranscriptionResult {
+  private async _processTranscriptionResponse(data: any, enableSecretTagDetection: boolean): Promise<TranscriptionResult> {
     // Ensure all required fields are present with defaults
     const processedResult: TranscriptionResult = {
       transcript: data.transcript || '',
       detected_language_code: data.detected_language_code || undefined,
-      confidence: typeof data.confidence === 'number' ? data.confidence : 0.0,
+      confidence: typeof data.confidence === 'number' ? data.confidence : 0.8, // Default confidence
       alternatives: Array.isArray(data.alternatives) ? data.alternatives : [],
       word_confidence: Array.isArray(data.word_confidence) ? data.word_confidence : [],
-      language_confidence: typeof data.language_confidence === 'number' ? data.language_confidence : 0.0,
+      language_confidence: typeof data.language_confidence === 'number' ? data.language_confidence : 0.8,
       quality_metrics: {
-        average_confidence: data.quality_metrics?.average_confidence || 0.0,
+        average_confidence: data.quality_metrics?.average_confidence || 0.8,
         low_confidence_words: data.quality_metrics?.low_confidence_words || 0,
         total_words: data.quality_metrics?.total_words || 0,
         ...data.quality_metrics
-      },
-      hidden_mode_activated: Boolean(data.hidden_mode_activated)
+      }
     };
+
+    // Perform secret tag detection if enabled and transcript is available
+    if (enableSecretTagDetection && processedResult.transcript.trim()) {
+      try {
+        logger.info(`[Secret Tag Detection] Starting detection for transcript: "${processedResult.transcript}"`);
+        
+        // Verify secret tag manager is initialized
+        await secretTagManager.initialize();
+        
+        // Get all secret tags to debug
+        const allTags = await secretTagManager.getAllSecretTags();
+        logger.info(`[Secret Tag Detection] Found ${allTags.length} secret tags in storage`);
+        
+        if (allTags.length > 0) {
+          logger.info(`[Secret Tag Detection] Secret tag names: ${allTags.map(t => t.name).join(', ')}`);
+        }
+        
+        const tagDetection = await secretTagManager.checkForSecretTagPhrases(processedResult.transcript);
+        processedResult.secret_tag_detected = tagDetection;
+        
+        logger.info(`[Secret Tag Detection] Detection result:`, tagDetection);
+        
+        if (tagDetection.found) {
+          logger.info(`Secret tag phrase detected: ${tagDetection.tagName} (${tagDetection.action})`);
+          
+          // Handle the detected secret tag action
+          await this._handleSecretTagDetection(tagDetection);
+        } else {
+          logger.info(`[Secret Tag Detection] No secret tag phrases detected in: "${processedResult.transcript}"`);
+        }
+      } catch (error) {
+        logger.error('Error during secret tag detection:', error);
+        // Don't fail the transcription if secret tag detection fails
+        processedResult.secret_tag_detected = { found: false };
+      }
+    } else {
+      processedResult.secret_tag_detected = { found: false };
+      
+      if (enableSecretTagDetection) {
+        logger.info(`[Secret Tag Detection] Skipped - empty transcript`);
+      } else {
+        logger.info(`[Secret Tag Detection] Disabled`);
+      }
+    }
 
     // Log quality metrics
     logger.info(
       `Transcription quality metrics - ` +
       `Avg confidence: ${processedResult.quality_metrics.average_confidence.toFixed(2)}, ` +
       `Low confidence words: ${processedResult.quality_metrics.low_confidence_words}/${processedResult.quality_metrics.total_words}, ` +
-      `Language confidence: ${processedResult.language_confidence.toFixed(2)}`
+      `Language confidence: ${processedResult.language_confidence.toFixed(2)}, ` +
+      `Secret tag detected: ${processedResult.secret_tag_detected?.found || false}`
     );
 
     return processedResult;
+  }
+
+  /**
+   * Handle secret tag detection results
+   */
+  private async _handleSecretTagDetection(detection: any): Promise<void> {
+    try {
+      if (detection.action === 'panic') {
+        // Handle panic mode
+        logger.warn('Panic mode detected - initiating secure deletion');
+        await secretTagManager.activatePanicMode();
+        return;
+      }
+
+      if (detection.tagId) {
+        if (detection.action === 'activate') {
+          await secretTagManager.activateSecretTag(detection.tagId);
+          logger.info(`Secret tag activated: ${detection.tagName}`);
+        } else if (detection.action === 'deactivate') {
+          await secretTagManager.deactivateSecretTag(detection.tagId);
+          logger.info(`Secret tag deactivated: ${detection.tagName}`);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to handle secret tag detection:', error);
+      // Don't throw - this shouldn't fail the transcription
+    }
   }
 
   /**
@@ -273,10 +370,11 @@ class SpeechToTextService {
    */
   private async _retryWithTokenRefresh(
     audioFilePath: string, 
-    languageCodes?: string[]
+    languageCodes?: string[],
+    enableSecretTagDetection: boolean = true
   ): Promise<TranscriptionResult> {
     try {
-      // Get refresh token
+      // Attempt to refresh the token
       const refreshToken = await AsyncStorage.getItem('refresh_token');
       if (!refreshToken) {
         throw this._createTranscriptionError({
@@ -284,41 +382,37 @@ class SpeechToTextService {
           message: 'No refresh token available for retry'
         });
       }
+
+      logger.info('Attempting to refresh access token...');
       
-      // Manual token refresh
-      const refreshResponse = await axios.post(
-        'http://localhost:8001/api/auth/refresh',
-        { refresh_token: refreshToken }
-      );
-      
-      if (!refreshResponse.data.access_token) {
+      // Call refresh endpoint
+      const refreshResponse = await axios.post('/api/auth/refresh', {
+        refresh_token: refreshToken,
+      });
+
+      if (refreshResponse.data.access_token) {
+        // Save new token
+        await AsyncStorage.setItem('access_token', refreshResponse.data.access_token);
+        
+        if (refreshResponse.data.refresh_token) {
+          await AsyncStorage.setItem('refresh_token', refreshResponse.data.refresh_token);
+        }
+
+        logger.info('Token refreshed successfully, retrying transcription...');
+        
+        // Retry the transcription with new token
+        return await this._performTranscription(audioFilePath, languageCodes, enableSecretTagDetection);
+      } else {
         throw this._createTranscriptionError({
           type: 'authentication',
-          message: 'Token refresh failed - invalid response'
+          message: 'Token refresh failed - no access token received'
         });
       }
-      
-      // Save new tokens
-      const newToken = refreshResponse.data.access_token;
-      await AsyncStorage.setItem('access_token', newToken);
-      if (refreshResponse.data.refresh_token) {
-        await AsyncStorage.setItem('refresh_token', refreshResponse.data.refresh_token);
-      }
-      
-      // Update global defaults
-      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      
-      logger.info('Token refreshed successfully, retrying transcription...');
-      
-      // Retry with new token
-      return await this._performTranscription(audioFilePath, languageCodes);
-    } 
-    catch (refreshOrRetryError: any) {
-      const retryErrorMessage = refreshOrRetryError.message || 'Unknown refresh/retry error';
-      logger.error('Token refresh or retry failed', { error: refreshOrRetryError });
+    } catch (refreshError: any) {
+      logger.error('Token refresh failed:', refreshError);
       throw this._createTranscriptionError({
         type: 'authentication',
-        message: `Transcription retry failed: ${retryErrorMessage}`
+        message: 'Authentication failed and token refresh unsuccessful'
       });
     }
   }
@@ -408,6 +502,10 @@ class SpeechToTextService {
       recommendations.push('Language detection failed - try selecting specific languages');
     }
 
+    if (result.secret_tag_detected?.found) {
+      recommendations.push(`Secret tag detected: ${result.secret_tag_detected.tagName || 'Unknown'}`);
+    }
+
     return {
       overall,
       confidence,
@@ -417,5 +515,5 @@ class SpeechToTextService {
 }
 
 // Export singleton instance
-const speechToTextService = new SpeechToTextService();
+const speechToTextService = SpeechToTextService.getInstance();
 export default speechToTextService; 

@@ -23,9 +23,23 @@ def upgrade() -> None:
     op.add_column('journal_entries', sa.Column('key_derivation_iterations', sa.Integer(), nullable=True))
     op.add_column('journal_entries', sa.Column('encryption_algorithm', sa.String(), nullable=True))
     op.add_column('journal_entries', sa.Column('encryption_wrap_iv', sa.String(), nullable=True))
+    
+    # Add simple secret tags fields
+    op.add_column('journal_entries', sa.Column('secret_tag_id', sa.String(36), nullable=True))
+    op.add_column('journal_entries', sa.Column('secret_tag_hash', sa.String(64), nullable=True))
+    
+    # Add indexes for efficient secret tag filtering
+    op.create_index('idx_journal_entries_secret_tag_hash', 'journal_entries', ['secret_tag_hash'])
+    op.create_index('idx_journal_entries_secret_tag_id', 'journal_entries', ['secret_tag_id'])
 
 
 def downgrade() -> None:
+    # Remove secret tags fields and indexes
+    op.drop_index('idx_journal_entries_secret_tag_id', 'journal_entries')
+    op.drop_index('idx_journal_entries_secret_tag_hash', 'journal_entries')
+    op.drop_column('journal_entries', 'secret_tag_hash')
+    op.drop_column('journal_entries', 'secret_tag_id')
+    
     # Remove zero-knowledge encryption fields
     op.drop_column('journal_entries', 'encryption_wrap_iv')
     op.drop_column('journal_entries', 'encryption_algorithm')

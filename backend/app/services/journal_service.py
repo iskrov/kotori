@@ -46,7 +46,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
 
         # ✅ ZERO-KNOWLEDGE: Return encrypted content as-is
         # Client will handle decryption if user has proper keys
-        content = db_obj.encrypted_content if db_obj.is_hidden else db_obj.content
+        content = db_obj.encrypted_content if db_obj.encrypted_content else db_obj.content
 
         return JournalEntry(
             id=db_obj.id,
@@ -83,9 +83,8 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         )
 
         # ✅ ZERO-KNOWLEDGE: Let client decide what to show
-        # Server doesn't have hidden mode concept anymore
-        if not include_hidden:
-            query = query.filter(JournalEntryModel.is_hidden == False)
+        # Server doesn't have hidden mode concept anymore - secret tags handle privacy
+        # No filtering needed here - client will filter by secret tags
 
         # Fix date filtering to handle date vs datetime comparison
         if start_date:
@@ -112,9 +111,9 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Manually construct Pydantic response models to ensure correct structure
         response_entries: list[JournalEntry] = []
         for db_entry in db_journal_entries:
-            # ✅ ZERO-KNOWLEDGE: Return encrypted content as-is for hidden entries
-            # Client will decrypt if it has the proper keys
-            content = db_entry.encrypted_content if db_entry.is_hidden else db_entry.content
+            # ✅ ZERO-KNOWLEDGE: Return content as-is
+            # Client will handle decryption for secret tag entries
+            content = db_entry.encrypted_content if db_entry.encrypted_content else db_entry.content
             
             # Extract ORM tags from the association
             orm_tags = [assoc.tag for assoc in db_entry.tags]
@@ -138,7 +137,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return response_entries
 
     def create_with_user(
-        self, db: Session, *, obj_in: JournalEntryCreate, user_id: int, is_hidden: bool = False
+        self, db: Session, *, obj_in: JournalEntryCreate, user_id: int
     ) -> JournalEntry:  # Change return type to JournalEntry schema
         """
         Create a new journal entry with user_id and process tags.
@@ -149,15 +148,8 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         obj_data = obj_in.dict(exclude={"tags"})
 
         # ✅ ZERO-KNOWLEDGE: Store content as provided by client
-        # If is_hidden=True, content should already be encrypted by client
+        # Client handles encryption for secret tag entries
         obj_data["user_id"] = user_id
-        obj_data["is_hidden"] = is_hidden
-        
-        if is_hidden:
-            # Client should send encrypted content in the 'content' field
-            # Move to encrypted_content field and clear plaintext
-            obj_data["encrypted_content"] = obj_data["content"]
-            obj_data["content"] = ""  # No plaintext for hidden entries
         
         # Create the journal entry
         db_journal_entry = JournalEntryModel(**obj_data)
@@ -178,7 +170,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return JournalEntry(
             id=db_journal_entry.id,
             title=db_journal_entry.title,
-            content=db_journal_entry.encrypted_content if is_hidden else db_journal_entry.content,
+            content=db_journal_entry.encrypted_content if db_journal_entry.encrypted_content else db_journal_entry.content,
             entry_date=db_journal_entry.entry_date,
             audio_url=db_journal_entry.audio_url,
             user_id=db_journal_entry.user_id,
@@ -283,278 +275,11 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Get the tags
         return db.query(TagModel).filter(TagModel.id.in_(tag_ids)).all()
 
-    @staticmethod
-    def create_journal_entry(
-        db: Session, 
-        entry: JournalEntryCreate, 
-        user_id: int
-    ) -> JournalEntry:
-        """
-        Create a new journal entry (regular or hidden with client-side encryption)
-        
-        For hidden entries, the content should already be encrypted client-side
-        and the encrypted_content, encryption_iv, and encryption_salt fields populated.
-        """
-        try:
-            db_entry = JournalEntry(
-                title=entry.title,
-                content=entry.content,  # Plain text for regular entries, empty for hidden
-                user_id=user_id,
-                created_at=entry.created_at or datetime.utcnow(),
-                is_hidden=entry.is_hidden or False,
-                encrypted_content=entry.encrypted_content,  # Client-encrypted content
-                encryption_iv=entry.encryption_iv,  # IV used for encryption
-                encryption_salt=entry.encryption_salt,  # Salt used for key derivation
-                tags=entry.tags
-            )
-            
-            db.add(db_entry)
-            db.commit()
-            db.refresh(db_entry)
-            
-            entry_type = "hidden" if db_entry.is_hidden else "regular"
-            logger.info(f"Created {entry_type} journal entry with ID: {db_entry.id}")
-            
-            return db_entry
-            
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to create journal entry: {str(e)}")
-            raise
+    # Legacy static methods removed - use instance methods instead
 
-    @staticmethod
-    def get_journal_entries(
-        db: Session, 
-        user_id: int, 
-        skip: int = 0, 
-        limit: int = 100,
-        include_hidden: bool = False
-    ) -> List[JournalEntry]:
-        """
-        Get journal entries for a user.
-        
-        Args:
-            db: Database session
-            user_id: User ID
-            skip: Number of entries to skip
-            limit: Maximum number of entries to return
-            include_hidden: Whether to include hidden entries in results
-        
-        Returns:
-            List of journal entries (server cannot decrypt hidden content)
-        """
-        try:
-            query = db.query(JournalEntryModel).filter(JournalEntryModel.user_id == user_id)
-            
-            if not include_hidden:
-                # Only return regular entries (non-hidden)
-                query = query.filter(JournalEntryModel.is_hidden == False)
-            
-            entries = query.order_by(JournalEntryModel.created_at.desc()).offset(skip).limit(limit).all()
-            
-            logger.info(f"Retrieved {len(entries)} journal entries for user {user_id} (include_hidden: {include_hidden})")
-            return entries
-            
-        except Exception as e:
-            logger.error(f"Failed to retrieve journal entries: {str(e)}")
-            raise
 
-    @staticmethod
-    def get_hidden_entries_only(
-        db: Session, 
-        user_id: int, 
-        skip: int = 0, 
-        limit: int = 100
-    ) -> List[JournalEntry]:
-        """
-        Get only hidden entries for a user.
-        Content will be encrypted and requires client-side decryption.
-        """
-        try:
-            entries = db.query(JournalEntryModel).filter(
-                JournalEntryModel.user_id == user_id,
-                JournalEntryModel.is_hidden == True
-            ).order_by(JournalEntryModel.created_at.desc()).offset(skip).limit(limit).all()
-            
-            logger.info(f"Retrieved {len(entries)} hidden journal entries for user {user_id}")
-            return entries
-            
-        except Exception as e:
-            logger.error(f"Failed to retrieve hidden journal entries: {str(e)}")
-            raise
 
-    @staticmethod
-    def get_journal_entry_by_id(
-        db: Session, 
-        entry_id: int, 
-        user_id: int
-    ) -> Optional[JournalEntry]:
-        """Get a specific journal entry by ID and user ID."""
-        try:
-            entry = db.query(JournalEntryModel).filter(
-                JournalEntryModel.id == entry_id,
-                JournalEntryModel.user_id == user_id
-            ).first()
-            
-            if entry:
-                entry_type = "hidden" if entry.is_hidden else "regular"
-                logger.info(f"Retrieved {entry_type} journal entry {entry_id} for user {user_id}")
-            else:
-                logger.info(f"Journal entry {entry_id} not found for user {user_id}")
-            
-            return entry
-            
-        except Exception as e:
-            logger.error(f"Failed to retrieve journal entry {entry_id}: {str(e)}")
-            raise
 
-    @staticmethod
-    def update_journal_entry(
-        db: Session, 
-        entry_id: int, 
-        user_id: int, 
-        entry_update: JournalEntryUpdate
-    ) -> Optional[JournalEntry]:
-        """
-        Update a journal entry.
-        
-        For hidden entries being updated, the new content should be 
-        client-side encrypted before being sent to the server.
-        """
-        try:
-            entry = db.query(JournalEntryModel).filter(
-                JournalEntryModel.id == entry_id,
-                JournalEntryModel.user_id == user_id
-            ).first()
-            
-            if not entry:
-                logger.info(f"Journal entry {entry_id} not found for user {user_id}")
-                return None
-            
-            # Update fields that are provided
-            update_data = entry_update.dict(exclude_unset=True)
-            
-            for field, value in update_data.items():
-                setattr(entry, field, value)
-            
-            # Update timestamp
-            entry.updated_at = datetime.utcnow()
-            
-            db.commit()
-            db.refresh(entry)
-            
-            entry_type = "hidden" if entry.is_hidden else "regular"
-            logger.info(f"Updated {entry_type} journal entry {entry_id}")
-            
-            return entry
-            
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to update journal entry {entry_id}: {str(e)}")
-            raise
-
-    @staticmethod
-    def delete_journal_entry(
-        db: Session, 
-        entry_id: int, 
-        user_id: int
-    ) -> bool:
-        """Delete a journal entry."""
-        try:
-            entry = db.query(JournalEntryModel).filter(
-                JournalEntryModel.id == entry_id,
-                JournalEntryModel.user_id == user_id
-            ).first()
-            
-            if not entry:
-                logger.info(f"Journal entry {entry_id} not found for user {user_id}")
-                return False
-            
-            entry_type = "hidden" if entry.is_hidden else "regular"
-            
-            db.delete(entry)
-            db.commit()
-            
-            logger.info(f"Deleted {entry_type} journal entry {entry_id}")
-            return True
-            
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to delete journal entry {entry_id}: {str(e)}")
-            raise
-
-    @staticmethod
-    def search_journal_entries(
-        db: Session, 
-        user_id: int, 
-        search_term: str,
-        include_hidden: bool = False
-    ) -> List[JournalEntry]:
-        """
-        Search journal entries by title and content.
-        
-        Note: Hidden entries cannot be searched by content since it's encrypted.
-        Only title can be searched for hidden entries.
-        """
-        try:
-            from sqlalchemy import or_, and_
-            
-            query = db.query(JournalEntryModel).filter(JournalEntryModel.user_id == user_id)
-            
-            if include_hidden:
-                # For hidden entries, only search title (content is encrypted)
-                query = query.filter(
-                    or_(
-                        and_(
-                            JournalEntryModel.is_hidden == False,
-                            or_(
-                                JournalEntryModel.content.ilike(f"%{search_term}%"),
-                                JournalEntryModel.title.ilike(f"%{search_term}%")
-                            )
-                        ),
-                        and_(
-                            JournalEntryModel.is_hidden == True,
-                            JournalEntryModel.title.ilike(f"%{search_term}%")
-                        )
-                    )
-                )
-            else:
-                # Regular entries only - search title and content
-                query = query.filter(
-                    JournalEntryModel.is_hidden == False
-                ).filter(
-                    or_(
-                        JournalEntryModel.content.ilike(f"%{search_term}%"),
-                        JournalEntryModel.title.ilike(f"%{search_term}%")
-                    )
-                )
-            
-            entries = query.order_by(JournalEntryModel.created_at.desc()).all()
-            
-            logger.info(f"Found {len(entries)} entries matching search term '{search_term}' for user {user_id}")
-            return entries
-            
-        except Exception as e:
-            logger.error(f"Failed to search journal entries: {str(e)}")
-            raise
-
-    @staticmethod
-    def get_entry_count(db: Session, user_id: int, include_hidden: bool = False) -> int:
-        """Get total count of journal entries for a user."""
-        try:
-            query = db.query(JournalEntryModel).filter(JournalEntryModel.user_id == user_id)
-            
-            if not include_hidden:
-                query = query.filter(JournalEntryModel.is_hidden == False)
-            
-            count = query.count()
-            
-            logger.info(f"User {user_id} has {count} journal entries (include_hidden: {include_hidden})")
-            return count
-            
-        except Exception as e:
-            logger.error(f"Failed to count journal entries: {str(e)}")
-            raise
 
 
 # Create singleton instance

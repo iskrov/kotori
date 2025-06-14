@@ -1,14 +1,13 @@
 /**
  * Encrypted Journal Service
  * 
- * High-level service that integrates zero-knowledge encryption with journal operations.
- * Handles transparent encryption/decryption for hidden entries.
+ * High-level service that integrates phrase-based zero-knowledge encryption with journal operations.
+ * Handles transparent encryption/decryption for secret tag entries using secret phrases directly as keys.
  */
 
 import { JournalAPI } from './api';
 import { zeroKnowledgeEncryption } from './zeroKnowledgeEncryption';
-import { hiddenModeManager } from './hiddenModeManager';
-import settingsService from './settingsService';
+import { secretTagManager } from './secretTagManager';
 import logger from '../utils/logger';
 
 export interface JournalEntryData {
@@ -18,68 +17,92 @@ export interface JournalEntryData {
   entry_date?: string;
   audio_url?: string;
   tags?: string[];
-  is_hidden?: boolean;
+  secret_tag_id?: string | null;  // Secret tag ID (if any)
   created_at?: string;
   updated_at?: string;
 }
 
 export interface CreateEntryOptions {
-  forceHidden?: boolean;  // Force entry to be hidden regardless of hidden mode state
-  regularEntry?: boolean; // Force entry to be regular (not hidden)
+  secretTagId?: string;    // Specific secret tag to use
+  forcePublic?: boolean;   // Force entry to be public (no secret tag)
+  detectedTagId?: string;  // Tag detected from voice activation
 }
 
 class EncryptedJournalService {
   /**
-   * Create a journal entry, automatically encrypting based on user preferences and hidden mode
+   * Create a journal entry, automatically encrypting based on active secret tags
    */
   async createEntry(
     entryData: Omit<JournalEntryData, 'id'>,
     options: CreateEntryOptions = {}
   ): Promise<JournalEntryData> {
-    const { forceHidden, regularEntry } = options;
+    const { secretTagId, forcePublic, detectedTagId } = options;
     
-    // Get user's default privacy setting
-    const settings = await settingsService.getSettings();
-    const defaultPrivacy = settings.defaultEntryPrivacy;
-    
-    // Determine if entry should be hidden based on:
-    // 1. Explicit force options
-    // 2. Hidden mode being active (overrides default privacy)
-    // 3. User's default privacy setting
-    let shouldHide = false;
-    
-    if (forceHidden) {
-      shouldHide = true;
-      logger.info('Creating hidden entry: forced by options');
-    } else if (regularEntry) {
-      shouldHide = false;
-      logger.info('Creating regular entry: forced by options');
-    } else if (hiddenModeManager.isActive()) {
-      shouldHide = true;
-      logger.info('Creating hidden entry: hidden mode is active');
-    } else if (defaultPrivacy === 'hidden') {
-      shouldHide = true;
-      logger.info('Creating hidden entry: user default privacy is hidden');
-    } else {
-      shouldHide = false;
-      logger.info('Creating regular entry: user default privacy is public');
+    // Check for manual secret tag activation in content before creating entry
+    let manuallyDetectedTagId: string | null = null;
+    if (!forcePublic && !secretTagId && !detectedTagId && entryData.content) {
+      try {
+        const detection = await secretTagManager.checkForSecretTagPhrases(entryData.content);
+        if (detection.found && detection.tagId && detection.action === 'activate') {
+          logger.info(`Manual secret tag activation detected in content: ${detection.tagName} (${detection.tagId})`);
+          
+          // Activate the detected tag
+          await secretTagManager.activateSecretTag(detection.tagId);
+          manuallyDetectedTagId = detection.tagId;
+          
+          // Remove the activation phrase from content to keep it private
+          const normalizedContent = secretTagManager.normalizePhrase(entryData.content);
+          const normalizedPhrase = secretTagManager.normalizePhrase(detection.tagName || '');
+          
+          // For single-word phrases, be more careful about removal to avoid removing legitimate content
+          let cleanedContent = entryData.content;
+          
+          // If the entire content (normalized) is just the activation phrase, replace it
+          if (normalizedContent === normalizedPhrase) {
+            cleanedContent = 'Secret tag activated via voice command.';
+          } else {
+            // Otherwise, try to remove just the activation phrase while preserving other content
+            // Use word boundaries for single words to avoid partial matches
+            const phrasePattern = new RegExp(`\\b${detection.tagName?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+            cleanedContent = entryData.content
+              .replace(phrasePattern, '')
+              .trim()
+              .replace(/^\s*[,.!?;:]*\s*/, '') // Remove leading punctuation/space
+              .replace(/\s*[,.!?;:]*\s*$/, '') // Remove trailing punctuation/space
+              .replace(/\s+/g, ' '); // Normalize whitespace
+          }
+          
+          if (cleanedContent.length > 0) {
+            entryData.content = cleanedContent;
+          } else {
+            // If content is just the activation phrase, use a default message
+            entryData.content = 'Secret tag activated via voice command.';
+          }
+        }
+      } catch (error) {
+        logger.error('Error during manual secret tag detection:', error);
+        // Continue with normal entry creation if detection fails
+      }
     }
     
-    if (shouldHide && zeroKnowledgeEncryption.isReady()) {
-      return this.createHiddenEntry(entryData);
+    // Try to use secret tag if one is currently active
+    const targetSecretTagId = secretTagManager.getActiveSecretTagForNewEntry();
+    
+    if (targetSecretTagId && zeroKnowledgeEncryption.isPhraseKeyLoaded(targetSecretTagId)) {
+      return this.createSecretTagEntry(entryData, targetSecretTagId);
     } else {
-      // Fall back to regular entry if encryption not ready
-      if (shouldHide && !zeroKnowledgeEncryption.isReady()) {
-        logger.warn('Entry should be hidden but encryption not ready, creating regular entry');
+      if (targetSecretTagId && !zeroKnowledgeEncryption.isPhraseKeyLoaded(targetSecretTagId)) {
+        logger.warn(`Entry should use secret tag ${targetSecretTagId} but phrase encryption not ready, creating public entry`);
       }
-      return this.createRegularEntry(entryData);
+      // Fall back to public entry
+      return this.createPublicEntry(entryData);
     }
   }
 
   /**
-   * Create a regular (non-encrypted) journal entry
+   * Create a public (non-encrypted) journal entry
    */
-  private async createRegularEntry(entryData: Omit<JournalEntryData, 'id'>): Promise<JournalEntryData> {
+  private async createPublicEntry(entryData: Omit<JournalEntryData, 'id'>): Promise<JournalEntryData> {
     try {
       const response = await JournalAPI.createEntry({
         title: entryData.title || '',
@@ -87,28 +110,44 @@ class EncryptedJournalService {
         entry_date: entryData.entry_date || new Date().toISOString(),
         audio_url: entryData.audio_url,
         tags: entryData.tags || [],
-        is_hidden: false,
+        secret_tag_id: null,
+        secret_tag_hash: null,
       });
       
-      logger.info('Created regular journal entry');
+      logger.info('Created public journal entry');
       return response.data;
     } catch (error) {
-      logger.error('Failed to create regular journal entry:', error);
+      logger.error('Failed to create public journal entry:', error);
       throw new Error('Failed to create journal entry');
     }
   }
 
   /**
-   * Create a hidden (encrypted) journal entry
+   * Create a secret tag (encrypted) journal entry
    */
-  private async createHiddenEntry(entryData: Omit<JournalEntryData, 'id'>): Promise<JournalEntryData> {
-    if (!zeroKnowledgeEncryption.isReady()) {
-      throw new Error('Zero-knowledge encryption not initialized');
+  private async createSecretTagEntry(
+    entryData: Omit<JournalEntryData, 'id'>, 
+    secretTagId: string
+  ): Promise<JournalEntryData> {
+    if (!zeroKnowledgeEncryption.isPhraseKeyLoaded(secretTagId)) {
+      throw new Error(`Secret tag encryption not loaded for tag: ${secretTagId}`);
     }
 
     try {
-      // Encrypt the content
-      const encrypted = await zeroKnowledgeEncryption.encryptEntry(entryData.content);
+      // Encrypt the content with tag-specific key
+      const encrypted = await zeroKnowledgeEncryption.encryptEntryWithSecretPhrase(
+        entryData.content, 
+        secretTagId
+      );
+      
+      // Get server-side tag hashes for this tag
+      const activeTagHashes = await secretTagManager.getActiveTagHashes();
+      const secretTags = await secretTagManager.getAllSecretTags();
+      const targetTag = secretTags.find(tag => tag.id === secretTagId);
+      
+      if (!targetTag) {
+        throw new Error(`Secret tag not found: ${secretTagId}`);
+      }
       
       // Create the encrypted entry
       const response = await JournalAPI.createEncryptedEntry({
@@ -122,42 +161,87 @@ class EncryptedJournalService {
         audio_url: entryData.audio_url,
         tags: entryData.tags || [],
         wrapIv: encrypted.wrapIv,
+        secret_tag_id: secretTagId,
+        secret_tag_hash: targetTag.serverTagHash,
       });
       
-      logger.info('Created hidden journal entry with zero-knowledge encryption');
+      logger.info(`Created secret tag journal entry with tag: ${secretTagId}`);
       
       // Return with decrypted content for immediate use
       return {
         ...response.data,
         content: entryData.content, // Return original content for UI
-        is_hidden: true,
+        secret_tag_id: secretTagId,
       };
     } catch (error) {
-      logger.error('Failed to create hidden journal entry:', error);
+      logger.error('Failed to create secret tag journal entry:', error);
       throw new Error('Failed to create encrypted journal entry');
     }
   }
 
   /**
-   * Get journal entries, automatically decrypting hidden entries if in hidden mode
+   * Create a secret tag entry without encryption (when encryption keys not ready)
+   */
+  private async createSecretTagEntryUnencrypted(
+    entryData: Omit<JournalEntryData, 'id'>, 
+    secretTagId: string
+  ): Promise<JournalEntryData> {
+    try {
+      // Get server-side tag hashes for this tag
+      const secretTags = await secretTagManager.getAllSecretTags();
+      const targetTag = secretTags.find(tag => tag.id === secretTagId);
+      
+      if (!targetTag) {
+        throw new Error(`Secret tag not found: ${secretTagId}`);
+      }
+      
+      // Create the entry with secret tag metadata but unencrypted content
+      const response = await JournalAPI.createEntry({
+        title: entryData.title || '',
+        content: entryData.content, // Store unencrypted for now
+        entry_date: entryData.entry_date || new Date().toISOString(),
+        audio_url: entryData.audio_url,
+        tags: entryData.tags || [],
+        secret_tag_id: secretTagId,
+        secret_tag_hash: targetTag.serverTagHash,
+      });
+      
+      logger.info(`Created secret tag journal entry (unencrypted) with tag: ${secretTagId}`);
+      
+      return {
+        ...response.data,
+        secret_tag_id: secretTagId,
+      };
+    } catch (error) {
+      logger.error('Failed to create secret tag journal entry (unencrypted):', error);
+      throw new Error('Failed to create journal entry with secret tag');
+    }
+  }
+
+  /**
+   * Get journal entries, automatically filtering and decrypting based on active secret tags
    */
   async getEntries(options: {
     page?: number;
     limit?: number;
     tags?: string[];
     entry_date?: string;
-    includeHidden?: boolean;
+    includeAllSecretTags?: boolean;
   } = {}): Promise<JournalEntryData[]> {
     try {
-      // Always fetch both hidden and regular entries
+      // Get active tag hashes for server-side filtering
+      const activeTagHashes = await secretTagManager.getActiveTagHashes();
+      
+      // Fetch entries with secret tag filtering
       const response = await JournalAPI.getEntries({
         ...options,
-        include_hidden: true,
+        secret_tag_hashes: activeTagHashes,
+        include_public: true, // Always include public entries
       });
       
       const entries = response.data.entries || response.data;
       
-      // Filter and decrypt entries based on hidden mode state
+      // Filter and decrypt entries based on active secret tags
       return this.processEntries(entries);
     } catch (error) {
       logger.error('Failed to get journal entries:', error);
@@ -166,9 +250,9 @@ class EncryptedJournalService {
   }
 
   /**
-   * Get a specific journal entry by ID
+   * Get a specific journal entry by ID, automatically decrypting if it's a secret tag entry
    */
-  async getEntry(id: string): Promise<JournalEntryData | null> {
+  async getEntry(id: number): Promise<JournalEntryData | null> {
     try {
       const response = await JournalAPI.getEntry(id);
       const entry = response.data;
@@ -184,17 +268,17 @@ class EncryptedJournalService {
   }
 
   /**
-   * Process entries: filter based on hidden mode and decrypt if necessary
+   * Process entries: filter based on active secret tags and decrypt if necessary
    */
   private async processEntries(entries: any[]): Promise<JournalEntryData[]> {
-    // Filter entries based on hidden mode state
-    const filteredEntries = hiddenModeManager.filterEntries(entries);
+    // Filter entries based on active secret tags
+    const filteredEntries = secretTagManager.filterEntriesByActiveTags(entries);
     
-    // Decrypt hidden entries if we're in hidden mode
+    // Decrypt secret tag entries if we have the keys loaded
     const processedEntries = await Promise.all(
       filteredEntries.map(async (entry) => {
-        if (entry.is_hidden && hiddenModeManager.isActive()) {
-          return this.decryptEntry(entry);
+        if (entry.secret_tag_id && secretTagManager.isSecretTagActive(entry.secret_tag_id)) {
+          return this.decryptSecretTagEntry(entry);
         }
         return entry;
       })
@@ -204,11 +288,18 @@ class EncryptedJournalService {
   }
 
   /**
-   * Decrypt a hidden journal entry
+   * Decrypt a secret tag journal entry
    */
-  private async decryptEntry(entry: any): Promise<JournalEntryData | null> {
-    if (!zeroKnowledgeEncryption.isReady()) {
-      logger.warn('Cannot decrypt entry: zero-knowledge encryption not initialized');
+  private async decryptSecretTagEntry(entry: any): Promise<JournalEntryData | null> {
+    const secretTagId = entry.secret_tag_id;
+    
+    if (!secretTagId) {
+      logger.warn('Entry has no secret tag ID, cannot decrypt');
+      return null;
+    }
+
+    if (!zeroKnowledgeEncryption.isPhraseKeyLoaded(secretTagId)) {
+      logger.warn(`Cannot decrypt entry: secret tag key not loaded for ${secretTagId}`);
       return null;
     }
 
@@ -221,21 +312,24 @@ class EncryptedJournalService {
 
       const encrypted = {
         encryptedContent: entry.encrypted_content,
-        encryptedKey: entry.encrypted_key || '', // Handle missing key field
+        encryptedKey: entry.encrypted_key || '',
         iv: entry.encryption_iv,
         salt: entry.encryption_salt,
         algorithm: entry.encryption_algorithm || 'AES-GCM',
-        wrapIv: entry.encryption_wrap_iv || entry.encryption_iv, // Fallback for backward compatibility
+        wrapIv: entry.encryption_wrap_iv || entry.encryption_iv,
       };
 
-      const decryptedContent = await zeroKnowledgeEncryption.decryptEntry(encrypted);
+      const decryptedContent = await zeroKnowledgeEncryption.decryptEntryWithSecretPhrase(
+        encrypted, 
+        secretTagId
+      );
       
       return {
         ...entry,
         content: decryptedContent,
       };
     } catch (error) {
-      logger.error('Failed to decrypt journal entry:', error);
+      logger.error('Failed to decrypt secret tag journal entry:', error);
       // Return entry with encrypted content as fallback
       return {
         ...entry,
@@ -245,13 +339,17 @@ class EncryptedJournalService {
   }
 
   /**
-   * Search journal entries
+   * Search journal entries (only in accessible entries)
    */
   async searchEntries(query: string): Promise<JournalEntryData[]> {
     try {
-      // Include hidden entries if in hidden mode
-      const includeHidden = hiddenModeManager.isActive();
-      const response = await JournalAPI.searchEntries(query, includeHidden);
+      // Get active tag hashes for filtering
+      const activeTagHashes = await secretTagManager.getActiveTagHashes();
+      
+      const response = await JournalAPI.searchEntries(query, {
+        secret_tag_hashes: activeTagHashes,
+        include_public: true,
+      });
       
       const entries = response.data.entries || response.data;
       return this.processEntries(entries);
@@ -264,10 +362,10 @@ class EncryptedJournalService {
   /**
    * Update a journal entry
    */
-  async updateEntry(id: string, updates: Partial<JournalEntryData>): Promise<JournalEntryData> {
+  async updateEntry(id: number, updates: Partial<JournalEntryData>): Promise<JournalEntryData> {
     try {
       // For now, use the regular update API
-      // TODO: Add support for updating encrypted content
+      // TODO: Add support for updating encrypted content and changing secret tags
       const response = await JournalAPI.updateEntry(id, updates);
       return response.data;
     } catch (error) {
@@ -279,64 +377,13 @@ class EncryptedJournalService {
   /**
    * Delete a journal entry
    */
-  async deleteEntry(id: string): Promise<void> {
+  async deleteEntry(id: number): Promise<void> {
     try {
       await JournalAPI.deleteEntry(id);
       logger.info(`Deleted journal entry ${id}`);
     } catch (error) {
       logger.error(`Failed to delete journal entry ${id}:`, error);
       throw new Error('Failed to delete journal entry');
-    }
-  }
-
-  /**
-   * Check if zero-knowledge encryption is available
-   */
-  isEncryptionReady(): boolean {
-    return zeroKnowledgeEncryption.isReady();
-  }
-
-  /**
-   * Initialize zero-knowledge encryption with user credentials
-   */
-  async initializeEncryption(userSecret: string): Promise<boolean> {
-    try {
-      const success = await zeroKnowledgeEncryption.initializeMasterKey({
-        userSecret,
-        iterations: 100000,
-        keyLength: 256,
-      });
-      
-      if (success) {
-        logger.info('Zero-knowledge encryption initialized successfully');
-      } else {
-        logger.error('Failed to initialize zero-knowledge encryption');
-      }
-      
-      return success;
-    } catch (error) {
-      logger.error('Error initializing zero-knowledge encryption:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Load existing encryption keys with user credentials
-   */
-  async loadEncryption(userSecret: string): Promise<boolean> {
-    try {
-      const success = await zeroKnowledgeEncryption.loadMasterKey(userSecret);
-      
-      if (success) {
-        logger.info('Zero-knowledge encryption keys loaded successfully');
-      } else {
-        logger.warn('No existing encryption keys found or failed to load');
-      }
-      
-      return success;
-    } catch (error) {
-      logger.error('Error loading zero-knowledge encryption:', error);
-      return false;
     }
   }
 }

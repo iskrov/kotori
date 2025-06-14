@@ -18,12 +18,14 @@ import { MainStackParamList, RecordScreenParams } from '../../navigation/types';
 
 // Components
 import AudioRecorder from '../../components/AudioRecorder';
+import { SecretTagFloatingIndicator } from '../../components/SecretTagIndicator';
 
 // Hooks
 import useJournalEntry from '../../hooks/useJournalEntry'; // Removed JournalData import as it's implicitly used
 import { getLanguageName } from '../../config/languageConfig';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { secretTagManager, SecretTag } from '../../services/secretTagManager';
 
 // Utils
 import logger from '../../utils/logger';
@@ -73,6 +75,7 @@ const RecordScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showRecorder, setShowRecorder] = useState(true); // Start with recorder visible
   const [hasStartedSaving, setHasStartedSaving] = useState(false);
+  const [activeTags, setActiveTags] = useState<SecretTag[]>([]);
   
   // Data states for saving the entry
   const [title, setTitle] = useState('');
@@ -141,6 +144,20 @@ const RecordScreen: React.FC = () => {
     return () => {
       mountedRef.current = false;
     };
+  }, []);
+
+  // Load active secret tags
+  useEffect(() => {
+    const loadActiveTags = async () => {
+      try {
+        const activeTagsList = await secretTagManager.getActiveSecretTags();
+        setActiveTags(activeTagsList);
+      } catch (error) {
+        logger.error('Failed to load active secret tags:', error);
+      }
+    };
+
+    loadActiveTags();
   }, []);
 
   const handleTranscriptionComplete = useCallback((transcript: string, transcribedAudioUri?: string, detectedLanguage?: string | null, confidence?: number) => {
@@ -324,6 +341,12 @@ const RecordScreen: React.FC = () => {
               onAutoSave={handleAutoSave}
               saveButtonState={getSaveButtonState()}
               startRecordingOnMount={startRecordingOnMount}
+            />
+            
+            {/* Secret Tag Floating Indicator */}
+            <SecretTagFloatingIndicator
+              activeTags={activeTags}
+              onPress={() => navigation.navigate('SecretTagManager')}
             />
           </View>
         </View>

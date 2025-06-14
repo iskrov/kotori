@@ -165,10 +165,11 @@ const JournalScreen = () => {
   };
   
   // Render journal entry item
-  const renderItem = ({ item }: { item: JournalEntry }) => (
+  const renderItem = ({ item, index }: { item: JournalEntry; index: number }) => (
     <JournalCard 
       entry={item}
       onPress={() => handleEntryPress(item)}
+      key={`journal-entry-${item.id}-${index}`}
     />
   );
   
@@ -200,7 +201,7 @@ const JournalScreen = () => {
       <FlatList
         data={item.entries}
         renderItem={renderItem}
-        keyExtractor={entry => entry.id}
+        keyExtractor={(entry, index) => `month-entry-${entry.id}-${index}`}
         scrollEnabled={false}
       />
     </View>

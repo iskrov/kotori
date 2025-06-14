@@ -18,7 +18,6 @@ from jose import JWTError, jwt
 from app.dependencies import get_db
 from app.models.user import User
 from app.services.speech_service import SpeechService, speech_service
-from app.services.session_service import session_service
 from app.core.config import settings
 from app.services.user_service import user_service
 
@@ -73,6 +72,11 @@ class TranscribeRequestParams(BaseModel):
     # Use Field to allow empty list or list of strings, default to None for auto-detect
     language_codes: Optional[List[str]] = Field(None)
 
+# Input model for secret tag activation
+class SecretTagActivationRequest(BaseModel):
+    tag_id: str = Field(..., description="Secret tag ID to activate")
+    action: str = Field(..., description="Action to perform: 'activate' or 'deactivate'")
+
 @router.post("/transcribe", response_model=dict)
 async def transcribe_audio_endpoint(
     # Use Form(...) for form fields alongside File(...)
@@ -84,7 +88,7 @@ async def transcribe_audio_endpoint(
 ):
     """
     Receives an audio file and optional language codes, transcribes it using the SpeechService,
-    and returns the transcription. Handles code phrase detection for hidden mode activation.
+    and returns the transcription. Secret tag phrase detection is handled client-side.
     Defaults to automatic language detection if language_codes are not provided or empty.
     (Authentication handled manually within endpoint)
     """
@@ -145,37 +149,27 @@ async def transcribe_audio_endpoint(
 
         # Add more robust validation if necessary (e.g., file size limit)
 
-        # Use the enhanced transcription method with user context for code phrase detection
+        # Use the enhanced transcription method with user context
         transcription_data = await speech_service_instance.transcribe_audio_with_user_context(
             audio_content,
             user_id=current_user.id,
             language_codes=effective_language_codes
         )
         
-        # Handle code phrase detection
-        code_phrase_detected = transcription_data.get("code_phrase_detected")
-        if code_phrase_detected == "unlock":
-            session_service.activate_hidden_mode(current_user.id)
-            logger.info(f"Hidden mode activated for user {current_user.id} via code phrase")
-        elif code_phrase_detected == "decoy":
-            # TODO: Implement decoy mode
-            logger.info(f"Decoy mode triggered for user {current_user.id} (not implemented)")
-        elif code_phrase_detected == "panic":
-            # TODO: Implement panic/self-destruct mode
-            logger.info(f"Panic mode triggered for user {current_user.id} (not implemented)")
+        # Note: Secret tag phrase detection is now handled client-side
+        # The server only provides the transcript for client-side processing
         
         logger.info(
             f"Successfully transcribed audio for user {current_user.email}. "
             f"Transcript length: {len(transcription_data.get('transcript', ''))}, "
-            f"Detected language: {transcription_data.get('detected_language_code')}, "
-            f"Code phrase: {code_phrase_detected or 'none'}"
+            f"Detected language: {transcription_data.get('detected_language_code')}"
         )
 
-        # Return response (don't expose code phrase detection to client for security)
+        # Return response (transcript only - secret tag detection happens client-side)
         return {
             "transcript": transcription_data.get("transcript", ""),
             "detected_language_code": transcription_data.get("detected_language_code"),
-            "hidden_mode_activated": code_phrase_detected == "unlock"  # Only expose unlock status
+            "secret_tag_detected": transcription_data.get("secret_tag_detected")  # Will be None for now
         }
 
     except RuntimeError as e:
@@ -197,3 +191,51 @@ async def transcribe_audio_endpoint(
         ) from e
     finally:
         await file.close()
+
+@router.post("/secret-tag/activate", response_model=dict)
+async def activate_secret_tag_endpoint(
+    request: SecretTagActivationRequest,
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Endpoint for client-side secret tag activation/deactivation.
+    This is called by the client after it detects a secret tag phrase locally.
+    """
+    current_user = await manual_get_user_from_header(authorization, db)
+    
+    try:
+        # Validate that the secret tag belongs to the user
+        from app.models.secret_tag import SecretTag
+        secret_tag = db.query(SecretTag).filter(
+            SecretTag.id == request.tag_id,
+            SecretTag.user_id == current_user.id,
+            SecretTag.is_active == True
+        ).first()
+        
+        if not secret_tag:
+            logger.warning(f"Secret tag {request.tag_id} not found or not owned by user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Secret tag not found"
+            )
+        
+        # Log the activation/deactivation
+        logger.info(f"Secret tag {request.action} requested for user {current_user.email}: {request.tag_id}")
+        
+        # Return success - actual activation is handled client-side
+        return {
+            "success": True,
+            "tag_id": request.tag_id,
+            "action": request.action,
+            "message": f"Secret tag {request.action} processed successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing secret tag activation for user {current_user.email}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process secret tag activation"
+        ) from e

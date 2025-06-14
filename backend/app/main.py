@@ -10,11 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import speech as speech_router_module
+from app.api.v1.endpoints import secret_tags as secret_tags_router_module
 from app.core.config import settings
 from app.routers import auth_router
 from app.routers import journals_router
 from app.routers import reminders_router
 from app.routers import users_router
+
 from app.websockets import speech as speech_websocket_router
 
 # Configure logging
@@ -123,6 +125,8 @@ app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(journals_router, prefix="/api/journals", tags=["Journals"])
 app.include_router(reminders_router, prefix="/api/reminders", tags=["Reminders"])
 app.include_router(speech_router_module.router, prefix="/api/speech", tags=["Speech"])
+app.include_router(secret_tags_router_module.router, prefix="/api/secret-tags", tags=["Secret Tags"])
+
 app.include_router(speech_websocket_router.router, prefix="/ws", tags=["WebSockets"])
 
 

@@ -19,7 +19,7 @@ interface JournalCardProps {
 const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
-  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const getPreviewText = (content: string, maxLength: number = 120) => {
     if (!content) return 'No content';
@@ -38,15 +38,17 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
   );
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
+    Animated.timing(scaleAnim, {
       toValue: 0.98,
+      duration: 100,
       useNativeDriver,
     }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
+    Animated.timing(scaleAnim, {
       toValue: 1,
+      duration: 100,
       useNativeDriver,
     }).start();
   };
@@ -99,12 +101,12 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
         {entry.tags && entry.tags.length > 0 && (
           <View style={styles.tagsContainer} testID="tags-container">
             {entry.tags.slice(0, 3).map((tag: Tag, index: number) => (
-              <View key={tag.id || `${entry.id}-tag-${index}`} style={styles.tag} testID={`tag-${tag.id ?? index}`}>
+              <View key={`${entry.id}-tag-${tag.id || index}-${tag.name}`} style={styles.tag} testID={`tag-${tag.id ?? index}`}>
                 <Text style={styles.tagText}>{tag.name}</Text>
               </View>
             ))}
             {entry.tags.length > 3 && (
-              <View style={styles.moreTagsIndicator}>
+              <View key={`${entry.id}-more-tags`} style={styles.moreTagsIndicator}>
                 <Text style={styles.moreTagsText}>+{entry.tags.length - 3}</Text>
               </View>
             )}

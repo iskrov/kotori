@@ -1,6 +1,7 @@
 alembic==1.11.1
 annotated-types==0.7.0
 anyio==4.9.0
+argon2-cffi==23.1.0
 bcrypt==4.3.0
 cachetools==5.5.2
 certifi==2025.1.31
@@ -13,10 +14,10 @@ ecdsa==0.19.1
 email-validator==2.0.0
 exceptiongroup==1.2.2
 fastapi==0.100.0
-google-api-core==2.24.2
-google-auth==2.22.0
-google-cloud-speech==2.20.0
-googleapis-common-protos==1.69.2
+google-api-core>=2.11.0
+google-auth>=2.17.3
+google-cloud-speech>=2.21.0
+googleapis-common-protos>=1.60.0
 greenlet==3.1.1
 grpcio==1.71.0
 grpcio-status==1.62.3
@@ -31,8 +32,8 @@ MarkupSafe==3.0.2
 packaging==24.2
 passlib==1.7.4
 pluggy==1.5.0
-proto-plus==1.26.1
-protobuf==4.25.6
+proto-plus>=1.22.3
+protobuf>=4.21.1
 psycopg2-binary==2.9.6
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
