@@ -76,6 +76,7 @@ const RecordScreen: React.FC = () => {
   const [showRecorder, setShowRecorder] = useState(true); // Start with recorder visible
   const [hasStartedSaving, setHasStartedSaving] = useState(false);
   const [activeTags, setActiveTags] = useState<SecretTag[]>([]);
+  const [recorderState, setRecorderState] = useState('idle');
   
   // Data states for saving the entry
   const [title, setTitle] = useState('');
@@ -160,49 +161,38 @@ const RecordScreen: React.FC = () => {
     loadActiveTags();
   }, []);
 
-  const handleTranscriptionComplete = useCallback((transcript: string, transcribedAudioUri?: string, detectedLanguage?: string | null, confidence?: number) => {
-    if (!mountedRef.current) {
-      logger.debug('[RecordScreen] handleTranscriptionComplete: Aborted (unmounted).');
-      return;
-    }
-    logger.info('[RecordScreen] Transcription completed. Preparing to save...');
-
-    setContent(transcript);
-    if (transcribedAudioUri) {
-      setAudioUri(transcribedAudioUri);
-    }
-    if (transcript) {
-      const words = transcript.split(' ');
-      const generatedTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
-      setTitle(generatedTitle);
-    }
-
-    logger.info('[RecordScreen] Data set for saving, triggering save with navigation.');
-    setHasStartedSaving(true);
-    save(undefined, { navigateOnSuccess: true }); 
-    setIsLoading(true);
-
-  }, [setContent, setAudioUri, setTitle, save]);
+  const handleTranscriptionComplete = useCallback((finalTranscript: string) => {
+    // This logic is being disabled to prevent race conditions with manual saves.
+    // The save operation will now only be triggered by the user pressing the save button.
+    logger.info('[RecordScreen] Transcription completed, but auto-save is disabled.');
+    // logger.log('[RecordScreen] Transcription completed. Preparing to save...');
+    // setSaveData({
+    //   content: finalTranscript,
+    //   options: { silent: false, navigate: true },
+    // });
+  }, []);
 
   // Handle manual save from AudioRecorder
-  const handleManualSave = useCallback(async () => {
-    if (!mountedRef.current) {
-      logger.debug('[RecordScreen] handleManualSave: Aborted (unmounted).');
-      return;
-    }
+  const handleManualSave = useCallback(async (finalTranscript: string, finalAudioUri?: string) => {
+    if (!mountedRef.current || isSaving) return;
     
     logger.info('[RecordScreen] Manual save triggered.');
+    
+    setContent(finalTranscript);
+    if (finalAudioUri) setAudioUri(finalAudioUri);
+    if (finalTranscript && !title) {
+      const words = finalTranscript.split(' ');
+      setTitle(words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : ''));
+    }
+    
     setHasStartedSaving(true);
     
     try {
-      const savedId = await save(undefined, { navigateOnSuccess: true });
-      if (savedId) {
-        logger.info(`[RecordScreen] Manual save successful (ID: ${savedId}).`);
-      }
+      await save();
     } catch (error) {
       logger.error('[RecordScreen] Manual save failed:', error);
     }
-  }, [save]);
+  }, [save, title, isSaving]);
 
   const handleRecorderCancel = useCallback(() => {
     if (!mountedRef.current) {
@@ -280,6 +270,11 @@ const RecordScreen: React.FC = () => {
     return { text: 'Save', disabled: false, isSaving: false };
   }, [isSaving, hasStartedSaving]);
 
+  const handleCommandDetected = useCallback(() => {
+    logger.info('[RecordScreen] Secret tag command detected. Navigating back.');
+    navigation.goBack();
+  }, [navigation]);
+
   if (isLoading && !showRecorder) { // Show loading only if recorder isn't active yet
     return (
       <View style={styles.container}>
@@ -341,6 +336,7 @@ const RecordScreen: React.FC = () => {
               onAutoSave={handleAutoSave}
               saveButtonState={getSaveButtonState()}
               startRecordingOnMount={startRecordingOnMount}
+              onCommandDetected={handleCommandDetected}
             />
             
             {/* Secret Tag Floating Indicator */}

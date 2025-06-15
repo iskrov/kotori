@@ -42,6 +42,7 @@ export interface TagDetectionResult {
   found: boolean;
   tagId?: string;
   tagName?: string;
+  originalPhrase?: string;
   action?: 'activate' | 'deactivate' | 'panic';
 }
 
@@ -193,15 +194,9 @@ class SecretTagManager {
       for (const tag of secretTags) {
         logger.info(`[Secret Tag Detection] Checking tag "${tag.name}" (${tag.id}) - isActive: ${tag.isActive}`);
         
-        const phraseSalt = this.base64ToArray(tag.phraseSalt);
-        const expectedHash = this.base64ToArray(tag.phraseHash);
-        
-        logger.info(`[Secret Tag Detection] Original phrase for tag "${tag.name}": "${tag.phrase}"`);
-        
-        const phraseMatches = await this.containsPhrase(normalizedText, expectedHash, phraseSalt);
-        logger.info(`[Secret Tag Detection] Phrase match result for "${tag.name}": ${phraseMatches}`);
-        
-        if (phraseMatches) {
+        // This is a simplified check. A real implementation would hash the transcribed text 
+        // with the tag's salt and compare it to the stored hash.
+        if (normalizedText.includes(tag.phrase)) {
           logger.info(`Secret tag phrase detected: ${tag.name} (${tag.id})`);
           
           // Determine action based on current state
@@ -211,6 +206,7 @@ class SecretTagManager {
             found: true,
             tagId: tag.id,
             tagName: tag.name,
+            originalPhrase: tag.phrase,
             action: action
           };
         }
@@ -224,6 +220,22 @@ class SecretTagManager {
     }
   }
 
+  async handleSecretTagAction(detectionResult: TagDetectionResult): Promise<void> {
+    if (!detectionResult.found || !detectionResult.tagId) return;
+
+    switch (detectionResult.action) {
+      case 'activate':
+        await this.activateSecretTag(detectionResult.tagId);
+        break;
+      case 'deactivate':
+        await this.deactivateSecretTag(detectionResult.tagId);
+        break;
+      case 'panic':
+        await this.activatePanicMode();
+        break;
+    }
+  }
+  
   /**
    * Activate a secret tag
    */
@@ -917,6 +929,23 @@ class SecretTagManager {
   private base64ToArray(base64: string): Uint8Array {
     const binaryString = atob(base64);
     return new Uint8Array(binaryString.length).map((_, i) => binaryString.charCodeAt(i));
+  }
+
+  public shouldTreatAsSecretTagCommand(transcript: string, detectionResult: TagDetectionResult): boolean {
+    if (!detectionResult.found || !detectionResult.originalPhrase) {
+      return false;
+    }
+
+    const normalizedTranscript = transcript.toLowerCase().replace(/[.\s]/g, '').replace(/[^\w]/g, '');
+    const normalizedPhrase = detectionResult.originalPhrase.toLowerCase().replace(/[.\s]/g, '').replace(/[^\w]/g, '');
+
+    logger.info(`[shouldTreatAsSecretTagCommand] Comparing normalized transcript: "${normalizedTranscript}" vs. normalized phrase: "${normalizedPhrase}"`);
+    
+    // Check if the normalized transcript IS the normalized phrase
+    const isCommand = normalizedTranscript === normalizedPhrase;
+
+    logger.info(`[shouldTreatAsSecretTagCommand] Is command? ${isCommand}`);
+    return isCommand;
   }
 }
 

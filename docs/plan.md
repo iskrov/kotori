@@ -136,6 +136,21 @@ journal_entry_tags (id, entry_id, tag_id)
 - **Hardware Protection**: Keys stored in device secure enclave
 - **Forward Secrecy**: Unique keys per entry, deleted entries unrecoverable
 
+## 🔮 Current Development: Hybrid Secret Tag Manager
+
+### In Progress Enhancement: Context-Aware Security
+- [ ] **Hybrid Secret Tag Manager**: Combines V1 (client caching) + V2 (server verification)
+  - **Progressive Security**: Users choose privacy/convenience balance based on context
+  - **Border Crossing Mode**: One-tap maximum security for travel/sensitive situations
+  - **Offline Capability**: Full functionality with optional client-side caching
+  - **Graceful Degradation**: Online → Cache → Offline fallback strategies
+  - **User Control**: Settings toggles for security mode selection
+
+### Implementation Benefits
+- **Security Conscious Users**: Can disable all local storage instantly for border crossings
+- **Convenience Users**: Full offline operation with secure local caching
+- **Context-Aware Users**: Adapt security posture to current environment and threats
+
 ## 🔮 Future Enhancement Opportunities
 
 ### Potential Improvements

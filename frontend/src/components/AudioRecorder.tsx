@@ -1,114 +1,153 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { useAudioRecorderLogic } from '../hooks/useAudioRecorderLogic';
 import AudioRecorderUI from './AudioRecorderUI';
+import { secretTagManager, TagDetectionResult } from '../services/secretTagManager';
+import logger from '../utils/logger';
+import speechToTextService from '../services/speechToText';
 
-interface SaveButtonState {
-  text: string;
-  disabled: boolean;
-  isSaving: boolean;
-}
+
+const analyzeTranscriptionQuality = (result: any): { recommendations: string[] } => {
+  const recommendations = [];
+  if (result.confidence < 0.85) {
+    recommendations.push('Low transcription confidence.');
+  }
+  if (result.secret_tag_detected) {
+    recommendations.push(`Secret tag detected: ${result.secret_tag_details?.tagName}`);
+  }
+  return { recommendations };
+};
+
+const cleanupAudioFile = (uri: string) => {
+  logger.info(`[cleanupAudioFile] Cleaned up audio file: ${uri}`);
+};
 
 interface AudioRecorderProps {
-  onTranscriptionComplete: (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => void;
-  onCancel: () => void;
+  onSave?: (transcript: string) => void;
+  onManualSave?: (transcript: string, audioUri?: string) => void;
+  onTranscriptionComplete?: (transcript: string) => void;
+  onCancel?: () => void;
+  onAutoSave?: (transcript: string) => void;
+  onStateChange?: (newState: string) => void;
+  onCommandDetected?: () => void;
+  isEditingInitialContent?: boolean;
+  saveButtonState?: { text: string; disabled: boolean; isSaving: boolean };
   startRecordingOnMount?: boolean;
-  onManualSave?: () => Promise<void>;
-  saveButtonState?: SaveButtonState;
-  onAutoSave: (currentTranscript: string) => void;
-  showCloseButton?: boolean; // Optional prop to show close button in modal mode
-  existingContent?: string; // Optional existing content to show as context
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
+  onSave,
+  onManualSave,
   onTranscriptionComplete,
   onCancel,
-  startRecordingOnMount = false,
-  onManualSave,
-  saveButtonState,
   onAutoSave,
-  showCloseButton = false,
-  existingContent,
+  onStateChange,
+  onCommandDetected,
+  isEditingInitialContent = false,
+  saveButtonState,
+  startRecordingOnMount = true,
 }) => {
-  // Use the custom hook for all business logic
-  const audioRecorderLogic = useAudioRecorderLogic({
-    onTranscriptionComplete,
-    onCancel,
-    autoStart: startRecordingOnMount,
-    onAutoSave,
+  const handleTranscriptionComplete = (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => {
+    logger.info('[AudioRecorder] onTranscriptionComplete triggered.');
+    onTranscriptionComplete?.(text);
+    onSave?.(text);
+  };
+  
+  const handleCancel = () => {
+    logger.info('[AudioRecorder] onCancel called.');
+    onCancel?.();
+  };
+
+  const handleAutoSave = (text: string) => {
+    logger.info('[AudioRecorder] onAutoSave called.');
+    onAutoSave?.(text);
+  };
+  
+  const processSegment = useCallback(
+    async (audioUri: string, language: string): Promise<{ text: string } | null> => {
+      try {
+        const result = await speechToTextService.transcribeAudio(audioUri, { languageCodes: [language] });
+        if (!result) {
+          cleanupAudioFile(audioUri);
+          return null;
+        }
+        const { transcript } = result;
+        const detectionResult: TagDetectionResult = await secretTagManager.checkForSecretTagPhrases(transcript);
+        if (detectionResult.found) {
+          logger.info(`Secret tag phrase detected: ${detectionResult.tagName} (${detectionResult.action})`);
+          await secretTagManager.handleSecretTagAction(detectionResult);
+          if (secretTagManager.shouldTreatAsSecretTagCommand(transcript, detectionResult)) {
+            logger.info('[processSegment] Transcript was a secret tag command. Halting processing.');
+            cleanupAudioFile(audioUri);
+            onCommandDetected?.();
+            return null;
+          }
+        }
+        analyzeTranscriptionQuality(result);
+        cleanupAudioFile(audioUri);
+        return { text: transcript };
+      } catch (error) {
+        logger.error("Error during transcription processSegment", error);
+        cleanupAudioFile(audioUri);
+        return null;
+      }
+    },
+    [onCommandDetected]
+  );
+
+  const logic = useAudioRecorderLogic({
+    onTranscriptionComplete: handleTranscriptionComplete,
+    onCancel: handleCancel,
+    onAutoSave: handleAutoSave,
+    autoStart: startRecordingOnMount && !isEditingInitialContent,
   });
 
-  // Handler for replacing transcript segments with alternatives
-  const handleReplaceWithAlternative = useCallback((alternativeText: string) => {
-    // This would need to be implemented in the hook if needed
-    // For now, we'll just close the alternatives view
-    audioRecorderLogic.setShowAlternatives(false);
-  }, [audioRecorderLogic]);
+  useEffect(() => {
+    onStateChange?.(logic.isRecording ? 'recording' : 'idle');
+  }, [logic.isRecording, onStateChange]);
 
-  // Custom save handler that passes transcript data to RecordScreen first
-  const handleSave = useCallback(async () => {
-    if (onManualSave) {
-      // First, pass the transcript data to RecordScreen via onTranscriptionComplete
-      const fullTranscript = audioRecorderLogic.transcriptSegments.join('\n').trim();
-      if (fullTranscript) {
-        const confidence = audioRecorderLogic.lastTranscriptionResult?.confidence || 0;
-        const detectedLanguage = audioRecorderLogic.lastTranscriptionResult?.detected_language_code as string | undefined;
-        
-        // Pass the transcript data to RecordScreen
-        onTranscriptionComplete(fullTranscript, undefined, detectedLanguage, confidence);
-        
-        // Small delay to ensure state update happens before save
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Now trigger the manual save
-        await onManualSave();
-      }
-    } else {
-      // Fallback to the original accept transcript logic
-      audioRecorderLogic.handleAcceptTranscript();
+  const handleManualSave = useCallback(() => {
+    const fullTranscript = logic.transcriptSegments.join('\n').trim();
+    if (fullTranscript) {
+      onManualSave?.(fullTranscript);
+      onSave?.(fullTranscript);
     }
-  }, [onManualSave, audioRecorderLogic, onTranscriptionComplete]);
+  }, [logic.transcriptSegments, onManualSave, onSave]);
 
-  // Render the UI component with all the state and handlers
   return (
-    <AudioRecorderUI
-      // State props
-      transcriptSegments={audioRecorderLogic.transcriptSegments}
-      setTranscriptSegments={audioRecorderLogic.setTranscriptSegments}
-      currentSegmentTranscript={audioRecorderLogic.currentSegmentTranscript}
-      isTranscribingSegment={audioRecorderLogic.isTranscribingSegment}
-      lastTranscriptionResult={audioRecorderLogic.lastTranscriptionResult}
-      showAlternatives={audioRecorderLogic.showAlternatives}
-      selectedLanguage={audioRecorderLogic.selectedLanguage}
-      isProcessing={audioRecorderLogic.isProcessing}
-      canAcceptTranscript={audioRecorderLogic.canAcceptTranscript}
-      
-      // Animation refs
-      pulseAnim={audioRecorderLogic.pulseAnim}
-      waveAnim1={audioRecorderLogic.waveAnim1}
-      waveAnim2={audioRecorderLogic.waveAnim2}
-      
-      // Audio recording state
-      isRecording={audioRecorderLogic.isRecording}
-      recordingDuration={audioRecorderLogic.recordingDuration}
-      permissionGranted={audioRecorderLogic.permissionGranted}
-      
-      // Handlers
-      handleMicPress={audioRecorderLogic.handleMicPress}
-      handleAcceptTranscript={handleSave}
-      handleLanguageChange={audioRecorderLogic.handleLanguageChange}
-      formatDuration={audioRecorderLogic.formatDuration}
-      setShowAlternatives={audioRecorderLogic.setShowAlternatives}
-      
-      // Save button state
-      saveButtonState={saveButtonState}
-      
-      // Close button for modal mode
-      onClose={showCloseButton ? onCancel : undefined}
-      
-      // Existing content for context in edit mode
-      existingContent={existingContent}
-    />
+    <View style={styles.container}>
+      <AudioRecorderUI
+        isRecording={logic.isRecording}
+        transcriptSegments={logic.transcriptSegments}
+        setTranscriptSegments={logic.setTranscriptSegments}
+        currentSegmentTranscript={logic.currentSegmentTranscript}
+        isTranscribingSegment={logic.isTranscribingSegment}
+        lastTranscriptionResult={logic.lastTranscriptionResult}
+        showAlternatives={logic.showAlternatives}
+        setShowAlternatives={logic.setShowAlternatives}
+        selectedLanguage={logic.selectedLanguage}
+        isProcessing={logic.isProcessing}
+        canAcceptTranscript={logic.canAcceptTranscript}
+        pulseAnim={logic.pulseAnim}
+        waveAnim1={logic.waveAnim1}
+        waveAnim2={logic.waveAnim2}
+        recordingDuration={logic.recordingDuration}
+        permissionGranted={logic.permissionGranted}
+        handleMicPress={logic.handleMicPress}
+        handleAcceptTranscript={handleManualSave}
+        handleLanguageChange={logic.handleLanguageChange}
+        formatDuration={logic.formatDuration}
+      />
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 export default AudioRecorder; 

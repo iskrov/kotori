@@ -30,72 +30,80 @@ export interface CreateEntryOptions {
 
 class EncryptedJournalService {
   /**
+   * Reusable logic to detect and handle secret tag phrases in content.
+   * This can be called from both create and update operations.
+   * @returns {Promise<{
+   *   processedContent: string;
+   *   detectedTagId: string | null;
+   * }>}
+   */
+  private async detectAndProcessSecretPhrase(
+    content: string,
+    existingTagId: string | null = null
+  ): Promise<{ processedContent: string; detectedTagId: string | null }> {
+    if (!content) {
+      return { processedContent: content, detectedTagId: existingTagId };
+    }
+
+    try {
+      const detection = await secretTagManager.checkForSecretTagPhrases(content);
+      if (detection.found && detection.tagId && detection.action === 'activate') {
+        logger.info(`Secret tag activation phrase detected in content for tag: ${detection.tagName} (${detection.tagId})`);
+        
+        // Activate the tag
+        await secretTagManager.activateSecretTag(detection.tagId);
+        
+        // Clean the activation phrase from the content
+        let cleanedContent = content;
+        if (detection.tagName) {
+          // Create a regex to find the phrase (case-insensitive) and remove it
+          const phraseRegex = new RegExp(detection.tagName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+          cleanedContent = content.replace(phraseRegex, '').trim();
+        }
+        
+        return {
+          processedContent: cleanedContent,
+          detectedTagId: detection.tagId,
+        };
+      }
+    } catch (error) {
+      logger.error('Error during secret phrase detection, proceeding with original content.', error);
+    }
+
+    // If no phrase is detected, return original content and tag ID
+    return { processedContent: content, detectedTagId: existingTagId };
+  }
+
+  /**
    * Create a journal entry, automatically encrypting based on active secret tags
    */
   async createEntry(
     entryData: Omit<JournalEntryData, 'id'>,
     options: CreateEntryOptions = {}
   ): Promise<JournalEntryData> {
-    const { secretTagId, forcePublic, detectedTagId } = options;
+    const { secretTagId, forcePublic, detectedTagId: optionDetectedTagId } = options;
     
-    // Check for manual secret tag activation in content before creating entry
-    let manuallyDetectedTagId: string | null = null;
-    if (!forcePublic && !secretTagId && !detectedTagId && entryData.content) {
-      try {
-        const detection = await secretTagManager.checkForSecretTagPhrases(entryData.content);
-        if (detection.found && detection.tagId && detection.action === 'activate') {
-          logger.info(`Manual secret tag activation detected in content: ${detection.tagName} (${detection.tagId})`);
-          
-          // Activate the detected tag
-          await secretTagManager.activateSecretTag(detection.tagId);
-          manuallyDetectedTagId = detection.tagId;
-          
-          // Remove the activation phrase from content to keep it private
-          const normalizedContent = secretTagManager.normalizePhrase(entryData.content);
-          const normalizedPhrase = secretTagManager.normalizePhrase(detection.tagName || '');
-          
-          // For single-word phrases, be more careful about removal to avoid removing legitimate content
-          let cleanedContent = entryData.content;
-          
-          // If the entire content (normalized) is just the activation phrase, replace it
-          if (normalizedContent === normalizedPhrase) {
-            cleanedContent = 'Secret tag activated via voice command.';
-          } else {
-            // Otherwise, try to remove just the activation phrase while preserving other content
-            // Use word boundaries for single words to avoid partial matches
-            const phrasePattern = new RegExp(`\\b${detection.tagName?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-            cleanedContent = entryData.content
-              .replace(phrasePattern, '')
-              .trim()
-              .replace(/^\s*[,.!?;:]*\s*/, '') // Remove leading punctuation/space
-              .replace(/\s*[,.!?;:]*\s*$/, '') // Remove trailing punctuation/space
-              .replace(/\s+/g, ' '); // Normalize whitespace
-          }
-          
-          if (cleanedContent.length > 0) {
-            entryData.content = cleanedContent;
-          } else {
-            // If content is just the activation phrase, use a default message
-            entryData.content = 'Secret tag activated via voice command.';
-          }
-        }
-      } catch (error) {
-        logger.error('Error during manual secret tag detection:', error);
-        // Continue with normal entry creation if detection fails
-      }
-    }
+    // Process content for secret phrases unless forced public
+    const { processedContent, detectedTagId: manuallyDetectedTagId } = forcePublic
+      ? { processedContent: entryData.content, detectedTagId: null }
+      : await this.detectAndProcessSecretPhrase(entryData.content, null);
+
+    const finalEntryData = {
+      ...entryData,
+      content: processedContent,
+    };
     
-    // Try to use secret tag if one is currently active
-    const targetSecretTagId = secretTagManager.getActiveSecretTagForNewEntry();
+    // Determine the final secret tag to use for this entry
+    const targetSecretTagId = secretTagId || optionDetectedTagId || manuallyDetectedTagId;
     
     if (targetSecretTagId && zeroKnowledgeEncryption.isPhraseKeyLoaded(targetSecretTagId)) {
-      return this.createSecretTagEntry(entryData, targetSecretTagId);
+      return this.createSecretTagEntry(finalEntryData, targetSecretTagId);
     } else {
       if (targetSecretTagId && !zeroKnowledgeEncryption.isPhraseKeyLoaded(targetSecretTagId)) {
         logger.warn(`Entry should use secret tag ${targetSecretTagId} but phrase encryption not ready, creating public entry`);
       }
       // Fall back to public entry
-      return this.createPublicEntry(entryData);
+      return this.createPublicEntry(finalEntryData);
     }
   }
 
@@ -364,8 +372,47 @@ class EncryptedJournalService {
    */
   async updateEntry(id: number, updates: Partial<JournalEntryData>): Promise<JournalEntryData> {
     try {
-      // For now, use the regular update API
-      // TODO: Add support for updating encrypted content and changing secret tags
+      // If content is being updated, check it for secret phrases
+      if (typeof updates.content === 'string') {
+        const { processedContent, detectedTagId } = await this.detectAndProcessSecretPhrase(updates.content);
+        
+        // Update the content with the cleaned version
+        updates.content = processedContent;
+
+        if (detectedTagId && zeroKnowledgeEncryption.isPhraseKeyLoaded(detectedTagId)) {
+          logger.info(`Secret phrase detected during update. Encrypting entry ${id} with tag ${detectedTagId}.`);
+          
+          const encrypted = await zeroKnowledgeEncryption.encryptEntryWithSecretPhrase(processedContent, detectedTagId);
+          const secretTags = await secretTagManager.getAllSecretTags();
+          const targetTag = secretTags.find(tag => tag.id === detectedTagId);
+
+          if (!targetTag) {
+            throw new Error(`Secret tag not found: ${detectedTagId}`);
+          }
+          
+          const encryptedUpdatePayload = {
+            ...updates,
+            content: "", // Clear plaintext content for the backend
+            encrypted_content: encrypted.encryptedContent,
+            encrypted_key: encrypted.encryptedKey,
+            iv: encrypted.iv,
+            salt: encrypted.salt,
+            algorithm: encrypted.algorithm,
+            wrapIv: encrypted.wrapIv,
+            secret_tag_id: detectedTagId,
+            secret_tag_hash: targetTag.serverTagHash,
+          };
+          
+          const response = await JournalAPI.updateEntry(id, encryptedUpdatePayload);
+          return {
+            ...response.data,
+            content: processedContent, // Return decrypted content for UI
+          };
+        }
+      }
+      
+      // If no secret phrase was detected or encryption is not ready, perform a standard public update
+      logger.info(`Updating public journal entry ${id}.`);
       const response = await JournalAPI.updateEntry(id, updates);
       return response.data;
     } catch (error) {
