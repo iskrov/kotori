@@ -48,20 +48,20 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
     {
       mode: 'online',
       title: 'Online Mode',
-      description: 'Server-only, no secrets on device',
+      description: 'Server-only, clears all device secrets',
       icon: 'cloud',
       color: '#007AFF',
       features: [
-        'No local secret storage',
+        'Clears all secret data from device',
         'Server-only verification',
         'Maximum privacy protection',
-        'Device appears normal'
+        'Device appears completely normal'
       ],
       useCases: [
-        'Travel scenarios',
-        'Shared devices',
+        'Travel & border crossings',
+        'Shared or monitored devices',
         'High-security environments',
-        'Border crossings'
+        'When device inspection is likely'
       ]
     },
     {
@@ -91,35 +91,82 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
   const handleModeChange = useCallback(async (mode: SecurityMode) => {
     if (mode === currentMode || disabled || isChanging) return;
 
-    // Show confirmation for mode changes
     const modeInfo = securityModes.find(m => m.mode === mode);
     if (!modeInfo) return;
 
-    Alert.alert(
-      `Switch to ${modeInfo.title}?`,
-      `${modeInfo.description}\n\n${modeInfo.features.join('\n• ')}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Switch',
-          onPress: async () => {
-            setIsChanging(true);
-            try {
-              await onModeChange(mode);
-              logger.info(`Security mode changed to: ${mode}`);
-            } catch (error) {
-              logger.error('Failed to change security mode:', error);
-              Alert.alert('Error', 'Failed to change security mode');
-            } finally {
-              setIsChanging(false);
+    // Special handling for switching TO online mode (data clearing warning)
+    if (mode === 'online' && currentMode === 'offline') {
+      Alert.alert(
+        '🔒 Switch to Online Mode',
+        '⚠️ SECURITY WARNING ⚠️\n\n' +
+        'Switching to Online Mode will:\n\n' +
+        '• PERMANENTLY DELETE all secret data from this device\n' +
+        '• Clear all cached secret tags and phrases\n' +
+        '• Remove all encryption keys from device storage\n' +
+        '• Deactivate all currently active secret tags\n\n' +
+        'This ensures maximum security - your device will appear completely normal with no secret data.\n\n' +
+        'The server remains the only source of your secret tags. You can switch back to Offline Mode later to re-cache data.\n\n' +
+        'Are you sure you want to proceed?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Clear Device & Switch',
+            style: 'destructive',
+            onPress: async () => {
+              setIsChanging(true);
+              try {
+                await onModeChange(mode);
+                logger.info(`Security mode changed to: ${mode} with data clearing`);
+                
+                // Show success confirmation
+                Alert.alert(
+                  '✅ Device Cleared',
+                  'Successfully switched to Online Mode.\n\n' +
+                  'All secret data has been removed from this device. ' +
+                  'Your secret tags are safely stored on the server and can be accessed when online.',
+                  [{ text: 'OK' }]
+                );
+              } catch (error) {
+                logger.error('Failed to change security mode:', error);
+                Alert.alert(
+                  'Error',
+                  'Failed to switch to Online Mode. Some secret data may still remain on device. Please try again.',
+                  [{ text: 'OK' }]
+                );
+              } finally {
+                setIsChanging(false);
+              }
             }
           }
-        }
-      ]
-    );
+        ]
+      );
+    } 
+    // Regular mode change (to offline mode)
+    else {
+      Alert.alert(
+        `Switch to ${modeInfo.title}?`,
+        `${modeInfo.description}\n\nFeatures:\n• ${modeInfo.features.join('\n• ')}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Switch',
+            onPress: async () => {
+              setIsChanging(true);
+              try {
+                await onModeChange(mode);
+                logger.info(`Security mode changed to: ${mode}`);
+              } catch (error) {
+                logger.error('Failed to change security mode:', error);
+                Alert.alert('Error', 'Failed to change security mode');
+              } finally {
+                setIsChanging(false);
+              }
+            }
+          }
+        ]
+      );
+    }
   }, [currentMode, disabled, isChanging, onModeChange, securityModes]);
-
-
 
   /**
    * Render security mode card
@@ -196,8 +243,6 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
         </Text>
       </View>
 
-
-
       {/* Security Modes */}
       <View style={styles.modesContainer}>
         {securityModes.map(renderModeCard)}
@@ -206,9 +251,19 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
       {/* Current Status */}
       <View style={styles.statusContainer}>
         <Text style={styles.statusTitle}>Current Status</Text>
-        <Text style={styles.statusText}>
-          {`${securityModes.find(m => m.mode === currentMode)?.title} active`}
-        </Text>
+        <View style={styles.statusRow}>
+          <Text style={styles.statusText}>
+            {`${securityModes.find(m => m.mode === currentMode)?.title} active`}
+          </Text>
+          {isChanging && (
+            <View style={styles.changingIndicator}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={styles.changingText}>
+                {currentMode === 'offline' ? 'Clearing device...' : 'Switching mode...'}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -235,8 +290,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
   },
-  
-
   
   // Security Modes
   modesContainer: {
@@ -318,6 +371,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.semiBold,
     marginBottom: theme.spacing.xs,
   },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   statusText: {
     fontSize: theme.typography.fontSizes.md,
     color: theme.colors.text,
@@ -327,6 +384,19 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   // Disabled state
   disabledCard: {
     opacity: 0.5,
+  },
+  
+  // Changing indicator
+  changingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: theme.spacing.md,
+  },
+  changingText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+    marginLeft: theme.spacing.xs,
   },
 });
 

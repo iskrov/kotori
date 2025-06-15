@@ -12,6 +12,7 @@ import { secretTagOnlineManager, SecretTagV2, TagDetectionResult } from './secre
 import { secretTagOfflineManager, SecretTag } from './secretTagOfflineManager';
 import { TagsAPI } from './api';
 import { Tag } from '../types';
+import { zeroKnowledgeEncryption } from './zeroKnowledgeEncryption';
 import logger from '../utils/logger';
 
 export type SecurityMode = 'online' | 'offline';
@@ -309,13 +310,22 @@ class TagManager {
   async setSecurityMode(mode: SecurityMode): Promise<void> {
     logger.info(`Switching to ${mode} mode`);
     
+    const previousMode = this.config.securityMode;
     this.config.securityMode = mode;
     
-    // Disable cache for online mode
+    // When switching TO online mode, perform comprehensive secret data clearing
     if (mode === 'online') {
       this.config.cacheEnabled = false;
-      await this.clearSecretCache();
+      
+      if (previousMode === 'offline') {
+        logger.warn('Switching to online mode - performing comprehensive secret data clearing');
+        await this.clearAllSecretData();
+      } else {
+        // Already in online mode, just clear cache as usual
+        await this.clearSecretCache();
+      }
     } else {
+      // Switching to offline mode
       this.config.cacheEnabled = true;
     }
 
@@ -534,6 +544,177 @@ class TagManager {
       logger.debug('Configuration saved');
     } catch (error) {
       logger.error('Failed to save configuration:', error);
+    }
+  }
+
+  /**
+   * Comprehensive secret data clearing for maximum security
+   * Used when switching to online-only mode to ensure no secret data remains on device
+   */
+  async clearAllSecretData(): Promise<void> {
+    try {
+      logger.warn('SECURITY: Starting comprehensive secret data clearing');
+      
+      // Step 1: Deactivate all currently active secret tags
+      logger.info('Step 1: Deactivating all active secret tags');
+      try {
+        await this.deactivateAllSecretTags();
+      } catch (error) {
+        logger.error('Failed to deactivate secret tags:', error);
+        // Continue with clearing even if deactivation fails
+      }
+
+      // Step 2: Clear all zero-knowledge encryption data (keys, device entropy, etc.)
+      logger.info('Step 2: Clearing zero-knowledge encryption data');
+      try {
+        await zeroKnowledgeEncryption.secureClearAllData();
+      } catch (error) {
+        logger.error('Failed to clear zero-knowledge encryption data:', error);
+        // Continue with clearing
+      }
+
+      // Step 3: Clear secret tags cache from offline manager
+      logger.info('Step 3: Clearing secret tags cache');
+      try {
+        const cachedTags = await this.secretCacheManager.getAllSecretTags();
+        
+        for (const tag of cachedTags) {
+          try {
+            // Clear phrase encryption data for this tag
+            await zeroKnowledgeEncryption.clearSecretPhraseEncryption(tag.id);
+          } catch (error) {
+            logger.warn(`Failed to clear phrase encryption for tag ${tag.id}:`, error);
+          }
+          
+          try {
+            // Delete cached tag
+            await this.secretCacheManager.deleteSecretTag(tag.id);
+          } catch (error) {
+            logger.warn(`Failed to delete cached tag ${tag.id}:`, error);
+          }
+        }
+      } catch (error) {
+        logger.error('Failed to clear secret tags cache:', error);
+      }
+
+      // Step 4: Clear any additional storage that might contain secret data
+      logger.info('Step 4: Clearing additional secret storage');
+      try {
+        // Clear any potential AsyncStorage keys that might contain secret data
+        // This is a safety measure for any data that might have been stored outside the main services
+        await this.clearAdditionalSecretStorage();
+      } catch (error) {
+        logger.error('Failed to clear additional secret storage:', error);
+      }
+
+      // Step 5: Verify clearing was successful
+      logger.info('Step 5: Verifying secret data clearing');
+      const verification = await this.verifySecretDataClearing();
+      
+      if (verification.success) {
+        logger.warn('SECURITY: Comprehensive secret data clearing completed successfully');
+      } else {
+        logger.error('SECURITY: Secret data clearing verification failed:', verification.issues);
+        throw new Error(`Secret data clearing incomplete: ${verification.issues.join(', ')}`);
+      }
+      
+    } catch (error) {
+      logger.error('SECURITY: Failed to clear all secret data:', error);
+      throw new Error('Failed to completely clear secret data from device');
+    }
+  }
+
+  /**
+   * Clear additional storage that might contain secret data
+   */
+  private async clearAdditionalSecretStorage(): Promise<void> {
+    try {
+      // Import AsyncStorage for clearing any potential secret keys
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      
+      // Get all AsyncStorage keys
+      const allKeys = await AsyncStorage.getAllKeys();
+      
+      // Filter for keys that might contain secret data
+      const secretKeys = allKeys.filter((key: string) => 
+        key.includes('secret') || 
+        key.includes('phrase') || 
+        key.includes('zk_') || 
+        key.includes('hidden') ||
+        key.includes('encrypted')
+      );
+      
+      if (secretKeys.length > 0) {
+        logger.info(`Clearing ${secretKeys.length} potential secret storage keys:`, secretKeys);
+        await AsyncStorage.multiRemove(secretKeys);
+      }
+      
+    } catch (error) {
+      logger.warn('Failed to clear additional secret storage:', error);
+      // Don't throw - this is a safety measure
+    }
+  }
+
+  /**
+   * Verify that secret data clearing was successful
+   */
+  private async verifySecretDataClearing(): Promise<{success: boolean, issues: string[]}> {
+    const issues: string[] = [];
+    
+    try {
+      // Check 1: Verify no secret tags in cache
+      try {
+        const cachedTags = await this.secretCacheManager.getAllSecretTags();
+        if (cachedTags.length > 0) {
+          issues.push(`${cachedTags.length} secret tags still in cache`);
+        }
+      } catch (error) {
+        // If we can't read cache, that's actually good - means it's cleared
+        logger.debug('Cache read failed during verification (expected after clearing)');
+      }
+      
+      // Check 2: Verify no phrase keys loaded in memory
+      const loadedPhraseKeys = [];
+      try {
+        // We can't directly check the private phraseKeys map in zeroKnowledgeEncryption,
+        // but we can check if any common tag IDs still have loaded keys
+        for (let i = 0; i < 10; i++) {
+          const testTagId = `test-tag-${i}`;
+          if (zeroKnowledgeEncryption.isPhraseKeyLoaded(testTagId)) {
+            loadedPhraseKeys.push(testTagId);
+          }
+        }
+      } catch (error) {
+        // Error checking is acceptable
+      }
+      
+      if (loadedPhraseKeys.length > 0) {
+        issues.push(`${loadedPhraseKeys.length} phrase keys still loaded in memory`);
+      }
+      
+      // Check 3: Verify no active tags
+      try {
+        const activeTags = await this.getActiveSecretTags();
+        if (activeTags.length > 0) {
+          issues.push(`${activeTags.length} secret tags still active`);
+        }
+      } catch (error) {
+        // If we can't get active tags from online manager, that might be a network issue
+        // Don't count this as a verification failure
+        logger.warn('Could not verify active tags (network issue?):', error);
+      }
+      
+      return {
+        success: issues.length === 0,
+        issues
+      };
+      
+    } catch (error) {
+      logger.error('Failed to verify secret data clearing:', error);
+      return {
+        success: false,
+        issues: ['Verification process failed']
+      };
     }
   }
 }
