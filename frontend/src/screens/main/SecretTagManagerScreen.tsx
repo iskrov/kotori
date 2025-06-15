@@ -29,7 +29,7 @@ import SecretTagIndicator from '../../components/SecretTagIndicator';
 import SecretTagSetup from '../../components/SecretTagSetup';
 import logger from '../../utils/logger';
 
-type SecretTagManagerScreenNavigationProp = StackNavigationProp<MainStackParamList, 'SecretTagManager'>;
+type SecretTagManagerScreenNavigationProp = StackNavigationProp<MainStackParamList, 'TagManagement'>;
 
 const SecretTagManagerScreen: React.FC = () => {
   const navigation = useNavigation<SecretTagManagerScreenNavigationProp>();
@@ -67,7 +67,7 @@ const SecretTagManagerScreen: React.FC = () => {
   useEffect(() => {
     const initializeScreen = async () => {
       setIsLoading(true);
-      await secretTagManager.initialize();
+      await tagManager.initialize();
       await loadSecretTags();
       setIsLoading(false);
     };
@@ -89,7 +89,7 @@ const SecretTagManagerScreen: React.FC = () => {
    */
   const handleActivateTag = useCallback(async (tagId: string) => {
     try {
-      await secretTagManager.activateSecretTag(tagId);
+      await tagManager.activateSecretTag(tagId);
       await loadSecretTags();
       
       const tag = secretTags.find(t => t.id === tagId);
@@ -110,7 +110,7 @@ const SecretTagManagerScreen: React.FC = () => {
    */
   const handleDeactivateTag = useCallback(async (tagId: string) => {
     try {
-      await secretTagManager.deactivateSecretTag(tagId);
+      await tagManager.deactivateSecretTag(tagId);
       await loadSecretTags();
       
       const tag = secretTags.find(t => t.id === tagId);
@@ -131,7 +131,7 @@ const SecretTagManagerScreen: React.FC = () => {
    */
   const handleDeleteTag = useCallback(async (tagId: string) => {
     try {
-      await secretTagManager.deleteSecretTag(tagId);
+      await tagManager.deleteSecretTag(tagId);
       await loadSecretTags();
       
       Alert.alert('Tag Deleted', 'The secret tag has been permanently deleted.');
@@ -152,7 +152,7 @@ const SecretTagManagerScreen: React.FC = () => {
   /**
    * Handle edit tag
    */
-  const handleEditTag = useCallback((tag: SecretTag) => {
+  const handleEditTag = useCallback((tag: SecretTagV2) => {
     setEditingTag(tag);
     // TODO: Implement edit modal/screen
     Alert.alert('Coming Soon', 'Tag editing will be available in a future update.');
@@ -172,7 +172,7 @@ const SecretTagManagerScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await secretTagManager.deactivateAllSecretTags();
+              await tagManager.deactivateAllSecretTags();
               await loadSecretTags();
               Alert.alert('All Tags Deactivated', 'All secret tags have been deactivated.');
             } catch (error) {

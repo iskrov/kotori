@@ -17,15 +17,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { SecretTag } from '../services/secretTagOfflineManager';
+import { SecretTagV2 } from '../services/secretTagOnlineManager';
 import logger from '../utils/logger';
 
 interface SecretTagCardProps {
-  tag: SecretTag;
+  tag: SecretTagV2;
   isActive: boolean;
   onActivate: (tagId: string) => Promise<void>;
   onDeactivate: (tagId: string) => Promise<void>;
-  onEdit: (tag: SecretTag) => void;
+  onEdit: (tag: SecretTagV2) => void;
   onDelete: (tagId: string) => Promise<void>;
 }
 
@@ -139,8 +139,8 @@ const SecretTagCard: React.FC<SecretTagCardProps> = ({
   /**
    * Format creation date
    */
-  const formatDate = (timestamp: number): string => {
-    const date = new Date(timestamp);
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',

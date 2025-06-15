@@ -17,14 +17,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { SecretTag } from '../services/secretTagOfflineManager';
+import { SecretTagV2 } from '../services/secretTagOnlineManager';
 import logger from '../utils/logger';
 
 // Helper to determine if native driver should be used
 const useNativeDriver = Platform.OS !== 'web';
 
 interface SecretTagIndicatorProps {
-  activeTags: SecretTag[];
+  activeTags: SecretTagV2[];
   onPress?: () => void;
   compact?: boolean;
   showPulse?: boolean;
@@ -135,7 +135,7 @@ const SecretTagIndicator: React.FC<SecretTagIndicatorProps> = ({
  * Mini version for floating display
  */
 export const SecretTagFloatingIndicator: React.FC<{
-  activeTags: SecretTag[];
+  activeTags: SecretTagV2[];
   onPress?: () => void;
 }> = ({ activeTags, onPress }) => {
   const { theme } = useAppTheme();
