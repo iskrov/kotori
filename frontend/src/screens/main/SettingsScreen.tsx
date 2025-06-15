@@ -151,10 +151,10 @@ const SettingsScreen: React.FC = () => {
         icon="shield-checkmark"
       >
         <SettingsRow
-          title="Secret Tags"
-          subtitle="Manage multi-level privacy tags"
-          leftIcon="shield"
-          onPress={() => navigation.navigate('SecretTagManager')}
+          title="Tags"
+          subtitle="Manage regular and privacy tags"
+          leftIcon="pricetag"
+          onPress={() => navigation.navigate('TagManagement')}
           showChevron={true}
         />
 

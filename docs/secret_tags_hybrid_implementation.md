@@ -50,9 +50,9 @@ The hybrid approach provides **progressive security** where users can choose the
 ### 1. Hybrid Manager Core Structure
 
 ```typescript
-class SecretTagManagerHybrid {
+class TagManager {
   // Core V2 functionality
-  private serverManager: SecretTagManagerV2;
+  private serverManager: SecretTagOnlineManager;
   
   // Optional caching layer
   private cacheManager: SecretTagCacheManager | null = null;
@@ -122,14 +122,14 @@ async checkForSecretTagPhrases(transcribedText: string): Promise<TagDetectionRes
 
 ## 🎛️ User Interface Integration
 
-### Unified Tag Management Interface
+### Tag Management Interface
 
-The hybrid implementation includes a **unified tag management system** that consolidates both regular and secret tag management into a single, cohesive interface while maintaining their distinct relationship models and security characteristics.
+The hybrid implementation includes a **tag management system** that consolidates both regular and secret tag management into a single, cohesive interface while maintaining their distinct relationship models and security characteristics.
 
-#### Unified Settings Screen Design
+#### Tag Management Screen Design
 
 ```typescript
-interface UnifiedTagManagementProps {
+interface TagManagementProps {
   // Regular tag management
   regularTags: RegularTag[];
   onRegularTagCreate: (tag: RegularTag) => Promise<void>;
@@ -140,7 +140,7 @@ interface UnifiedTagManagementProps {
   secretTags: SecretTag[];
   hybridManager: SecretTagManagerHybrid;
   
-  // Unified interface state
+  // Interface state
   activeView: 'overview' | 'regular' | 'secret';
   cacheStatus: CacheStatus;
   securityMode: SecurityMode;
@@ -163,41 +163,38 @@ secret_tags → journal_entries (secret_tag_id)
 -- One secret tag per entry, multiple entries per secret tag
 ```
 
-#### Unified Interface Components
+#### Tag Management Interface Components
 
-1. **TagManagementScreen.tsx** (New Unified Screen)
+1. **TagManagementScreen.tsx** (Main Interface)
    ```typescript
-   // Replaces separate secret tag manager in settings
-   // Combines both tag types in tabbed interface
+   // Main tag management screen accessed from settings
+   // Shows "Tags" with toggle between regular and secret
    interface TagManagementScreenState {
-     activeTab: 'regular' | 'secret';
-     regularTagsView: RegularTagsManager;
-     secretTagsView: SecretTagsManagerHybrid;
+     tagsManager: TagsManager;
+     showingOverview: boolean;
    }
    ```
 
-2. **RegularTagsManager.tsx** (New Component)
+2. **TagsManager.tsx** (Main Tags Component)
    ```typescript
-   // Currently doesn't exist - needs implementation
-   // Manages many-to-many regular tags
-   interface RegularTagsManagerProps {
-     tags: RegularTag[];
-     onTagCreate: (name: string, color?: string) => Promise<void>;
-     onTagEdit: (tag: RegularTag) => Promise<void>;
-     onTagDelete: (tagId: string) => Promise<void>;
-     onTagMerge: (sourceId: string, targetId: string) => Promise<void>;
-   }
-   ```
-
-3. **SecretTagsManagerHybrid.tsx** (Enhanced Component)  
-   ```typescript
-   // Enhanced version of existing SecretTagManagerScreen
-   // Integrated with hybrid caching and security modes
-   interface SecretTagsManagerHybridProps extends SecretTagsManagerProps {
+   // Manages all tags - regular and secret in unified interface
+   interface TagsManagerProps {
+     // Regular tags (many-to-many)
+     regularTags: RegularTag[];
+     onRegularTagCreate: (name: string, color?: string) => Promise<void>;
+     onRegularTagEdit: (tag: RegularTag) => Promise<void>;
+     onRegularTagDelete: (tagId: string) => Promise<void>;
+     onRegularTagMerge: (sourceId: string, targetId: string) => Promise<void>;
+     
+     // Secret tags (one-to-many) 
+     secretTags: SecretTag[];
      hybridManager: SecretTagManagerHybrid;
      securityMode: SecurityMode;
      cacheStatus: CacheStatus;
      onSecurityModeChange: (mode: SecurityMode) => Promise<void>;
+     
+     // Interface state
+     activeTagType: 'regular' | 'secret';
    }
    ```
 
@@ -213,14 +210,14 @@ interface SecuritySettings {
 }
 ```
 
-### Unified Tag Management Navigation
+### Tag Management Navigation
 
 ```typescript
-// Update MainStackParamList to include unified management
+// Update MainStackParamList to include tag management
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Record: RecordScreenParams | undefined;
-  TagManagement: undefined; // New unified screen
+  TagManagement: undefined; // Clean, simple name
   // SecretTagManager: undefined; // Remove separate screen
 };
 ```
@@ -232,19 +229,19 @@ export type MainStackParamList = {
    - Add regular tag CRUD operations 
    - Maintain many-to-many relationships
 
-2. **Phase 2: Create Unified Interface**
+2. **Phase 2: Create Tag Management Interface**
    - Build TagManagementScreen with tabbed layout
    - Integrate regular and secret tag managers
-   - Add unified navigation from settings
+   - Add tag management navigation from settings
 
 3. **Phase 3: Enhance with Hybrid Features**
-   - Add security mode controls to unified interface
+   - Add security mode controls to tag interface
    - Integrate cache status and controls
    - Add border crossing mode toggle
 
 4. **Phase 4: Update Navigation & Settings**
    - Replace separate SecretTagManager navigation
-   - Update settings screen to point to unified interface
+   - Update settings screen to point to tag management
    - Add quick access toggles for security modes
 
 ## 📱 User Experience Flows

@@ -1,19 +1,18 @@
 /**
  * Tags Manager Component
  * 
- * Manages all tags in a unified interface with toggle between regular and secret tag modes.
- * Handles both many-to-many regular tags and one-to-many secret tags seamlessly.
+ * Unified interface for managing both regular and secret tags
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
+  Alert,
   TextInput,
   Modal,
   RefreshControl,
@@ -21,15 +20,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { TagsAPI } from '../services/api';
 import { Tag } from '../types';
-import { SecretTag, secretTagManager } from '../services/secretTagManager';
+import { SecretTagV2 } from '../services/secretTagOnlineManager';
 import { 
   SecurityMode, 
   NetworkStatus, 
   CacheStatus, 
-  secretTagManagerHybrid 
-} from '../services/secretTagManagerHybrid';
+  tagManager 
+} from '../services/tagManager';
 import SecurityModeSelector from './SecurityModeSelector';
 import CacheStatusIndicator from './CacheStatusIndicator';
 import logger from '../utils/logger';
@@ -50,7 +48,7 @@ interface RegularTagWithStats extends Tag {
   lastUsed?: string;
 }
 
-interface SecretTagWithStats extends SecretTag {
+interface SecretTagWithStats extends SecretTagV2 {
   entryCount: number;
   lastUsed?: string;
 }
@@ -59,87 +57,78 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
 
-  // State management
+  // UI state
   const [activeTagType, setActiveTagType] = useState<TagType>('regular');
-  const [regularTags, setRegularTags] = useState<RegularTagWithStats[]>([]);
-  const [secretTags, setSecretTags] = useState<SecretTagWithStats[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'usage' | 'recent'>('name');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Tag data
+  const [regularTags, setRegularTags] = useState<RegularTagWithStats[]>([]);
+  const [secretTags, setSecretTags] = useState<SecretTagWithStats[]>([]);
+
+  // Form state
+  const [tagName, setTagName] = useState('');
+  const [activationPhrase, setActivationPhrase] = useState('');
+  const [tagColor, setTagColor] = useState('#007AFF');
   const [editingTag, setEditingTag] = useState<RegularTagWithStats | SecretTagWithStats | null>(null);
 
-  // Hybrid manager state
-  const [securityMode, setSecurityMode] = useState<SecurityMode>('balanced');
-  const [borderCrossingMode, setBorderCrossingMode] = useState(false);
+  // Tag manager state
+  const [securityMode, setSecurityMode] = useState<SecurityMode>('offline');
   const [networkStatus, setNetworkStatus] = useState<NetworkStatus>('unknown');
   const [cacheStatus, setCacheStatus] = useState<CacheStatus>({
-    enabled: true,
+    enabled: false,
     entryCount: 0,
     storageSize: 0,
     integrity: 'unknown'
   });
-  const [showSecurityModal, setShowSecurityModal] = useState(false);
 
-  // Create/Edit form state
-  const [tagName, setTagName] = useState('');
-  const [tagColor, setTagColor] = useState('#007AFF');
-  const [activationPhrase, setActivationPhrase] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Predefined color options
   const colorOptions = [
-    '#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D92',
-    '#5AC8FA', '#FFCC00', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+    '#007AFF', '#FF3B30', '#FF9500', '#FFCC02',
+    '#34C759', '#00C7BE', '#32D74B', '#AF52DE',
+    '#FF2D92', '#A2845E', '#8E8E93', '#000000'
   ];
 
   /**
-   * Load regular tags from API
+   * Load regular tags
    */
   const loadRegularTags = useCallback(async () => {
     try {
-      const response = await TagsAPI.getTags();
-      const tags = response.data;
+      const tags = await tagManager.getRegularTags();
       
-      // TODO: Add API endpoint to get tag usage statistics
-      const tagsWithStats: RegularTagWithStats[] = tags.map((tag: Tag) => ({
+      // TODO: Get actual usage statistics from API
+      const tagsWithStats: RegularTagWithStats[] = tags.map(tag => ({
         ...tag,
-        entryCount: Math.floor(Math.random() * 20), // Mock usage
-        lastUsed: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+        entryCount: 0,
+        lastUsed: undefined
       }));
       
       setRegularTags(tagsWithStats);
     } catch (error) {
       logger.error('Failed to load regular tags:', error);
-      Alert.alert('Error', 'Failed to load tags');
     }
   }, []);
 
   /**
-   * Load secret tags from hybrid manager
+   * Load secret tags
    */
   const loadSecretTags = useCallback(async () => {
     try {
-      const tags = await secretTagManagerHybrid.getAllSecretTags();
+      const tags = await tagManager.getSecretTags();
       
-      // TODO: Add method to get secret tag usage statistics
-      const tagsWithStats: SecretTagWithStats[] = tags.map((tag) => ({
+      // TODO: Get actual usage statistics 
+      const tagsWithStats: SecretTagWithStats[] = tags.map(tag => ({
         ...tag,
-        // Convert V2 format to compatible format
-        phrase: '', // Not available in V2 format
-        phraseHash: '', // Not available in V2 format
-        phraseSalt: '', // Not available in V2 format
-        serverTagHash: '', // Not available in V2 format
-        createdAt: new Date(tag.createdAt).getTime(), // Convert to timestamp
-        entryCount: Math.floor(Math.random() * 15), // Mock usage
-        lastUsed: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+        entryCount: 0,
+        lastUsed: undefined
       }));
       
       setSecretTags(tagsWithStats);
     } catch (error) {
       logger.error('Failed to load secret tags:', error);
-      Alert.alert('Error', 'Failed to load secret tags');
     }
   }, []);
 
@@ -154,20 +143,19 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   }, [loadRegularTags, loadSecretTags]);
 
   /**
-   * Load hybrid manager status
+   * Load tag manager status
    */
-  const loadHybridStatus = useCallback(async () => {
+  const loadTagStatus = useCallback(async () => {
     try {
-      const config = secretTagManagerHybrid.getConfig();
-      const networkStatus = secretTagManagerHybrid.getNetworkStatus();
-      const cacheStatus = await secretTagManagerHybrid.getCacheStatus();
+      const config = tagManager.getConfig();
+      const networkStatus = tagManager.getNetworkStatus();
+      const cacheStatus = await tagManager.getCacheStatus();
 
       setSecurityMode(config.securityMode);
-      setBorderCrossingMode(config.borderCrossingMode);
       setNetworkStatus(networkStatus);
       setCacheStatus(cacheStatus);
     } catch (error) {
-      logger.error('Failed to load hybrid status:', error);
+      logger.error('Failed to load tag status:', error);
     }
   }, []);
 
@@ -177,14 +165,14 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   useEffect(() => {
     const initializeManager = async () => {
       setIsLoading(true);
-      await secretTagManagerHybrid.initialize();
+      await tagManager.initialize();
       await loadAllTags();
-      await loadHybridStatus();
+      await loadTagStatus();
       setIsLoading(false);
     };
 
     initializeManager();
-  }, [loadAllTags, loadHybridStatus]);
+  }, [loadAllTags, loadTagStatus]);
 
   /**
    * Handle refresh
@@ -192,66 +180,52 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await loadAllTags();
-    await loadHybridStatus();
+    await loadTagStatus();
     onRefresh?.();
     setIsRefreshing(false);
-  }, [loadAllTags, loadHybridStatus, onRefresh]);
+  }, [loadAllTags, loadTagStatus, onRefresh]);
 
   /**
    * Handle security mode change
    */
   const handleSecurityModeChange = useCallback(async (mode: SecurityMode) => {
     try {
-      await secretTagManagerHybrid.setSecurityMode(mode);
-      await loadHybridStatus();
+      await tagManager.setSecurityMode(mode);
+      await loadTagStatus();
       await loadSecretTags(); // Reload secret tags as they may change
     } catch (error) {
       logger.error('Failed to change security mode:', error);
       Alert.alert('Error', 'Failed to change security mode');
     }
-  }, [loadHybridStatus, loadSecretTags]);
-
-  /**
-   * Handle border crossing mode toggle
-   */
-  const handleBorderCrossingToggle = useCallback(async (enabled: boolean) => {
-    try {
-      await secretTagManagerHybrid.setBorderCrossingMode(enabled);
-      await loadHybridStatus();
-      await loadSecretTags(); // Reload secret tags as cache may be cleared
-    } catch (error) {
-      logger.error('Failed to toggle border crossing mode:', error);
-      Alert.alert('Error', 'Failed to toggle border crossing mode');
-    }
-  }, [loadHybridStatus, loadSecretTags]);
+  }, [loadTagStatus, loadSecretTags]);
 
   /**
    * Handle clear cache
    */
   const handleClearCache = useCallback(async () => {
     try {
-      await secretTagManagerHybrid.clearCache();
-      await loadHybridStatus();
+      await tagManager.clearSecretCache();
+      await loadTagStatus();
       await loadSecretTags(); // Reload secret tags after cache clear
     } catch (error) {
       logger.error('Failed to clear cache:', error);
       Alert.alert('Error', 'Failed to clear cache');
     }
-  }, [loadHybridStatus, loadSecretTags]);
+  }, [loadTagStatus, loadSecretTags]);
 
   /**
    * Handle sync with server
    */
   const handleSync = useCallback(async () => {
     try {
-      await secretTagManagerHybrid.syncWithServer();
-      await loadHybridStatus();
+      await tagManager.syncWithServer();
+      await loadTagStatus();
       await loadSecretTags(); // Reload secret tags after sync
     } catch (error) {
       logger.error('Failed to sync with server:', error);
       Alert.alert('Sync Failed', 'Could not sync with server');
     }
-  }, [loadHybridStatus, loadSecretTags]);
+  }, [loadTagStatus, loadSecretTags]);
 
   /**
    * Get current tags based on active type
@@ -367,11 +341,12 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
       } else {
         if (activeTagType === 'secret') {
           // Create secret tag
-          await secretTagManagerHybrid.createSecretTag(tagName, activationPhrase, tagColor);
+          await tagManager.createSecretTag(tagName, activationPhrase, tagColor);
           await loadSecretTags();
         } else {
-          // TODO: Implement regular tag creation API
-          Alert.alert('Coming Soon', 'Regular tag creation will be available in a future update.');
+          // Create regular tag
+          await tagManager.createRegularTag(tagName, tagColor);
+          await loadRegularTags();
         }
       }
       
@@ -387,7 +362,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [tagName, activationPhrase, tagColor, activeTagType, editingTag, validateTagName, validateActivationPhrase, loadSecretTags]);
+  }, [tagName, activationPhrase, tagColor, activeTagType, editingTag, validateTagName, validateActivationPhrase, loadSecretTags, loadRegularTags]);
 
   /**
    * Handle delete tag
@@ -402,15 +377,15 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-                          try {
-                if (activeTagType === 'secret') {
-                  await secretTagManagerHybrid.deleteSecretTag(String(tag.id));
-                  await loadSecretTags();
-                } else {
-                  // TODO: Implement regular tag deletion API
-                  Alert.alert('Coming Soon', 'Regular tag deletion will be available in a future update.');
-                }
-              } catch (error) {
+            try {
+              if (activeTagType === 'secret') {
+                await tagManager.deleteSecretTag(String(tag.id));
+                await loadSecretTags();
+              } else {
+                await tagManager.deleteRegularTag(String(tag.id));
+                await loadRegularTags();
+              }
+            } catch (error) {
               logger.error('Failed to delete tag:', error);
               Alert.alert('Error', 'Failed to delete tag');
             }
@@ -418,7 +393,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         }
       ]
     );
-  }, [activeTagType, loadSecretTags]);
+  }, [activeTagType, loadSecretTags, loadRegularTags]);
 
   /**
    * Handle edit tag
@@ -455,7 +430,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           styles.toggleButtonText,
           activeTagType === 'regular' && styles.activeToggleButtonText
         ]}>
-          Regular
+          Tags
         </Text>
       </TouchableOpacity>
       
@@ -475,7 +450,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           styles.toggleButtonText,
           activeTagType === 'secret' && styles.activeToggleButtonText
         ]}>
-          Secret
+          Secret Tags
         </Text>
       </TouchableOpacity>
     </View>
@@ -495,7 +470,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{totalTags}</Text>
           <Text style={styles.statLabel}>
-            {activeTagType === 'regular' ? 'Regular' : 'Secret'} Tags
+            {activeTagType === 'regular' ? 'Tags' : 'Secret Tags'}
           </Text>
         </View>
         <View style={styles.statItem}>
@@ -556,261 +531,87 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     </View>
   );
 
-  /**
-   * Render create/edit modal
-   */
-  const renderTagModal = () => (
-    <Modal
-      visible={showCreateModal}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => {
-        setShowCreateModal(false);
-        setEditingTag(null);
-        setTagName('');
-        setActivationPhrase('');
-        setTagColor('#007AFF');
-      }}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {editingTag ? 'Edit' : 'Create'} {activeTagType === 'secret' ? 'Secret' : 'Regular'} Tag
-            </Text>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => {
-                setShowCreateModal(false);
-                setEditingTag(null);
-                setTagName('');
-                setActivationPhrase('');
-                setTagColor('#007AFF');
-              }}
-            >
-              <Ionicons name="close" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.formContainer}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Tag Name</Text>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  tagName && validateTagName(tagName) ? styles.textInputError : null
-                ]}
-                value={tagName}
-                onChangeText={setTagName}
-                placeholder="e.g., work, personal, ideas"
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={50}
-              />
-              {tagName && validateTagName(tagName) && (
-                <Text style={styles.errorText}>{validateTagName(tagName)}</Text>
-              )}
-            </View>
-
-            {activeTagType === 'secret' && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Activation Phrase</Text>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    activationPhrase && validateActivationPhrase(activationPhrase) ? styles.textInputError : null
-                  ]}
-                  value={activationPhrase}
-                  onChangeText={setActivationPhrase}
-                  placeholder="e.g., activate work mode, private thoughts"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={100}
-                />
-                {activationPhrase && validateActivationPhrase(activationPhrase) && (
-                  <Text style={styles.errorText}>{validateActivationPhrase(activationPhrase)}</Text>
-                )}
-              </View>
-            )}
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Color</Text>
-              <View style={styles.colorGrid}>
-                {colorOptions.map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      styles.colorOption,
-                      { backgroundColor: color },
-                      tagColor === color && styles.selectedColorOption,
-                    ]}
-                    onPress={() => setTagColor(color)}
-                  >
-                    {tagColor === color && (
-                      <Ionicons name="checkmark" size={16} color="white" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowCreateModal(false);
-                  setEditingTag(null);
-                  setTagName('');
-                  setActivationPhrase('');
-                  setTagColor('#007AFF');
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  styles.submitButton,
-                  ((!tagName.trim() || 
-                   !!validateTagName(tagName) || 
-                   (activeTagType === 'secret' && !!validateActivationPhrase(activationPhrase)) ||
-                   isSubmitting) ? styles.disabledButton : null)
-                ]}
-                onPress={handleSubmitTag}
-                disabled={
-                  !tagName.trim() || 
-                  !!validateTagName(tagName) || 
-                  (activeTagType === 'secret' && !!validateActivationPhrase(activationPhrase)) ||
-                  isSubmitting
-                }
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color={theme.colors.background} />
-                ) : (
-                  <Text style={styles.submitButtonText}>
-                    {editingTag ? 'Update' : 'Create'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading tags...</Text>
       </View>
     );
   }
 
-  const displayedTags = filteredAndSortedTags();
-
   return (
     <View style={styles.container}>
-      {/* Tag Type Toggle */}
+      {/* Header with toggle */}
       {renderTagTypeToggle()}
+
+      {/* Secret tags security controls */}
+      {activeTagType === 'secret' && (
+        <View style={styles.securitySection}>
+          <SecurityModeSelector
+            currentMode={securityMode}
+            onModeChange={handleSecurityModeChange}
+            disabled={isLoading || isRefreshing}
+          />
+          
+          <CacheStatusIndicator
+            cacheStatus={cacheStatus}
+            networkStatus={networkStatus}
+            onRefresh={loadTagStatus}
+            onClearCache={handleClearCache}
+            onSync={handleSync}
+            disabled={isLoading || isRefreshing}
+          />
+        </View>
+      )}
 
       {/* Statistics */}
       {renderTagStats()}
 
-      {/* Security Components for Secret Tags */}
-      {activeTagType === 'secret' && (
-        <View style={styles.securitySection}>
-          <TouchableOpacity
-            style={styles.securityHeader}
-            onPress={() => setShowSecurityModal(!showSecurityModal)}
-          >
-            <View style={styles.securityHeaderContent}>
-              <Ionicons name="shield-checkmark" size={20} color={theme.colors.primary} />
-              <Text style={styles.securityHeaderTitle}>Security Settings</Text>
-              <Text style={styles.securityHeaderSubtitle}>
-                {securityMode.charAt(0).toUpperCase() + securityMode.slice(1)} Mode
-              </Text>
-            </View>
-            <Ionicons 
-              name={showSecurityModal ? 'chevron-up' : 'chevron-down'} 
-              size={16} 
-              color={theme.colors.textSecondary} 
-            />
-          </TouchableOpacity>
-
-          {showSecurityModal && (
-            <View style={styles.securityContent}>
-              <SecurityModeSelector
-                currentMode={securityMode}
-                borderCrossingMode={borderCrossingMode}
-                onModeChange={handleSecurityModeChange}
-                onBorderCrossingToggle={handleBorderCrossingToggle}
-                disabled={isLoading || isRefreshing}
-              />
-              
-              <View style={styles.securityDivider} />
-              
-              <CacheStatusIndicator
-                cacheStatus={cacheStatus}
-                networkStatus={networkStatus}
-                onRefresh={loadHybridStatus}
-                onClearCache={handleClearCache}
-                onSync={handleSync}
-                disabled={isLoading || isRefreshing}
-              />
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Search and Controls */}
+      {/* Search and sort controls */}
       <View style={styles.controlsContainer}>
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
+            placeholder={`Search ${activeTagType} tags...`}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search tags..."
-            placeholderTextColor={theme.colors.textSecondary}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => setShowCreateModal(true)}
-        >
-          <Ionicons name="add" size={20} color={theme.colors.background} />
-          <Text style={styles.createButtonText}>Create</Text>
-        </TouchableOpacity>
+        <View style={styles.sortContainer}>
+          <Text style={styles.sortLabel}>Sort:</Text>
+          {(['name', 'usage', 'recent'] as const).map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={[
+                styles.sortButton,
+                sortBy === option && styles.activeSortButton
+              ]}
+              onPress={() => setSortBy(option)}
+            >
+              <Text style={[
+                styles.sortButtonText,
+                sortBy === option && styles.activeSortButtonText
+              ]}>
+                {option === 'name' ? 'Name' : option === 'usage' ? 'Usage' : 'Recent'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* Sort Options */}
-      <View style={styles.sortContainer}>
-        <Text style={styles.sortLabel}>Sort by:</Text>
-        {(['name', 'usage', 'recent'] as const).map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[
-              styles.sortOption,
-              sortBy === option && styles.activeSortOption
-            ]}
-            onPress={() => setSortBy(option)}
-          >
-            <Text style={[
-              styles.sortOptionText,
-              sortBy === option && styles.activeSortOptionText
-            ]}>
-              {option.charAt(0).toUpperCase() + option.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Tags List */}
+      {/* Tags list */}
       <ScrollView
-        style={styles.tagsContainer}
+        style={styles.tagsList}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -820,41 +621,174 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           />
         }
       >
-        {displayedTags.length === 0 ? (
+        {filteredAndSortedTags().map(renderTagCard)}
+        
+        {filteredAndSortedTags().length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons 
-              name={activeTagType === 'secret' ? 'shield-outline' : 'pricetag-outline'} 
-              size={64} 
-              color={theme.colors.textSecondary} 
+            <Ionicons
+              name={activeTagType === 'secret' ? 'shield-outline' : 'pricetag-outline'}
+              size={48}
+              color={theme.colors.textSecondary}
             />
-            <Text style={styles.emptyTitle}>
-              {searchQuery ? 'No matching tags' : `No ${activeTagType} tags yet`}
+            <Text style={styles.emptyStateTitle}>
+              No {activeTagType} tags {searchQuery ? 'found' : 'yet'}
             </Text>
-            <Text style={styles.emptyDescription}>
+            <Text style={styles.emptyStateMessage}>
               {searchQuery 
-                ? 'Try adjusting your search criteria'
-                : `Create your first ${activeTagType} tag to organize your journal entries`
+                ? `No tags match "${searchQuery}"`
+                : `Create your first ${activeTagType} tag to get started`
               }
             </Text>
-            {!searchQuery && (
-              <TouchableOpacity
-                style={styles.emptyActionButton}
-                onPress={() => setShowCreateModal(true)}
-              >
-                <Ionicons name="add-circle" size={20} color={theme.colors.background} />
-                <Text style={styles.emptyActionButtonText}>
-                  Create First {activeTagType === 'secret' ? 'Secret' : 'Regular'} Tag
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
-        ) : (
-          displayedTags.map(renderTagCard)
         )}
       </ScrollView>
 
+      {/* Create button */}
+      <TouchableOpacity
+        style={styles.createButton}
+        onPress={() => setShowCreateModal(true)}
+      >
+        <Ionicons name="add" size={24} color={theme.colors.background} />
+      </TouchableOpacity>
+
       {/* Create/Edit Modal */}
-      {renderTagModal()}
+      <Modal
+        visible={showCreateModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowCreateModal(false);
+          setEditingTag(null);
+          setTagName('');
+          setActivationPhrase('');
+          setTagColor('#007AFF');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingTag ? 'Edit' : 'Create'} {activeTagType === 'secret' ? 'Secret' : ''} Tag
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  setEditingTag(null);
+                  setTagName('');
+                  setActivationPhrase('');
+                  setTagColor('#007AFF');
+                }}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.formContainer}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Tag Name</Text>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    tagName && validateTagName(tagName) ? styles.textInputError : null
+                  ]}
+                  value={tagName}
+                  onChangeText={setTagName}
+                  placeholder="e.g., work, personal, ideas"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={50}
+                />
+                {tagName && validateTagName(tagName) && (
+                  <Text style={styles.errorText}>{validateTagName(tagName)}</Text>
+                )}
+              </View>
+
+              {activeTagType === 'secret' && (
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Activation Phrase</Text>
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      activationPhrase && validateActivationPhrase(activationPhrase) ? styles.textInputError : null
+                    ]}
+                    value={activationPhrase}
+                    onChangeText={setActivationPhrase}
+                    placeholder="e.g., activate work mode, private thoughts"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={100}
+                  />
+                  {activationPhrase && validateActivationPhrase(activationPhrase) && (
+                    <Text style={styles.errorText}>{validateActivationPhrase(activationPhrase)}</Text>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Color</Text>
+                <View style={styles.colorGrid}>
+                  {colorOptions.map((color) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[
+                        styles.colorOption,
+                        { backgroundColor: color },
+                        tagColor === color && styles.selectedColorOption,
+                      ]}
+                      onPress={() => setTagColor(color)}
+                    >
+                      {tagColor === color && (
+                        <Ionicons name="checkmark" size={16} color="white" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowCreateModal(false);
+                    setEditingTag(null);
+                    setTagName('');
+                    setActivationPhrase('');
+                    setTagColor('#007AFF');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.submitButton,
+                    ((!tagName.trim() || 
+                     !!validateTagName(tagName) || 
+                     (activeTagType === 'secret' && !!validateActivationPhrase(activationPhrase)) ||
+                     isSubmitting) ? styles.disabledButton : null)
+                  ]}
+                  onPress={handleSubmitTag}
+                  disabled={
+                    !tagName.trim() || 
+                    !!validateTagName(tagName) || 
+                    (activeTagType === 'secret' && !!validateActivationPhrase(activationPhrase)) ||
+                    isSubmitting
+                  }
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color={theme.colors.background} />
+                  ) : (
+                    <Text style={styles.submitButtonText}>
+                      {editingTag ? 'Update' : 'Create'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -864,24 +798,28 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  centerContent: {
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
   },
   loadingText: {
     marginTop: theme.spacing.md,
-    fontSize: theme.typography.fontSizes.md,
+    fontSize: theme.typography.fontSizes.lg,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
   },
-  
-  // Toggle
+
+  // Tag type toggle
   toggleContainer: {
     flexDirection: 'row',
-    margin: theme.spacing.lg,
-    backgroundColor: theme.colors.card,
-    borderRadius: 8,
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    borderRadius: 12,
     padding: theme.spacing.xs,
+    ...theme.shadows.sm,
   },
   toggleButton: {
     flex: 1,
@@ -889,13 +827,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: theme.spacing.sm,
-    borderRadius: 6,
-    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: 8,
   },
   activeToggleButton: {
     backgroundColor: theme.colors.primary,
   },
   toggleButtonText: {
+    marginLeft: theme.spacing.xs,
     fontSize: theme.typography.fontSizes.md,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.medium,
@@ -903,111 +842,99 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   activeToggleButtonText: {
     color: theme.colors.background,
   },
-  
+
+  // Security section
+  securitySection: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+  },
+
   // Statistics
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: theme.colors.card,
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
     borderRadius: 12,
+    padding: theme.spacing.lg,
     ...theme.shadows.sm,
   },
   statItem: {
+    flex: 1,
     alignItems: 'center',
   },
   statNumber: {
     fontSize: theme.typography.fontSizes.xl,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
-    fontFamily: theme.typography.fontFamilies.bold,
+    fontWeight: '600',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   statLabel: {
-    fontSize: theme.typography.fontSizes.sm,
+    fontSize: theme.typography.fontSizes.xs,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
     marginTop: theme.spacing.xs,
+    textAlign: 'center',
   },
-  
+
   // Controls
   controlsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
   },
   searchContainer: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    ...theme.shadows.sm,
   },
   searchInput: {
     flex: 1,
-    marginLeft: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
     fontSize: theme.typography.fontSizes.md,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.regular,
   },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: 8,
-    gap: theme.spacing.xs,
-  },
-  createButtonText: {
-    color: theme.colors.background,
-    fontSize: theme.typography.fontSizes.md,
-    fontWeight: '600',
-    fontFamily: theme.typography.fontFamilies.semiBold,
-  },
-  
-  // Sort Options
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    gap: theme.spacing.sm,
   },
   sortLabel: {
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.regular,
+    fontFamily: theme.typography.fontFamilies.medium,
+    marginRight: theme.spacing.sm,
   },
-  sortOption: {
-    paddingHorizontal: theme.spacing.md,
+  sortButton: {
+    paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
-    borderRadius: 16,
-    backgroundColor: theme.colors.card,
+    borderRadius: 6,
+    marginRight: theme.spacing.xs,
   },
-  activeSortOption: {
-    backgroundColor: theme.colors.primary,
+  activeSortButton: {
+    backgroundColor: theme.colors.primary + '20',
   },
-  sortOptionText: {
-    fontSize: theme.typography.fontSizes.sm,
+  sortButtonText: {
+    fontSize: theme.typography.fontSizes.xs,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.medium,
   },
-  activeSortOptionText: {
-    color: theme.colors.background,
+  activeSortButtonText: {
+    color: theme.colors.primary,
   },
-  
-  // Tags
-  tagsContainer: {
+
+  // Tags list
+  tagsList: {
     flex: 1,
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
   },
   tagCard: {
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
@@ -1025,131 +952,128 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   tagTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    flex: 1,
   },
   tagName: {
     fontSize: theme.typography.fontSizes.lg,
     fontWeight: '600',
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.semiBold,
+    marginLeft: theme.spacing.xs,
   },
   tagActions: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    alignItems: 'center',
   },
   actionButton: {
     padding: theme.spacing.sm,
-    borderRadius: 6,
-    backgroundColor: theme.colors.background,
+    marginLeft: theme.spacing.xs,
   },
   tagStats: {
     flexDirection: 'row',
-    gap: theme.spacing.lg,
+    alignItems: 'center',
   },
   tagStat: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.xs,
+    marginRight: theme.spacing.lg,
   },
   tagStatText: {
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
+    marginLeft: theme.spacing.xs,
   },
-  
-  // Empty State
+
+  // Empty state
   emptyState: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.xxxl,
-    paddingHorizontal: theme.spacing.lg,
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.xxl,
   },
-  emptyTitle: {
-    fontSize: theme.typography.fontSizes.xl,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.bold,
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
+  emptyStateTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    marginTop: theme.spacing.md,
+    textAlign: 'center',
   },
-  emptyDescription: {
+  emptyStateMessage: {
     fontSize: theme.typography.fontSizes.md,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
+    marginTop: theme.spacing.xs,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: theme.spacing.xl,
-  },
-  emptyActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary,
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderRadius: 8,
-    gap: theme.spacing.xs,
   },
-  emptyActionButtonText: {
-    color: theme.colors.background,
-    fontSize: theme.typography.fontSizes.md,
-    fontWeight: '600',
-    fontFamily: theme.typography.fontFamilies.semiBold,
+
+  // Create button
+  createButton: {
+    position: 'absolute',
+    bottom: theme.spacing.lg,
+    right: theme.spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.lg,
   },
-  
+
   // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.background,
-    borderRadius: 16,
-    padding: theme.spacing.lg,
-    width: '100%',
-    maxWidth: 400,
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.lg,
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: theme.typography.fontSizes.xl,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.bold,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   modalCloseButton: {
     padding: theme.spacing.sm,
   },
-  
-  // Form
   formContainer: {
-    maxHeight: 400,
+    padding: theme.spacing.lg,
   },
   inputContainer: {
     marginBottom: theme.spacing.lg,
   },
   inputLabel: {
     fontSize: theme.typography.fontSizes.md,
-    fontWeight: '600',
+    fontWeight: '500',
     color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.semiBold,
+    fontFamily: theme.typography.fontFamilies.medium,
     marginBottom: theme.spacing.sm,
   },
   textInput: {
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: 8,
-    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
     fontSize: theme.typography.fontSizes.md,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.regular,
-    backgroundColor: theme.colors.card,
+    backgroundColor: theme.colors.background,
   },
   textInputError: {
     borderColor: theme.colors.error,
@@ -1160,8 +1084,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
     marginTop: theme.spacing.xs,
   },
-  
-  // Color Selection
   colorGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1179,84 +1101,37 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   selectedColorOption: {
     borderColor: theme.colors.text,
   },
-  
-  // Modal Actions
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: theme.spacing.md,
     marginTop: theme.spacing.lg,
   },
   modalButton: {
     flex: 1,
-    padding: theme.spacing.md,
     borderRadius: 8,
+    paddingVertical: theme.spacing.md,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.textSecondary,
-  },
-  cancelButtonText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.typography.fontSizes.md,
-    fontWeight: '600',
-    fontFamily: theme.typography.fontFamilies.semiBold,
+    borderColor: theme.colors.border,
   },
   submitButton: {
     backgroundColor: theme.colors.primary,
   },
-  submitButtonText: {
-    color: theme.colors.background,
-    fontSize: theme.typography.fontSizes.md,
-    fontWeight: '600',
-    fontFamily: theme.typography.fontFamilies.semiBold,
-  },
   disabledButton: {
-    opacity: 0.5,
-  },
-  
-  // Security Components
-  securitySection: {
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    backgroundColor: theme.colors.card,
-    borderRadius: 12,
-    ...theme.shadows.sm,
-  },
-  securityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
-  },
-  securityHeaderContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  securityHeaderTitle: {
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: '600',
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-  },
-  securityHeaderSubtitle: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.regular,
-    marginLeft: 'auto',
-  },
-  securityContent: {
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  securityDivider: {
-    height: 1,
     backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.md,
+  },
+  cancelButtonText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.medium,
+  },
+  submitButtonText: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.background,
+    fontFamily: theme.typography.fontFamilies.medium,
   },
 });
 

@@ -2,7 +2,7 @@
  * Cache Status Indicator Component
  * 
  * Shows cache status, network connectivity, and sync information
- * for the hybrid secret tag system.
+ * for secret tags.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -20,8 +20,8 @@ import { AppTheme } from '../config/theme';
 import {
   CacheStatus,
   NetworkStatus,
-  secretTagManagerHybrid
-} from '../services/secretTagManagerHybrid';
+  tagManager
+} from '../services/tagManager';
 import logger from '../utils/logger';
 
 interface CacheStatusIndicatorProps {
@@ -66,7 +66,7 @@ const CacheStatusIndicator: React.FC<CacheStatusIndicatorProps> = ({
         };
       case 'offline':
         return {
-          icon: 'wifi-off' as const,
+          icon: 'cloud-offline' as const,
           color: theme.colors.error,
           text: 'Offline',
           description: 'No internet connection'

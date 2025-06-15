@@ -1,13 +1,16 @@
 /**
- * Secret Tag Manager V2 - Server-side Hash Verification
+ * Secret Tag Online Manager
  * 
- * This version uses server-side hash verification for improved security:
- * - Server stores salted Argon2 hashes of secret phrases
- * - Client never stores persistent secret tag metadata
- * - Device appears normal when inspected (no local secret data)
- * - Phrases only exist in memory when activated
+ * Server-side hash verification for maximum security.
  * 
- * Compatible with existing UI components.
+ * Features:
+ * - Server-only phrase verification using Argon2 hashes
+ * - No persistent local storage of secrets
+ * - Memory-only tag activation
+ * - Used in "Online Mode" for travel and high-security scenarios
+ * 
+ * Security: Device appears completely normal when inspected.
+ * No secret phrases or metadata stored locally.
  */
 
 import { secretTagHashService } from './secretTagHashService';
@@ -36,7 +39,7 @@ export interface SecretTagConfig {
   maxActiveTags: number;         // Max simultaneously active tags
 }
 
-class SecretTagManagerV2 {
+class SecretTagOnlineManager {
   // Memory-only state (never persisted)
   private activeTags: Set<string> = new Set(); // Active tag IDs
   private activeTagNames: Map<string, string> = new Map(); // tagId -> tagName
@@ -393,4 +396,4 @@ class SecretTagManagerV2 {
 }
 
 // Export singleton instance
-export const secretTagManagerV2 = new SecretTagManagerV2(); 
+export const secretTagOnlineManager = new SecretTagOnlineManager(); 

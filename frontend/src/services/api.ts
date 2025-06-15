@@ -513,6 +513,15 @@ export const TagsAPI = {
   getTags: () => api.get('/api/journals/tags'),
   
   getEntriesByTag: (tagName: string) => api.get(`/api/journals/tags/${tagName}/entries`),
+  
+  createTag: (data: { name: string; color?: string }) => 
+    api.post('/api/journals/tags', data),
+  
+  updateTag: (id: string, data: Partial<{ name: string; color: string }>) => 
+    api.put(`/api/journals/tags/${id}`, data),
+  
+  deleteTag: (id: string) => 
+    api.delete(`/api/journals/tags/${id}`),
 };
 
 // Audio transcription

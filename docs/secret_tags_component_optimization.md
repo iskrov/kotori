@@ -285,11 +285,11 @@ class SecretTagManagerWrapper {
 - [ ] **Security**: Successful security audits
 - [ ] **Compatibility**: Cross-platform functionality validation
 
-## Unified Tag Management Interface
+## Tag Management Interface
 
-### TagManagementScreen.tsx (New Unified Interface)
+### TagManagementScreen.tsx (Main Tag Interface)
 
-**Purpose**: Replace the separate `SecretTagManagerScreen` with a unified interface that manages both regular and secret tags from a single screen while preserving their distinct relationship models.
+**Purpose**: Replace the separate `SecretTagManagerScreen` with a tag management interface that manages both regular and secret tags from a single screen while preserving their distinct relationship models.
 
 ```typescript
 interface TagManagementScreenProps {
@@ -321,28 +321,38 @@ interface TagManagementState {
 2. **Regular Tags Tab**: Many-to-many tag management 
 3. **Secret Tags Tab**: One-to-many hybrid secret tag management
 
-### RegularTagsManager.tsx (New Component)
+### TagsManager.tsx (Main Tags Component)
 
-**Purpose**: Manage regular tags with many-to-many relationships to journal entries.
+**Purpose**: Manage all tags in a unified interface with toggle between regular and secret tag modes.
 
 ```typescript
-interface RegularTagsManagerProps {
-  tags: RegularTag[];
-  usageStats: TagUsageStatistics;
-  onTagCreate: (name: string, color?: string) => Promise<void>;
-  onTagEdit: (tag: RegularTag) => Promise<void>;
-  onTagDelete: (tagId: string) => Promise<void>;
-  onTagMerge: (sourceId: string, targetId: string) => Promise<void>;
+interface TagsManagerProps {
+  // Regular tags (many-to-many)
+  regularTags: RegularTag[];
+  onRegularTagCreate: (name: string, color?: string) => Promise<void>;
+  onRegularTagEdit: (tag: RegularTag) => Promise<void>;
+  onRegularTagDelete: (tagId: string) => Promise<void>;
+  onRegularTagMerge: (sourceId: string, targetId: string) => Promise<void>;
+  
+  // Secret tags (one-to-many)
+  secretTags: SecretTag[];
+  hybridManager: SecretTagManagerHybrid;
+  
+  // Interface state
+  activeTagType: 'regular' | 'secret';
+  onTagTypeChange: (type: 'regular' | 'secret') => void;
 }
 ```
 
 **Features**:
-- Full CRUD operations for regular tags
+- Toggle between regular and secret tag management
+- Full CRUD operations for regular tags (many-to-many)
+- Integrated secret tag management (one-to-many) 
 - Tag usage statistics and analytics
 - Color customization and organization
 - Tag merging for duplicate management
-- Bulk operations (delete, merge, organize)
-- Search and filter capabilities
+- Unified search and filter capabilities
+- Context-aware security controls for secret tags
 
 ### Relationship Model Preservation
 
@@ -360,11 +370,11 @@ secret_tags → journal_entries (secret_tag_id)
 -- One secret tag per entry, multiple entries per secret tag
 ```
 
-**Benefits of Unified Interface**:
+**Benefits of Integrated Interface**:
 - Single location for all tag management
 - Consistent user experience across tag types
 - Shared components and styling patterns
 - Integrated security controls for secret tags
 - Overview of entire tag ecosystem
 
-This component optimization plan ensures that the existing secret tag system evolves smoothly into the hybrid architecture while maintaining the user-friendly experience and adding powerful new context-aware security features. 
+This component optimization plan ensures that the existing secret tag system evolves smoothly into the hybrid architecture while maintaining the user-friendly experience and adding powerful new context-aware security features. The clean "tags" naming keeps the interface intuitive while providing advanced privacy capabilities when needed. 

@@ -7,7 +7,7 @@
 
 import { JournalAPI } from './api';
 import { zeroKnowledgeEncryption } from './zeroKnowledgeEncryption';
-import { secretTagManager } from './secretTagManager';
+import { tagManager } from './tagManager';
 import logger from '../utils/logger';
 
 export interface JournalEntryData {
@@ -46,12 +46,12 @@ class EncryptedJournalService {
     }
 
     try {
-      const detection = await secretTagManager.checkForSecretTagPhrases(content);
+      const detection = await tagManager.checkForSecretTagPhrases(content);
       if (detection.found && detection.tagId && detection.action === 'activate') {
         logger.info(`Secret tag activation phrase detected in content for tag: ${detection.tagName} (${detection.tagId})`);
         
         // Activate the tag
-        await secretTagManager.activateSecretTag(detection.tagId);
+        await tagManager.activateSecretTag(detection.tagId);
         
         // Clean the activation phrase from the content
         let cleanedContent = content;
@@ -149,9 +149,9 @@ class EncryptedJournalService {
       );
       
       // Get server-side tag hashes for this tag
-      const activeTagHashes = await secretTagManager.getActiveTagHashes();
-      const secretTags = await secretTagManager.getAllSecretTags();
-      const targetTag = secretTags.find(tag => tag.id === secretTagId);
+      const activeTagHashes = await tagManager.getActiveSecretTags();
+      const secretTags = await tagManager.getSecretTags();
+      const targetTag = secretTags.find((tag: any) => tag.id === secretTagId);
       
       if (!targetTag) {
         throw new Error(`Secret tag not found: ${secretTagId}`);
@@ -170,7 +170,7 @@ class EncryptedJournalService {
         tags: entryData.tags || [],
         wrapIv: encrypted.wrapIv,
         secret_tag_id: secretTagId,
-        secret_tag_hash: targetTag.serverTagHash,
+        secret_tag_hash: targetTag.id,
       });
       
       logger.info(`Created secret tag journal entry with tag: ${secretTagId}`);
@@ -196,8 +196,8 @@ class EncryptedJournalService {
   ): Promise<JournalEntryData> {
     try {
       // Get server-side tag hashes for this tag
-      const secretTags = await secretTagManager.getAllSecretTags();
-      const targetTag = secretTags.find(tag => tag.id === secretTagId);
+      const secretTags = await tagManager.getSecretTags();
+      const targetTag = secretTags.find((tag: any) => tag.id === secretTagId);
       
       if (!targetTag) {
         throw new Error(`Secret tag not found: ${secretTagId}`);
@@ -211,7 +211,7 @@ class EncryptedJournalService {
         audio_url: entryData.audio_url,
         tags: entryData.tags || [],
         secret_tag_id: secretTagId,
-        secret_tag_hash: targetTag.serverTagHash,
+        secret_tag_hash: targetTag.id,
       });
       
       logger.info(`Created secret tag journal entry (unencrypted) with tag: ${secretTagId}`);
@@ -237,8 +237,9 @@ class EncryptedJournalService {
     includeAllSecretTags?: boolean;
   } = {}): Promise<JournalEntryData[]> {
     try {
-      // Get active tag hashes for server-side filtering
-      const activeTagHashes = await secretTagManager.getActiveTagHashes();
+      // Get active secret tags for server-side filtering
+      const activeTags = await tagManager.getActiveSecretTags();
+      const activeTagHashes = activeTags.map((tag: any) => tag.id);
       
       // Fetch entries with secret tag filtering
       const response = await JournalAPI.getEntries({
@@ -279,13 +280,17 @@ class EncryptedJournalService {
    * Process entries: filter based on active secret tags and decrypt if necessary
    */
   private async processEntries(entries: any[]): Promise<JournalEntryData[]> {
-    // Filter entries based on active secret tags
-    const filteredEntries = secretTagManager.filterEntriesByActiveTags(entries);
+    // Filter entries based on active secret tags - for now just return all entries
+    // TODO: Implement filtering logic in tagManager
+    const filteredEntries = entries;
     
     // Decrypt secret tag entries if we have the keys loaded
+    const activeTags = await tagManager.getActiveSecretTags();
+    const activeTagIds = activeTags.map((tag: any) => tag.id);
+    
     const processedEntries = await Promise.all(
-      filteredEntries.map(async (entry) => {
-        if (entry.secret_tag_id && secretTagManager.isSecretTagActive(entry.secret_tag_id)) {
+      filteredEntries.map(async (entry: any) => {
+        if (entry.secret_tag_id && activeTagIds.includes(entry.secret_tag_id)) {
           return this.decryptSecretTagEntry(entry);
         }
         return entry;
@@ -352,7 +357,8 @@ class EncryptedJournalService {
   async searchEntries(query: string): Promise<JournalEntryData[]> {
     try {
       // Get active tag hashes for filtering
-      const activeTagHashes = await secretTagManager.getActiveTagHashes();
+      const activeTags = await tagManager.getActiveSecretTags();
+      const activeTagHashes = activeTags.map((tag: any) => tag.id);
       
       const response = await JournalAPI.searchEntries(query, {
         secret_tag_hashes: activeTagHashes,
@@ -383,8 +389,8 @@ class EncryptedJournalService {
           logger.info(`Secret phrase detected during update. Encrypting entry ${id} with tag ${detectedTagId}.`);
           
           const encrypted = await zeroKnowledgeEncryption.encryptEntryWithSecretPhrase(processedContent, detectedTagId);
-          const secretTags = await secretTagManager.getAllSecretTags();
-          const targetTag = secretTags.find(tag => tag.id === detectedTagId);
+          const secretTags = await tagManager.getSecretTags();
+          const targetTag = secretTags.find((tag: any) => tag.id === detectedTagId);
 
           if (!targetTag) {
             throw new Error(`Secret tag not found: ${detectedTagId}`);
@@ -400,7 +406,7 @@ class EncryptedJournalService {
             algorithm: encrypted.algorithm,
             wrapIv: encrypted.wrapIv,
             secret_tag_id: detectedTagId,
-            secret_tag_hash: targetTag.serverTagHash,
+            secret_tag_hash: targetTag.id,
           };
           
           const response = await JournalAPI.updateEntry(id, encryptedUpdatePayload);

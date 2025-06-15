@@ -2,7 +2,8 @@ import React, { useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useAudioRecorderLogic } from '../hooks/useAudioRecorderLogic';
 import AudioRecorderUI from './AudioRecorderUI';
-import { secretTagManager, TagDetectionResult } from '../services/secretTagManager';
+import { tagManager } from '../services/tagManager';
+import { TagDetectionResult } from '../services/secretTagOnlineManager';
 import logger from '../utils/logger';
 import speechToTextService from '../services/speechToText';
 
@@ -72,16 +73,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           return null;
         }
         const { transcript } = result;
-        const detectionResult: TagDetectionResult = await secretTagManager.checkForSecretTagPhrases(transcript);
+        const detectionResult: TagDetectionResult = await tagManager.checkForSecretTagPhrases(transcript);
         if (detectionResult.found) {
           logger.info(`Secret tag phrase detected: ${detectionResult.tagName} (${detectionResult.action})`);
-          await secretTagManager.handleSecretTagAction(detectionResult);
-          if (secretTagManager.shouldTreatAsSecretTagCommand(transcript, detectionResult)) {
-            logger.info('[processSegment] Transcript was a secret tag command. Halting processing.');
-            cleanupAudioFile(audioUri);
-            onCommandDetected?.();
-            return null;
+          // Handle secret tag activation/deactivation
+          if (detectionResult.action === 'activate' && detectionResult.tagId) {
+            await tagManager.activateSecretTag(detectionResult.tagId);
+          } else if (detectionResult.action === 'deactivate' && detectionResult.tagId) {
+            await tagManager.deactivateSecretTag(detectionResult.tagId);
           }
+          // Treat secret tag phrases as commands (don't add to transcript)
+          logger.info('[processSegment] Transcript was a secret tag command. Halting processing.');
+          cleanupAudioFile(audioUri);
+          onCommandDetected?.();
+          return null;
         }
         analyzeTranscriptionQuality(result);
         cleanupAudioFile(audioUri);

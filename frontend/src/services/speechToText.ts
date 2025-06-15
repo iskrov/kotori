@@ -6,7 +6,7 @@ import { api as axiosInstance } from './api';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { validateLanguageCode } from '../config/languageConfig';
-import { secretTagManager } from './secretTagManager';
+import { tagManager } from './tagManager';
 
 // Enhanced types for multi-language transcription
 interface TranscriptionResult {
@@ -287,18 +287,18 @@ class SpeechToTextService {
       try {
         logger.info(`[Secret Tag Detection] Starting detection for transcript: "${processedResult.transcript}"`);
         
-        // Verify secret tag manager is initialized
-        await secretTagManager.initialize();
+        // Verify tag manager is initialized
+        await tagManager.initialize();
         
         // Get all secret tags to debug
-        const allTags = await secretTagManager.getAllSecretTags();
+        const allTags = await tagManager.getSecretTags();
         logger.info(`[Secret Tag Detection] Found ${allTags.length} secret tags in storage`);
         
         if (allTags.length > 0) {
-          logger.info(`[Secret Tag Detection] Secret tag names: ${allTags.map(t => t.name).join(', ')}`);
+          logger.info(`[Secret Tag Detection] Secret tag names: ${allTags.map((t: any) => t.name).join(', ')}`);
         }
         
-        const tagDetection = await secretTagManager.checkForSecretTagPhrases(processedResult.transcript);
+        const tagDetection = await tagManager.checkForSecretTagPhrases(processedResult.transcript);
         processedResult.secret_tag_detected = tagDetection;
         
         logger.info(`[Secret Tag Detection] Detection result:`, tagDetection);
@@ -346,16 +346,16 @@ class SpeechToTextService {
       if (detection.action === 'panic') {
         // Handle panic mode
         logger.warn('Panic mode detected - initiating secure deletion');
-        await secretTagManager.activatePanicMode();
+        await tagManager.clearSecretCache();
         return;
       }
 
       if (detection.tagId) {
         if (detection.action === 'activate') {
-          await secretTagManager.activateSecretTag(detection.tagId);
+          await tagManager.activateSecretTag(detection.tagId);
           logger.info(`Secret tag activated: ${detection.tagName}`);
         } else if (detection.action === 'deactivate') {
-          await secretTagManager.deactivateSecretTag(detection.tagId);
+          await tagManager.deactivateSecretTag(detection.tagId);
           logger.info(`Secret tag deactivated: ${detection.tagName}`);
         }
       }

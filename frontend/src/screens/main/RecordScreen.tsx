@@ -25,7 +25,8 @@ import useJournalEntry from '../../hooks/useJournalEntry'; // Removed JournalDat
 import { getLanguageName } from '../../config/languageConfig';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { secretTagManager, SecretTag } from '../../services/secretTagManager';
+import { tagManager } from '../../services/tagManager';
+import { SecretTagV2 } from '../../services/secretTagOnlineManager';
 
 // Utils
 import logger from '../../utils/logger';
@@ -75,7 +76,7 @@ const RecordScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showRecorder, setShowRecorder] = useState(true); // Start with recorder visible
   const [hasStartedSaving, setHasStartedSaving] = useState(false);
-  const [activeTags, setActiveTags] = useState<SecretTag[]>([]);
+  const [activeTags, setActiveTags] = useState<SecretTagV2[]>([]);
   const [recorderState, setRecorderState] = useState('idle');
   
   // Data states for saving the entry
@@ -151,7 +152,7 @@ const RecordScreen: React.FC = () => {
   useEffect(() => {
     const loadActiveTags = async () => {
       try {
-        const activeTagsList = await secretTagManager.getActiveSecretTags();
+        const activeTagsList = await tagManager.getActiveSecretTags();
         setActiveTags(activeTagsList);
       } catch (error) {
         logger.error('Failed to load active secret tags:', error);
@@ -342,7 +343,7 @@ const RecordScreen: React.FC = () => {
             {/* Secret Tag Floating Indicator */}
             <SecretTagFloatingIndicator
               activeTags={activeTags}
-              onPress={() => navigation.navigate('SecretTagManager')}
+              onPress={() => navigation.navigate('TagManagement')}
             />
           </View>
         </View>

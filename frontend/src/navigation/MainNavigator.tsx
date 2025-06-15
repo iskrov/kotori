@@ -2,7 +2,7 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import MainTabNavigator from './MainTabNavigator';
 import RecordScreen from '../screens/main/RecordScreen';
-import SecretTagManagerScreen from '../screens/main/SecretTagManagerScreen';
+import TagManagementScreen from '../screens/main/TagManagementScreen';
 import { MainStackParamList } from './types';
 
 const Stack = createStackNavigator<MainStackParamList>();
@@ -28,10 +28,9 @@ const MainNavigator = () => {
         }}
       />
       <Stack.Screen
-        name="SecretTagManager"
-        component={SecretTagManagerScreen}
+        name="TagManagement"
+        component={TagManagementScreen}
         options={{
-          
           presentation: 'modal',
           headerShown: false,
         }}

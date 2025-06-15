@@ -17,7 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { SecretTag } from '../services/secretTagManager';
+import { SecretTag } from '../services/secretTagOfflineManager';
 import logger from '../utils/logger';
 
 // Helper to determine if native driver should be used

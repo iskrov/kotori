@@ -18,7 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { secretTagManager } from '../services/secretTagManager';
+import { tagManager } from '../services/tagManager';
 import logger from '../utils/logger';
 
 interface SecretTagSetupProps {
@@ -126,7 +126,7 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
 
     try {
       // Create the secret tag
-      const tagId = await secretTagManager.createSecretTag(
+      const tagId = await tagManager.createSecretTag(
         tagName.trim(),
         activationPhrase.trim(),
         selectedColor

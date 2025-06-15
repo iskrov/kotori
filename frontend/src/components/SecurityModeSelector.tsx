@@ -1,8 +1,7 @@
 /**
  * Security Mode Selector Component
  * 
- * Allows users to quickly switch between security modes and activate
- * border crossing mode for travel scenarios.
+ * Allows users to switch between online and offline modes for secret tags.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -17,14 +16,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { SecurityMode, secretTagManagerHybrid } from '../services/secretTagManagerHybrid';
+import { SecurityMode, tagManager } from '../services/tagManager';
 import logger from '../utils/logger';
 
 interface SecurityModeSelectorProps {
   currentMode: SecurityMode;
-  borderCrossingMode: boolean;
   onModeChange: (mode: SecurityMode) => Promise<void>;
-  onBorderCrossingToggle: (enabled: boolean) => Promise<void>;
   disabled?: boolean;
 }
 
@@ -40,9 +37,7 @@ interface SecurityModeInfo {
 
 const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
   currentMode,
-  borderCrossingMode,
   onModeChange,
-  onBorderCrossingToggle,
   disabled = false
 }) => {
   const { theme } = useAppTheme();
@@ -51,60 +46,41 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
 
   const securityModes: SecurityModeInfo[] = [
     {
-      mode: 'maximum',
-      title: 'Maximum Security',
-      description: 'Server-only, no caching',
-      icon: 'shield',
-      color: '#FF3B30',
+      mode: 'online',
+      title: 'Online Mode',
+      description: 'Server-only, no secrets on device',
+      icon: 'cloud',
+      color: '#007AFF',
       features: [
-        'No local data storage',
+        'No local secret storage',
         'Server-only verification',
-        'Instant cache clearing',
-        'Maximum privacy protection'
+        'Maximum privacy protection',
+        'Device appears normal'
       ],
       useCases: [
-        'Border crossings',
-        'High-risk travel',
+        'Travel scenarios',
         'Shared devices',
-        'Maximum privacy scenarios'
+        'High-security environments',
+        'Border crossings'
       ]
     },
     {
-      mode: 'balanced',
-      title: 'Balanced Security',
-      description: 'Server-first with cache fallback',
+      mode: 'offline',
+      title: 'Offline Mode',
+      description: 'Cached secrets for offline access',
       icon: 'shield-checkmark',
-      color: '#007AFF',
+      color: '#34C759',
       features: [
-        'Server verification priority',
-        'Cache fallback when offline',
-        'Automatic sync',
-        'Good privacy & usability balance'
+        'Offline access available',
+        'Cache-first verification',
+        'Background sync',
+        'Convenient daily use'
       ],
       useCases: [
         'Daily use',
-        'Home & office',
-        'Reliable network areas',
-        'Most users'
-      ]
-    },
-    {
-      mode: 'convenience',
-      title: 'Convenience Mode',
-      description: 'Cache-first with server sync',
-      icon: 'checkmark-circle',
-      color: '#34C759',
-      features: [
-        'Fast offline access',
-        'Cache-first verification',
-        'Background sync',
-        'Maximum convenience'
-      ],
-      useCases: [
-        'Frequent travel',
         'Poor connectivity areas',
-        'Offline-first usage',
-        'Performance priority'
+        'Frequent offline usage',
+        'Most users'
       ]
     }
   ];
@@ -143,68 +119,7 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
     );
   }, [currentMode, disabled, isChanging, onModeChange, securityModes]);
 
-  /**
-   * Handle border crossing mode toggle
-   */
-  const handleBorderCrossingToggle = useCallback(async () => {
-    if (disabled || isChanging) return;
 
-    if (!borderCrossingMode) {
-      // Activating border crossing mode
-      Alert.alert(
-        'Enable Border Crossing Mode?',
-        'This will:\n\n• Switch to Maximum Security mode\n• Clear all cached data\n• Disable offline access\n\nYour device will appear completely normal if inspected.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Enable',
-            style: 'destructive',
-            onPress: async () => {
-              setIsChanging(true);
-              try {
-                await onBorderCrossingToggle(true);
-                logger.info('Border crossing mode enabled');
-                Alert.alert(
-                  'Border Crossing Mode Active',
-                  'Cache cleared and maximum security enabled. Your device now appears normal.',
-                  [{ text: 'OK' }]
-                );
-              } catch (error) {
-                logger.error('Failed to enable border crossing mode:', error);
-                Alert.alert('Error', 'Failed to enable border crossing mode');
-              } finally {
-                setIsChanging(false);
-              }
-            }
-          }
-        ]
-      );
-    } else {
-      // Disabling border crossing mode
-      Alert.alert(
-        'Disable Border Crossing Mode?',
-        'This will restore balanced security settings and re-enable caching.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Disable',
-            onPress: async () => {
-              setIsChanging(true);
-              try {
-                await onBorderCrossingToggle(false);
-                logger.info('Border crossing mode disabled');
-              } catch (error) {
-                logger.error('Failed to disable border crossing mode:', error);
-                Alert.alert('Error', 'Failed to disable border crossing mode');
-              } finally {
-                setIsChanging(false);
-              }
-            }
-          }
-        ]
-      );
-    }
-  }, [borderCrossingMode, disabled, isChanging, onBorderCrossingToggle]);
 
   /**
    * Render security mode card
@@ -281,49 +196,7 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
         </Text>
       </View>
 
-      {/* Border Crossing Mode */}
-      <TouchableOpacity
-        style={[
-          styles.borderCrossingCard,
-          borderCrossingMode && styles.activeBorderCrossingCard,
-          disabled && styles.disabledCard
-        ]}
-        onPress={handleBorderCrossingToggle}
-        disabled={disabled || isChanging}
-        accessibilityLabel="Border crossing mode toggle"
-        accessibilityRole="button"
-      >
-        <View style={styles.borderCrossingContent}>
-          <View style={styles.borderCrossingIcon}>
-            {isChanging ? (
-              <ActivityIndicator size="small" color={theme.colors.background} />
-            ) : (
-              <Ionicons 
-                name={borderCrossingMode ? 'airplane' : 'airplane-outline'} 
-                size={20} 
-                color={borderCrossingMode ? theme.colors.background : theme.colors.error} 
-              />
-            )}
-          </View>
-          <View style={styles.borderCrossingText}>
-            <Text style={[
-              styles.borderCrossingTitle,
-              borderCrossingMode && styles.activeBorderCrossingTitle
-            ]}>
-              Border Crossing Mode
-            </Text>
-            <Text style={[
-              styles.borderCrossingSubtitle,
-              borderCrossingMode && styles.activeBorderCrossingSubtitle
-            ]}>
-              {borderCrossingMode 
-                ? 'Maximum security active • Cache cleared'
-                : 'Tap to clear cache and maximize security'
-              }
-            </Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+
 
       {/* Security Modes */}
       <View style={styles.modesContainer}>
@@ -334,10 +207,7 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
       <View style={styles.statusContainer}>
         <Text style={styles.statusTitle}>Current Status</Text>
         <Text style={styles.statusText}>
-          {borderCrossingMode 
-            ? 'Border crossing mode active with maximum security'
-            : `${securityModes.find(m => m.mode === currentMode)?.title} mode active`
-          }
+          {`${securityModes.find(m => m.mode === currentMode)?.title} active`}
         </Text>
       </View>
     </View>
@@ -366,54 +236,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
   },
   
-  // Border Crossing Mode
-  borderCrossingCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 12,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    ...theme.shadows.sm,
-  },
-  activeBorderCrossingCard: {
-    backgroundColor: theme.colors.error,
-    borderColor: theme.colors.error,
-  },
-  borderCrossingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  borderCrossingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.error + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  borderCrossingText: {
-    flex: 1,
-  },
-  borderCrossingTitle: {
-    fontSize: theme.typography.fontSizes.lg,
-    fontWeight: '600',
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-  },
-  activeBorderCrossingTitle: {
-    color: theme.colors.background,
-  },
-  borderCrossingSubtitle: {
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.regular,
-    marginTop: theme.spacing.xs,
-  },
-  activeBorderCrossingSubtitle: {
-    color: theme.colors.background + 'CC',
-  },
+
   
   // Security Modes
   modesContainer: {

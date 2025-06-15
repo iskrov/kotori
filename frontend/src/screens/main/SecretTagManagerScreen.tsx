@@ -22,7 +22,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import { MainStackParamList } from '../../navigation/types';
-import { secretTagManager, SecretTag } from '../../services/secretTagManager';
+import { tagManager } from '../../services/tagManager';
+import { SecretTagV2 } from '../../services/secretTagOnlineManager';
 import SecretTagCard from '../../components/SecretTagCard';
 import SecretTagIndicator from '../../components/SecretTagIndicator';
 import SecretTagSetup from '../../components/SecretTagSetup';
@@ -35,12 +36,12 @@ const SecretTagManagerScreen: React.FC = () => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
 
-  const [secretTags, setSecretTags] = useState<SecretTag[]>([]);
-  const [activeTags, setActiveTags] = useState<SecretTag[]>([]);
+  const [secretTags, setSecretTags] = useState<SecretTagV2[]>([]);
+  const [activeTags, setActiveTags] = useState<SecretTagV2[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingTag, setEditingTag] = useState<SecretTag | null>(null);
+  const [editingTag, setEditingTag] = useState<SecretTagV2 | null>(null);
 
   /**
    * Load secret tags from storage
@@ -48,8 +49,8 @@ const SecretTagManagerScreen: React.FC = () => {
   const loadSecretTags = useCallback(async () => {
     try {
       const [allTags, activeTagsList] = await Promise.all([
-        secretTagManager.getAllSecretTags(),
-        secretTagManager.getActiveSecretTags(),
+        tagManager.getSecretTags(),
+        tagManager.getActiveSecretTags(),
       ]);
       
       setSecretTags(allTags);

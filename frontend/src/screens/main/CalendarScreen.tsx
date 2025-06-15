@@ -22,7 +22,7 @@ import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
-import { secretTagManager } from '../../services/secretTagManager';
+import { tagManager } from '../../services/tagManager';
 import { AppTheme } from '../../config/theme';
 
 type CalendarScreenNavigationProp = CompositeNavigationProp<
@@ -44,8 +44,9 @@ const CalendarScreen = () => {
   
   // Check for active secret tags
   useEffect(() => {
-    const checkActiveSecretTags = () => {
-      setHasActiveSecretTags(secretTagManager.hasActiveSecretTags());
+    const checkActiveSecretTags = async () => {
+      const activeTags = await tagManager.getActiveSecretTags();
+      setHasActiveSecretTags(activeTags.length > 0);
     };
     
     checkActiveSecretTags();
@@ -56,8 +57,8 @@ const CalendarScreen = () => {
   }, []);
   
   const visibleEntries = useMemo(() => {
-    // Filter entries based on active secret tags
-    return secretTagManager.filterEntriesByActiveTags(allEntries);
+    // For now, return all entries - filtering will happen server-side
+    return allEntries;
   }, [allEntries, hasActiveSecretTags]);
   
   useFocusEffect(
@@ -95,13 +96,9 @@ const CalendarScreen = () => {
     try {
       setIsLoading(true);
       
-      // Get active secret tag hashes for filtering
-      const activeTagHashes = await secretTagManager.getActiveTagHashes();
-      
       // Fetch all entries for date indicators in the calendar
       const allEntriesResponse = await JournalAPI.getEntries({
         limit: 100,  // Fetch more entries to show indicators properly
-        secret_tag_hashes: activeTagHashes,
         include_public: true
       });
       const entries = Array.isArray(allEntriesResponse.data) 
@@ -125,21 +122,17 @@ const CalendarScreen = () => {
       // Format date as YYYY-MM-DD for API query
       const formattedDate = format(date, 'yyyy-MM-dd');
       
-      // Get active secret tag hashes for filtering
-      const activeTagHashes = await secretTagManager.getActiveTagHashes();
-      
       // Use start_date and end_date parameters to filter by exact date
       const response = await JournalAPI.getEntries({
         // Filter by the specific date using both start_date and end_date
         start_date: formattedDate,
         end_date: formattedDate,
-        secret_tag_hashes: activeTagHashes,
         include_public: true
       });
       
-      // Filter entries based on active secret tags (additional client-side filtering)
+      // Use entries as-is (server-side filtering handles secret tags)
       const entries = response.data as JournalEntry[];
-      const filtered = secretTagManager.filterEntriesByActiveTags(entries);
+      const filtered = entries;
       
       setFilteredEntriesForSelectedDate(filtered);
     } catch (error) {
@@ -176,7 +169,7 @@ const CalendarScreen = () => {
   const handleEntryPress = (entry: JournalEntry) => {
     navigation.navigate('Journal', { 
       screen: 'JournalEntryDetail', 
-      params: { entryId: entry.id } 
+      params: { entryId: String(entry.id) } 
     });
   };
   

@@ -1,24 +1,20 @@
 /**
- * Secret Tag Manager Hybrid
+ * Tag Manager
  * 
- * Combines the best of both V1 and V2 implementations:
- * - V2's server-side hash verification as core engine
- * - V1's secure caching as optional offline layer
- * - User-controlled security modes for different contexts
- * - Graceful network degradation with fallback strategies
- * 
- * Security Modes:
- * - Maximum: Server-only, no caching (travel/border crossing)
- * - Balanced: Server-first with cache fallback (daily use)  
- * - Convenience: Cache-first with server sync (offline priority)
+ * Unified manager for both regular and secret tags with two operation modes:
+ * - Online mode: Server-only verification, no secrets cached on device
+ * - Offline mode: Cached secrets for offline access
+ * - Automatic network-aware fallback strategies
  */
 
 import NetInfo from '@react-native-community/netinfo';
-import { secretTagManagerV2, SecretTagV2, TagDetectionResult } from './secretTagManagerV2';
-import { secretTagManager, SecretTag } from './secretTagManager';
+import { secretTagOnlineManager, SecretTagV2, TagDetectionResult } from './secretTagOnlineManager';
+import { secretTagOfflineManager, SecretTag } from './secretTagOfflineManager';
+import { TagsAPI } from './api';
+import { Tag } from '../types';
 import logger from '../utils/logger';
 
-export type SecurityMode = 'maximum' | 'balanced' | 'convenience';
+export type SecurityMode = 'online' | 'offline';
 export type NetworkStatus = 'online' | 'offline' | 'poor' | 'unknown';
 
 export interface CacheStatus {
@@ -29,16 +25,15 @@ export interface CacheStatus {
   integrity: 'valid' | 'corrupted' | 'unknown';
 }
 
-export interface HybridTagConfig {
+export interface TagConfig {
   securityMode: SecurityMode;
   cacheEnabled: boolean;
   autoSyncInterval: number;     // Minutes between auto-sync
-  borderCrossingMode: boolean;  // Quick disable for travel
   maxCacheAge: number;          // Hours before cache expires
   syncOnForeground: boolean;    // Sync when app becomes active
 }
 
-interface VerificationStrategy {
+interface SecretTagStrategy {
   verifyPhrase(phrase: string): Promise<TagDetectionResult>;
   getAllTags(): Promise<SecretTagV2[]>;
   createTag(name: string, phrase: string, colorCode?: string): Promise<string>;
@@ -47,37 +42,37 @@ interface VerificationStrategy {
   deactivateTag(tagId: string): Promise<void>;
 }
 
-class ServerOnlyStrategy implements VerificationStrategy {
+class ServerOnlyStrategy implements SecretTagStrategy {
   async verifyPhrase(phrase: string): Promise<TagDetectionResult> {
-    return await secretTagManagerV2.checkForSecretTagPhrases(phrase);
+    return await secretTagOnlineManager.checkForSecretTagPhrases(phrase);
   }
 
   async getAllTags(): Promise<SecretTagV2[]> {
-    return await secretTagManagerV2.getAllSecretTags();
+    return await secretTagOnlineManager.getAllSecretTags();
   }
 
   async createTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
-    return await secretTagManagerV2.createSecretTag(name, phrase, colorCode);
+    return await secretTagOnlineManager.createSecretTag(name, phrase, colorCode);
   }
 
   async deleteTag(tagId: string): Promise<void> {
-    return await secretTagManagerV2.deleteSecretTag(tagId);
+    return await secretTagOnlineManager.deleteSecretTag(tagId);
   }
 
   async activateTag(tagId: string): Promise<void> {
-    return await secretTagManagerV2.activateSecretTag(tagId);
+    return await secretTagOnlineManager.activateSecretTag(tagId);
   }
 
   async deactivateTag(tagId: string): Promise<void> {
-    return await secretTagManagerV2.deactivateSecretTag(tagId);
+    return await secretTagOnlineManager.deactivateSecretTag(tagId);
   }
 }
 
-class CacheFirstStrategy implements VerificationStrategy {
+class CacheFirstStrategy implements SecretTagStrategy {
   async verifyPhrase(phrase: string): Promise<TagDetectionResult> {
     try {
       // Try cache first
-      const cacheResult = await secretTagManager.checkForSecretTagPhrases(phrase);
+      const cacheResult = await secretTagOfflineManager.checkForSecretTagPhrases(phrase);
       if (cacheResult.found) {
         return cacheResult;
       }
@@ -86,13 +81,13 @@ class CacheFirstStrategy implements VerificationStrategy {
     }
 
     // Fallback to server
-    return await secretTagManagerV2.checkForSecretTagPhrases(phrase);
+    return await secretTagOnlineManager.checkForSecretTagPhrases(phrase);
   }
 
   async getAllTags(): Promise<SecretTagV2[]> {
     try {
       // Try cache first and convert format
-      const cachedTags = await secretTagManager.getAllSecretTags();
+      const cachedTags = await secretTagOfflineManager.getAllSecretTags();
       if (cachedTags.length > 0) {
         return this.convertV1ToV2Format(cachedTags);
       }
@@ -101,14 +96,14 @@ class CacheFirstStrategy implements VerificationStrategy {
     }
 
     // Fallback to server
-    return await secretTagManagerV2.getAllSecretTags();
+    return await secretTagOnlineManager.getAllSecretTags();
   }
 
   async createTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
     // Create in both cache and server
-    const [serverId, cacheId] = await Promise.all([
-      secretTagManagerV2.createSecretTag(name, phrase, colorCode),
-      secretTagManager.createSecretTag(name, phrase, colorCode)
+    const [serverId] = await Promise.all([
+      secretTagOnlineManager.createSecretTag(name, phrase, colorCode),
+      secretTagOfflineManager.createSecretTag(name, phrase, colorCode)
     ]);
     return serverId; // Return server ID as primary
   }
@@ -116,7 +111,7 @@ class CacheFirstStrategy implements VerificationStrategy {
   async deleteTag(tagId: string): Promise<void> {
     // Delete from both cache and server
     await Promise.all([
-      secretTagManagerV2.deleteSecretTag(tagId),
+      secretTagOnlineManager.deleteSecretTag(tagId),
       this.deleteCacheTag(tagId)
     ]);
   }
@@ -124,7 +119,7 @@ class CacheFirstStrategy implements VerificationStrategy {
   async activateTag(tagId: string): Promise<void> {
     // Activate in both cache and server
     await Promise.all([
-      secretTagManagerV2.activateSecretTag(tagId),
+      secretTagOnlineManager.activateSecretTag(tagId),
       this.activateCacheTag(tagId)
     ]);
   }
@@ -132,7 +127,7 @@ class CacheFirstStrategy implements VerificationStrategy {
   async deactivateTag(tagId: string): Promise<void> {
     // Deactivate in both cache and server
     await Promise.all([
-      secretTagManagerV2.deactivateSecretTag(tagId),
+      secretTagOnlineManager.deactivateSecretTag(tagId),
       this.deactivateCacheTag(tagId)
     ]);
   }
@@ -149,7 +144,7 @@ class CacheFirstStrategy implements VerificationStrategy {
 
   private async deleteCacheTag(tagId: string): Promise<void> {
     try {
-      await secretTagManager.deleteSecretTag(tagId);
+      await secretTagOfflineManager.deleteSecretTag(tagId);
     } catch (error) {
       logger.warn('Cache tag deletion failed:', error);
     }
@@ -157,7 +152,7 @@ class CacheFirstStrategy implements VerificationStrategy {
 
   private async activateCacheTag(tagId: string): Promise<void> {
     try {
-      await secretTagManager.activateSecretTag(tagId);
+      await secretTagOfflineManager.activateSecretTag(tagId);
     } catch (error) {
       logger.warn('Cache tag activation failed:', error);
     }
@@ -165,37 +160,37 @@ class CacheFirstStrategy implements VerificationStrategy {
 
   private async deactivateCacheTag(tagId: string): Promise<void> {
     try {
-      await secretTagManager.deactivateSecretTag(tagId);
+      await secretTagOfflineManager.deactivateSecretTag(tagId);
     } catch (error) {
       logger.warn('Cache tag deactivation failed:', error);
     }
   }
 }
 
-class CacheOnlyStrategy implements VerificationStrategy {
+class CacheOnlyStrategy implements SecretTagStrategy {
   async verifyPhrase(phrase: string): Promise<TagDetectionResult> {
-    return await secretTagManager.checkForSecretTagPhrases(phrase);
+    return await secretTagOfflineManager.checkForSecretTagPhrases(phrase);
   }
 
   async getAllTags(): Promise<SecretTagV2[]> {
-    const cachedTags = await secretTagManager.getAllSecretTags();
+    const cachedTags = await secretTagOfflineManager.getAllSecretTags();
     return this.convertV1ToV2Format(cachedTags);
   }
 
   async createTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
-    return await secretTagManager.createSecretTag(name, phrase, colorCode);
+    return await secretTagOfflineManager.createSecretTag(name, phrase, colorCode);
   }
 
   async deleteTag(tagId: string): Promise<void> {
-    return await secretTagManager.deleteSecretTag(tagId);
+    return await secretTagOfflineManager.deleteSecretTag(tagId);
   }
 
   async activateTag(tagId: string): Promise<void> {
-    return await secretTagManager.activateSecretTag(tagId);
+    return await secretTagOfflineManager.activateSecretTag(tagId);
   }
 
   async deactivateTag(tagId: string): Promise<void> {
-    return await secretTagManager.deactivateSecretTag(tagId);
+    return await secretTagOfflineManager.deactivateSecretTag(tagId);
   }
 
   private convertV1ToV2Format(v1Tags: SecretTag[]): SecretTagV2[] {
@@ -209,19 +204,19 @@ class CacheOnlyStrategy implements VerificationStrategy {
   }
 }
 
-class SecretTagManagerHybrid {
+class TagManager {
   // Core managers
-  private serverManager = secretTagManagerV2;
-  private cacheManager = secretTagManager;
+  private secretServerManager = secretTagOnlineManager;
+  private secretCacheManager = secretTagOfflineManager;
   
   // Network and state
   private networkStatus: NetworkStatus = 'unknown';
-  private currentStrategy: VerificationStrategy;
-  private config: HybridTagConfig;
+  private currentSecretStrategy: SecretTagStrategy;
+  private config: TagConfig;
   private syncTimeout: NodeJS.Timeout | null = null;
 
-  // Strategies
-  private strategies = {
+  // Secret tag strategies
+  private secretStrategies = {
     serverOnly: new ServerOnlyStrategy(),
     cacheFirst: new CacheFirstStrategy(),
     cacheOnly: new CacheOnlyStrategy()
@@ -229,28 +224,27 @@ class SecretTagManagerHybrid {
 
   constructor() {
     this.config = {
-      securityMode: 'balanced',
+      securityMode: 'offline',
       cacheEnabled: true,
       autoSyncInterval: 15,
-      borderCrossingMode: false,
       maxCacheAge: 24,
       syncOnForeground: true
     };
 
-    this.currentStrategy = this.strategies.cacheFirst;
+    this.currentSecretStrategy = this.secretStrategies.cacheFirst;
   }
 
   /**
-   * Initialize hybrid manager
+   * Initialize manager
    */
   async initialize(): Promise<void> {
     try {
-      logger.info('Initializing Secret Tag Manager Hybrid');
+      logger.info('Initializing Tag Manager');
 
-      // Initialize both underlying managers
+      // Initialize secret tag managers
       await Promise.all([
-        this.serverManager.initialize(),
-        this.cacheManager.initialize()
+        this.secretServerManager.initialize(),
+        this.secretCacheManager.initialize()
       ]);
 
       // Set up network monitoring
@@ -264,25 +258,63 @@ class SecretTagManagerHybrid {
         this.startAutoSync();
       }
 
-      logger.info(`Hybrid manager initialized with ${this.config.securityMode} security mode`);
+      logger.info(`Tag Manager initialized with ${this.config.securityMode} mode`);
     } catch (error) {
-      logger.error('Failed to initialize hybrid manager:', error);
+      logger.error('Failed to initialize tag manager:', error);
       throw error;
     }
   }
 
-  /**
-   * Set security mode and update strategy
-   */
+  // Regular Tags API
+  async getRegularTags(): Promise<Tag[]> {
+    try {
+      const response = await TagsAPI.getTags();
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to get regular tags:', error);
+      throw error;
+    }
+  }
+
+  async createRegularTag(name: string, color?: string): Promise<Tag> {
+    try {
+      const response = await TagsAPI.createTag({ name, color });
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to create regular tag:', error);
+      throw error;
+    }
+  }
+
+  async updateRegularTag(id: string, updates: Partial<Tag>): Promise<Tag> {
+    try {
+      const response = await TagsAPI.updateTag(id, updates);
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to update regular tag:', error);
+      throw error;
+    }
+  }
+
+  async deleteRegularTag(id: string): Promise<void> {
+    try {
+      await TagsAPI.deleteTag(id);
+    } catch (error) {
+      logger.error('Failed to delete regular tag:', error);
+      throw error;
+    }
+  }
+
+  // Secret Tags API
   async setSecurityMode(mode: SecurityMode): Promise<void> {
-    logger.info(`Switching to ${mode} security mode`);
+    logger.info(`Switching to ${mode} mode`);
     
     this.config.securityMode = mode;
     
-    // Disable cache for maximum security
-    if (mode === 'maximum') {
+    // Disable cache for online mode
+    if (mode === 'online') {
       this.config.cacheEnabled = false;
-      await this.clearCache();
+      await this.clearSecretCache();
     } else {
       this.config.cacheEnabled = true;
     }
@@ -291,114 +323,64 @@ class SecretTagManagerHybrid {
     await this.saveConfig();
   }
 
-  /**
-   * Enable/disable border crossing mode
-   */
-  async setBorderCrossingMode(enabled: boolean): Promise<void> {
-    logger.info(`Border crossing mode: ${enabled ? 'enabled' : 'disabled'}`);
-    
-    this.config.borderCrossingMode = enabled;
-    
-    if (enabled) {
-      // Switch to maximum security and clear cache
-      this.config.securityMode = 'maximum';
-      this.config.cacheEnabled = false;
-      await this.clearCache();
-    } else {
-      // Restore previous settings
-      this.config.securityMode = 'balanced';
-      this.config.cacheEnabled = true;
-    }
-
-    this.updateStrategy();
-    await this.saveConfig();
-  }
-
-  /**
-   * Check for secret tag phrases with hybrid strategy
-   */
   async checkForSecretTagPhrases(transcribedText: string): Promise<TagDetectionResult> {
     try {
-      const result = await this.currentStrategy.verifyPhrase(transcribedText);
+      const result = await this.currentSecretStrategy.verifyPhrase(transcribedText);
       
-      // Log successful detection for analytics
       if (result.found) {
-        logger.info(`Secret tag detected via ${this.getStrategyName()} strategy: ${result.tagName}`);
+        logger.info(`Secret tag detected: ${result.tagName}`);
       }
 
       return result;
     } catch (error) {
-      logger.error('Error in hybrid phrase verification:', error);
+      logger.error('Error in phrase verification:', error);
       return { found: false };
     }
   }
 
-  /**
-   * Get all secret tags using current strategy
-   */
-  async getAllSecretTags(): Promise<SecretTagV2[]> {
-    return await this.currentStrategy.getAllTags();
+  async getSecretTags(): Promise<SecretTagV2[]> {
+    return await this.currentSecretStrategy.getAllTags();
   }
 
-  /**
-   * Get active secret tags
-   */
   async getActiveSecretTags(): Promise<SecretTagV2[]> {
-    const allTags = await this.getAllSecretTags();
+    const allTags = await this.getSecretTags();
     return allTags.filter(tag => tag.isActive);
   }
 
-  /**
-   * Create secret tag using current strategy
-   */
   async createSecretTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
-    const tagId = await this.currentStrategy.createTag(name, phrase, colorCode);
+    const tagId = await this.currentSecretStrategy.createTag(name, phrase, colorCode);
     
-    // Trigger sync if in balanced mode
-    if (this.config.securityMode === 'balanced') {
+    // Trigger sync if in offline mode
+    if (this.config.securityMode === 'offline') {
       this.scheduleSync();
     }
     
     return tagId;
   }
 
-  /**
-   * Delete secret tag using current strategy
-   */
   async deleteSecretTag(tagId: string): Promise<void> {
-    await this.currentStrategy.deleteTag(tagId);
+    await this.currentSecretStrategy.deleteTag(tagId);
     
-    // Trigger sync if in balanced mode
-    if (this.config.securityMode === 'balanced') {
+    // Trigger sync if in offline mode
+    if (this.config.securityMode === 'offline') {
       this.scheduleSync();
     }
   }
 
-  /**
-   * Activate secret tag using current strategy
-   */
   async activateSecretTag(tagId: string): Promise<void> {
-    await this.currentStrategy.activateTag(tagId);
+    await this.currentSecretStrategy.activateTag(tagId);
   }
 
-  /**
-   * Deactivate secret tag using current strategy
-   */
   async deactivateSecretTag(tagId: string): Promise<void> {
-    await this.currentStrategy.deactivateTag(tagId);
+    await this.currentSecretStrategy.deactivateTag(tagId);
   }
 
-  /**
-   * Deactivate all secret tags
-   */
   async deactivateAllSecretTags(): Promise<void> {
     const activeTags = await this.getActiveSecretTags();
     await Promise.all(activeTags.map(tag => this.deactivateSecretTag(tag.id)));
   }
 
-  /**
-   * Get cache status
-   */
+  // Cache and Status API
   async getCacheStatus(): Promise<CacheStatus> {
     if (!this.config.cacheEnabled) {
       return {
@@ -410,13 +392,13 @@ class SecretTagManagerHybrid {
     }
 
     try {
-      const cachedTags = await this.cacheManager.getAllSecretTags();
+      const cachedTags = await this.secretCacheManager.getAllSecretTags();
       return {
         enabled: true,
-        lastSync: new Date().toISOString(), // TODO: Track actual last sync
+        lastSync: new Date().toISOString(),
         entryCount: cachedTags.length,
         storageSize: JSON.stringify(cachedTags).length,
-        integrity: 'valid' // TODO: Implement integrity checking
+        integrity: 'valid'
       };
     } catch (error) {
       return {
@@ -428,18 +410,14 @@ class SecretTagManagerHybrid {
     }
   }
 
-  /**
-   * Clear cache (for security)
-   */
-  async clearCache(): Promise<void> {
+  async clearSecretCache(): Promise<void> {
     try {
       logger.info('Clearing secret tag cache');
-      const cachedTags = await this.cacheManager.getAllSecretTags();
+      const cachedTags = await this.secretCacheManager.getAllSecretTags();
       
-      // Delete all cached tags
       for (const tag of cachedTags) {
         try {
-          await this.cacheManager.deleteSecretTag(tag.id);
+          await this.secretCacheManager.deleteSecretTag(tag.id);
         } catch (error) {
           logger.warn(`Failed to delete cached tag ${tag.id}:`, error);
         }
@@ -452,9 +430,6 @@ class SecretTagManagerHybrid {
     }
   }
 
-  /**
-   * Sync cache with server
-   */
   async syncWithServer(): Promise<void> {
     if (!this.config.cacheEnabled || this.networkStatus === 'offline') {
       return;
@@ -464,12 +439,10 @@ class SecretTagManagerHybrid {
       logger.info('Syncing cache with server');
       
       const [serverTags, cachedTags] = await Promise.all([
-        this.serverManager.getAllSecretTags(),
-        this.cacheManager.getAllSecretTags()
+        this.secretServerManager.getAllSecretTags(),
+        this.secretCacheManager.getAllSecretTags()
       ]);
 
-      // TODO: Implement proper sync logic
-      // For now, just log the difference
       logger.info(`Server has ${serverTags.length} tags, cache has ${cachedTags.length} tags`);
       
     } catch (error) {
@@ -477,62 +450,41 @@ class SecretTagManagerHybrid {
     }
   }
 
-  /**
-   * Get current configuration
-   */
-  getConfig(): HybridTagConfig {
+  getConfig(): TagConfig {
     return { ...this.config };
   }
 
-  /**
-   * Update configuration
-   */
-  async updateConfig(updates: Partial<HybridTagConfig>): Promise<void> {
+  async updateConfig(updates: Partial<TagConfig>): Promise<void> {
     this.config = { ...this.config, ...updates };
     this.updateStrategy();
     await this.saveConfig();
   }
 
-  /**
-   * Get network status
-   */
   getNetworkStatus(): NetworkStatus {
     return this.networkStatus;
   }
 
-  /**
-   * Private: Update strategy based on current config and network
-   */
   private updateStrategy(): void {
-    const { securityMode, cacheEnabled, borderCrossingMode } = this.config;
+    const { securityMode, cacheEnabled } = this.config;
 
-    if (borderCrossingMode || securityMode === 'maximum' || !cacheEnabled) {
-      this.currentStrategy = this.strategies.serverOnly;
+    if (securityMode === 'online' || !cacheEnabled) {
+      this.currentSecretStrategy = this.secretStrategies.serverOnly;
     } else if (this.networkStatus === 'offline') {
-      this.currentStrategy = this.strategies.cacheOnly;
-    } else if (securityMode === 'convenience') {
-      this.currentStrategy = this.strategies.cacheFirst;
+      this.currentSecretStrategy = this.secretStrategies.cacheOnly;
     } else {
-      // Balanced mode - cache first with server fallback
-      this.currentStrategy = this.strategies.cacheFirst;
+      this.currentSecretStrategy = this.secretStrategies.cacheFirst;
     }
 
     logger.debug(`Strategy updated to: ${this.getStrategyName()}`);
   }
 
-  /**
-   * Private: Get current strategy name for logging
-   */
   private getStrategyName(): string {
-    if (this.currentStrategy === this.strategies.serverOnly) return 'server-only';
-    if (this.currentStrategy === this.strategies.cacheFirst) return 'cache-first';
-    if (this.currentStrategy === this.strategies.cacheOnly) return 'cache-only';
+    if (this.currentSecretStrategy === this.secretStrategies.serverOnly) return 'server-only';
+    if (this.currentSecretStrategy === this.secretStrategies.cacheFirst) return 'cache-first';
+    if (this.currentSecretStrategy === this.secretStrategies.cacheOnly) return 'cache-only';
     return 'unknown';
   }
 
-  /**
-   * Private: Setup network monitoring
-   */
   private setupNetworkMonitoring(): void {
     NetInfo.addEventListener(state => {
       const wasOffline = this.networkStatus === 'offline';
@@ -540,15 +492,14 @@ class SecretTagManagerHybrid {
       if (!state.isConnected) {
         this.networkStatus = 'offline';
       } else if (state.details && 'strength' in state.details) {
-        this.networkStatus = (state.details.strength || 0) < 2 ? 'poor' : 'online';
+        const strength = state.details.strength as number;
+        this.networkStatus = strength < 2 ? 'poor' : 'online';
       } else {
         this.networkStatus = 'online';
       }
 
-      // Update strategy when network changes
       this.updateStrategy();
 
-      // Trigger sync when coming back online
       if (wasOffline && this.networkStatus === 'online' && this.config.syncOnForeground) {
         this.scheduleSync();
       }
@@ -557,9 +508,6 @@ class SecretTagManagerHybrid {
     });
   }
 
-  /**
-   * Private: Schedule a sync
-   */
   private scheduleSync(): void {
     if (this.syncTimeout) {
       clearTimeout(this.syncTimeout);
@@ -567,12 +515,9 @@ class SecretTagManagerHybrid {
 
     this.syncTimeout = setTimeout(() => {
       this.syncWithServer();
-    }, 5000); // 5 second delay
+    }, 5000);
   }
 
-  /**
-   * Private: Start auto-sync timer
-   */
   private startAutoSync(): void {
     if (this.syncTimeout) {
       clearTimeout(this.syncTimeout);
@@ -584,12 +529,8 @@ class SecretTagManagerHybrid {
     }, intervalMs);
   }
 
-  /**
-   * Private: Save configuration
-   */
   private async saveConfig(): Promise<void> {
     try {
-      // TODO: Implement config persistence
       logger.debug('Configuration saved');
     } catch (error) {
       logger.error('Failed to save configuration:', error);
@@ -598,4 +539,4 @@ class SecretTagManagerHybrid {
 }
 
 // Export singleton instance
-export const secretTagManagerHybrid = new SecretTagManagerHybrid(); 
+export const tagManager = new TagManager(); 
