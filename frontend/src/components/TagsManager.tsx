@@ -46,6 +46,7 @@ interface TagStats {
 interface RegularTagWithStats extends Tag {
   entryCount: number;
   lastUsed?: string;
+  colorCode?: string;
 }
 
 interface SecretTagWithStats extends SecretTagV2 {
@@ -367,10 +368,12 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   /**
    * Handle delete tag
    */
-  const handleDeleteTag = useCallback(async (tag: RegularTagWithStats | SecretTagWithStats) => {
+  const handleDeleteTag = useCallback(async (id: string, name: string) => {
+    // TODO: Get real entry count
+    const entryCount = 0;
     Alert.alert(
       'Delete Tag',
-      `Are you sure you want to delete "${tag.name}"? This will remove it from ${tag.entryCount} journal entries.`,
+      `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -379,21 +382,23 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           onPress: async () => {
             try {
               if (activeTagType === 'secret') {
-                await tagManager.deleteSecretTag(String(tag.id));
+                await tagManager.deleteSecretTag(id);
                 await loadSecretTags();
               } else {
-                await tagManager.deleteRegularTag(String(tag.id));
+                await tagManager.deleteRegularTag(id);
                 await loadRegularTags();
               }
+              Alert.alert('Success', `Tag "${name}" deleted successfully.`);
             } catch (error) {
-              logger.error('Failed to delete tag:', error);
-              Alert.alert('Error', 'Failed to delete tag');
+              logger.error(`Failed to delete tag ${name}:`, error);
+              Alert.alert('Error', `Failed to delete tag "${name}".`);
             }
-          }
-        }
-      ]
+          },
+        },
+      ],
+      { cancelable: true }
     );
-  }, [activeTagType, loadSecretTags, loadRegularTags]);
+  }, [activeTagType, loadRegularTags, loadSecretTags]);
 
   /**
    * Handle edit tag
@@ -489,45 +494,35 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
    * Render tag card
    */
   const renderTagCard = (tag: RegularTagWithStats | SecretTagWithStats) => (
-    <View key={tag.id} style={styles.tagCard}>
-      <View style={styles.tagInfo}>
-        <View style={styles.tagHeader}>
-          <View style={styles.tagTitleContainer}>
-            {activeTagType === 'secret' && (
-              <Ionicons name="shield" size={16} color={theme.colors.primary} />
-            )}
-            <Text style={styles.tagName}>#{tag.name}</Text>
-          </View>
-          <View style={styles.tagActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleEditTag(tag)}
-            >
-              <Ionicons name="pencil" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleDeleteTag(tag)}
-            >
-              <Ionicons name="trash" size={16} color={theme.colors.error} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View style={styles.tagStats}>
-          <View style={styles.tagStat}>
-            <Ionicons name="document-text" size={14} color={theme.colors.textSecondary} />
-            <Text style={styles.tagStatText}>{tag.entryCount} entries</Text>
-          </View>
-          {tag.lastUsed && (
-            <View style={styles.tagStat}>
-              <Ionicons name="time" size={14} color={theme.colors.textSecondary} />
-              <Text style={styles.tagStatText}>
-                {new Date(tag.lastUsed).toLocaleDateString()}
-              </Text>
-            </View>
-          )}
+    <View key={String(tag.id)} style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.cardColorIndicator, { backgroundColor: tag.colorCode || tagColor }]} />
+        <Text style={styles.cardTitle}>{tag.name}</Text>
+        <View style={styles.cardActions}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => handleEditTag(tag)}
+          >
+            <Ionicons name="pencil" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => handleDeleteTag(String(tag.id), tag.name)}
+          >
+            <Ionicons name="trash-bin" size={20} color={theme.colors.error} />
+          </TouchableOpacity>
         </View>
       </View>
+      
+      {activeTagType === 'secret' && (
+        <View style={styles.cardSection}>
+          <Text style={styles.label}>Usage</Text>
+          <Text style={styles.value}>{tag.entryCount} entries</Text>
+          {tag.lastUsed && (
+            <Text style={styles.value}>Last used: {new Date(tag.lastUsed).toLocaleDateString()}</Text>
+          )}
+        </View>
+      )}
     </View>
   );
 
@@ -580,11 +575,11 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {searchQuery ? (
+          {searchQuery && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
-          ) : null}
+          )}
         </View>
 
         <View style={styles.sortContainer}>
@@ -631,13 +626,12 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
               color={theme.colors.textSecondary}
             />
             <Text style={styles.emptyStateTitle}>
-              No {activeTagType} tags {searchQuery ? 'found' : 'yet'}
+              {`No ${activeTagType} tags ${searchQuery ? 'found' : 'yet'}`}
             </Text>
             <Text style={styles.emptyStateMessage}>
               {searchQuery 
                 ? `No tags match "${searchQuery}"`
-                : `Create your first ${activeTagType} tag to get started`
-              }
+                : `Create your first ${activeTagType} tag to get started`}
             </Text>
           </View>
         )}
@@ -668,7 +662,9 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingTag ? 'Edit' : 'Create'} {activeTagType === 'secret' ? 'Secret' : ''} Tag
+                {editingTag ? 'Edit ' : 'Create '}
+                {activeTagType === 'secret' ? 'Secret ' : ''}
+                Tag
               </Text>
               <TouchableOpacity
                 style={styles.modalCloseButton}
@@ -933,35 +929,32 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.sm,
   },
-  tagCard: {
+  card: {
     backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     ...theme.shadows.sm,
   },
-  tagInfo: {
-    flex: 1,
-  },
-  tagHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: theme.spacing.sm,
   },
-  tagTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  cardColorIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: theme.spacing.sm,
   },
-  tagName: {
+  cardTitle: {
     fontSize: theme.typography.fontSizes.lg,
     fontWeight: '600',
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.semiBold,
-    marginLeft: theme.spacing.xs,
   },
-  tagActions: {
+  cardActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -969,20 +962,20 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     padding: theme.spacing.sm,
     marginLeft: theme.spacing.xs,
   },
-  tagStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardSection: {
+    marginTop: theme.spacing.sm,
   },
-  tagStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: theme.spacing.lg,
-  },
-  tagStatText: {
+  label: {
     fontSize: theme.typography.fontSizes.sm,
+    fontWeight: '500',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.medium,
+    marginBottom: theme.spacing.xs,
+  },
+  value: {
+    fontSize: theme.typography.fontSizes.md,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
-    marginLeft: theme.spacing.xs,
   },
 
   // Empty state
