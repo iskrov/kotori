@@ -613,7 +613,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                 styles.sortButtonText,
                 sortBy === option && styles.activeSortButtonText
               ]}>
-                {option === 'name' ? 'Name' : option === 'usage' ? 'Usage' : 'Recent'}
+                {`${option === 'name' ? 'Name' : option === 'usage' ? 'Usage' : 'Recent'}`}
               </Text>
             </TouchableOpacity>
           ))}
@@ -678,9 +678,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingTag ? 'Edit ' : 'Create '}
-                {activeTagType === 'secret' ? 'Secret ' : ''}
-                Tag
+                {`${editingTag ? 'Edit' : 'Create'} ${activeTagType === 'secret' ? 'Secret ' : ''}Tag`}
               </Text>
               <TouchableOpacity
                 style={styles.modalCloseButton}
