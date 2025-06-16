@@ -540,7 +540,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{totalTags}</Text>
           <Text style={styles.statLabel}>
-            {activeTagType === 'regular' ? 'Tags' : 'Secret Tags'}
+            {`${activeTagType === 'regular' ? 'Tags' : 'Secret Tags'}`}
           </Text>
         </View>
         <View style={styles.statItem}>
@@ -839,7 +839,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                     <ActivityIndicator size="small" color={theme.colors.background} />
                   ) : (
                     <Text style={styles.submitButtonText}>
-                      {editingTag ? 'Update' : 'Create'}
+                      {`${editingTag ? 'Update' : 'Create'}`}
                     </Text>
                   )}
                 </TouchableOpacity>
