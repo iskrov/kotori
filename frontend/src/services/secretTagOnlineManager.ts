@@ -153,7 +153,8 @@ class SecretTagOnlineManager {
       }
 
       // Get tag info from server
-      const serverTags = await secretTagHashService.getSecretTags();
+      const serverTagsResponse = await secretTagHashService.getSecretTags();
+      const serverTags = serverTagsResponse.tags || [];
       const tag = serverTags.find(t => t.id === tagId);
       
       if (!tag) {
@@ -221,10 +222,11 @@ class SecretTagOnlineManager {
    */
   async getAllSecretTags(): Promise<SecretTagV2[]> {
     try {
-      const serverTags = await secretTagHashService.getSecretTags();
+      const serverTagsResponse = await secretTagHashService.getSecretTags();
+      const serverTags = serverTagsResponse.tags || [];
       
       // Convert to UI format with active state
-      return serverTags.map(tag => ({
+      return serverTags.map((tag: SecretTagResponse) => ({
         id: tag.id,
         name: tag.tag_name,
         colorCode: '#007AFF', // Default color since server doesn't store this
@@ -392,6 +394,28 @@ class SecretTagOnlineManager {
    */
   getConfig(): SecretTagConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Deletes all secret tags from the server.
+   * This is a sensitive operation and should be used with care.
+   */
+  async deleteAllSecretTags(): Promise<void> {
+    try {
+      const serverTagsResponse = await secretTagHashService.getSecretTags();
+      const serverTags = serverTagsResponse.tags || [];
+      
+      const deletionPromises = serverTags.map(tag =>
+        secretTagHashService.deleteSecretTag(tag.id)
+      );
+      
+      await Promise.all(deletionPromises);
+      logger.info(`Deleted ${serverTags.length} secret tags from the server.`);
+      
+    } catch (error) {
+      logger.error('Failed to delete all secret tags:', error);
+      throw error;
+    }
   }
 }
 

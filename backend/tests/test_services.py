@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time
 
 from sqlalchemy.orm import Session
 
@@ -73,11 +73,11 @@ def test_journal_service(db: Session, test_user):
     entry_data = JournalEntryCreate(
         title="Service Test Entry",
         content="Testing journal service",
-        entry_date=date.today().isoformat(),
+        entry_date=date.today(),
         tags=["test", "service"],
     )
 
-    entry = journal_service.create_entry(db, obj_in=entry_data, user_id=test_user.id)
+    entry = journal_service.create_with_user(db=db, obj_in=entry_data, user_id=test_user.id)
 
     # Assertions
     assert entry.id is not None
@@ -92,26 +92,26 @@ def test_journal_service(db: Session, test_user):
     assert "service" in tag_names
 
     # Test get entry
-    retrieved_entry = journal_service.get_entry(db, entry_id=entry.id)
+    retrieved_entry = journal_service.get(db, id=entry.id)
     assert retrieved_entry is not None
     assert retrieved_entry.id == entry.id
 
     # Test update entry
     updated_data = {"title": "Updated Title", "content": "Updated content"}
-    updated_entry = journal_service.update_entry(
-        db, entry_id=entry.id, obj_in=updated_data
+    updated_entry = journal_service.update(
+        db, db_obj=entry, obj_in=updated_data
     )
     assert updated_entry.title == "Updated Title"
     assert updated_entry.content == "Updated content"
 
     # Test list entries
-    entries = journal_service.get_entries(db, user_id=test_user.id)
+    entries = journal_service.get_multi_by_user(db, user_id=test_user.id)
     assert len(entries) >= 1
     assert any(e.id == entry.id for e in entries)
 
     # Test delete entry
-    journal_service.delete_entry(db, entry_id=entry.id)
-    deleted_entry = journal_service.get_entry(db, entry_id=entry.id)
+    journal_service.remove(db, id=entry.id)
+    deleted_entry = journal_service.get(db, id=entry.id)
     assert deleted_entry is None
 
 
@@ -121,18 +121,18 @@ def test_reminder_service(db: Session, test_user):
     reminder_data = ReminderCreate(
         title="Service Test Reminder",
         message="Testing reminder service",
-        time="09:00:00",
+        time=time(9, 0, 0),
         frequency="daily",
         is_active=True,
     )
 
-    reminder = reminder_service.create(db, obj_in=reminder_data, user_id=test_user.id)
+    reminder = reminder_service.create_with_user(db=db, obj_in=reminder_data, user_id=test_user.id)
 
     # Assertions
     assert reminder.id is not None
     assert reminder.title == "Service Test Reminder"
     assert reminder.message == "Testing reminder service"
-    assert reminder.time == "09:00:00"
+    assert reminder.time.strftime('%H:%M:%S') == "09:00:00"
     assert reminder.frequency == "daily"
     assert reminder.user_id == test_user.id
 

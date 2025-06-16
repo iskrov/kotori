@@ -1,5 +1,7 @@
 import CryptoJS from 'crypto-js';
-import { SecretTag, SecretTagCreateRequest, SecretTagResponse } from '../types';
+import { SecretTag, SecretTagCreateRequest, SecretTagResponse, SecretTagListResponse } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from './api';
 
 /**
  * Service for managing secret tags with server-side hash verification.
@@ -82,21 +84,18 @@ export class SecretTagHashService {
   /**
    * Get all secret tags for the current user
    */
-  async getSecretTags(): Promise<SecretTagResponse[]> {
+  async getSecretTags(): Promise<SecretTagListResponse> {
     try {
-      const response = await fetch(this.API_BASE, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch secret tags: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result.tags || [];
+      // This endpoint should return all tags, which will be filtered client-side if needed.
+      const response = await api.get(this.API_BASE);
+      // Assuming the actual tags are in response.data
+      const allTags = response.data; 
+      
+      // The backend doesn't distinguish between secret and regular tags at this endpoint,
+      // so we might need to filter them if the response contains a 'type' field.
+      // For now, we assume this endpoint is intended to return what we need,
+      // and we just return the data. The calling function will handle it.
+      return allTags;
     } catch (error) {
       console.error('Error fetching secret tags:', error);
       throw error;
@@ -109,7 +108,8 @@ export class SecretTagHashService {
   async verifySecretPhrase(phrase: string): Promise<{ isValid: boolean; tagName: string; tagId?: string }> {
     try {
       // Get all user's secret tags
-      const tags = await this.getSecretTags();
+      const tagsResponse = await this.getSecretTags();
+      const tags = tagsResponse.tags || [];
       
       // Test the phrase against each tag's hash
       for (const tag of tags) {
@@ -119,20 +119,13 @@ export class SecretTagHashService {
           const computedHash = await this.hashPhrase(phrase, salt);
           
           // Verify with server (this could be optimized to verify all at once)
-          const verificationResponse = await fetch(`${this.API_BASE}/verify-phrase`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.getAuthToken()}`
-            },
-            body: JSON.stringify({
-              phrase: phrase,
-              tag_id: tag.id
-            })
+          const verificationResponse = await api.post(`${this.API_BASE}/verify-phrase`, {
+            phrase: phrase,
+            tag_id: tag.id
           });
 
-          if (verificationResponse.ok) {
-            const verificationResult = await verificationResponse.json();
+          if (verificationResponse.status === 200) {
+            const verificationResult = verificationResponse.data;
             if (verificationResult.is_valid) {
               console.log(`Secret phrase verified for tag: ${verificationResult.tag_name}`);
               return {
@@ -161,18 +154,13 @@ export class SecretTagHashService {
    */
   async deleteSecretTag(tagId: string): Promise<boolean> {
     try {
-      const response = await fetch(`${this.API_BASE}/${tagId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        }
-      });
+      const response = await api.delete(`${this.API_BASE}/${tagId}`);
 
-      if (response.ok) {
+      if (response.status === 200) {
         console.log(`Deleted secret tag: ${tagId}`);
         return true;
       } else {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = response.data || {};
         throw new Error(errorData.detail || `Failed to delete secret tag: ${response.status}`);
       }
     } catch (error) {
@@ -184,9 +172,9 @@ export class SecretTagHashService {
   /**
    * Get authentication token from storage
    */
-  private getAuthToken(): string {
+  private async getAuthToken(): Promise<string> {
     // This should match your app's authentication token storage
-    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+    const token = await AsyncStorage.getItem('access_token');
     if (!token) {
       throw new Error('No authentication token found');
     }

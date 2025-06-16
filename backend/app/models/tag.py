@@ -13,6 +13,7 @@ class Tag(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True)
+    color = Column(String, nullable=True)
 
     # Relationships
     entries = relationship("JournalEntryTag", back_populates="tag")

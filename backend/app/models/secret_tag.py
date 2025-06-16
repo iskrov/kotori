@@ -1,9 +1,8 @@
 from sqlalchemy import Column, Integer, String, LargeBinary, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 
-from .base import Base
+from .base import Base, UUID
 from .base import TimestampMixin
 
 
@@ -16,7 +15,7 @@ class SecretTag(Base, TimestampMixin):
     """
     __tablename__ = "secret_tags"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     tag_name = Column(String(100), nullable=False)
     phrase_salt = Column(LargeBinary, nullable=False)  # 32-byte salt for Argon2

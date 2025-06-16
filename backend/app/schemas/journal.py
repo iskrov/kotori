@@ -10,11 +10,12 @@ class TagBase(BaseModel):
 
 
 class TagCreate(TagBase):
-    pass
+    color: Optional[str] = None
 
 
 class Tag(TagBase):
     id: int
+    color: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

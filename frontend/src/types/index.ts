@@ -181,7 +181,7 @@ export interface SecretTagResponse {
 }
 
 export interface SecretTagListResponse {
-  tags: SecretTagResponse[];
+  tags: SecretTag[];
   total: number;
 }
 

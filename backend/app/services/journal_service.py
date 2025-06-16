@@ -11,6 +11,7 @@ from ..models.tag import JournalEntryTag
 from ..models.tag import Tag as TagModel
 from ..schemas.journal import JournalEntry, JournalEntryCreate, JournalEntryUpdate
 from ..schemas.journal import Tag as TagSchema
+from ..schemas.journal import TagCreate
 from .base import BaseService
 from .session_service import session_service
 
@@ -136,6 +137,46 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         
         return response_entries
 
+    def create_tag(self, db: Session, *, tag_in: TagCreate, user_id: int) -> TagModel:
+        """Create a new tag."""
+        # Tags are not user-specific in this model, but we check for existence.
+        tag_obj = db.query(TagModel).filter(TagModel.name == tag_in.name).first()
+        if tag_obj:
+            raise ValueError("Tag with this name already exists")
+            
+        tag_obj = TagModel(**tag_in.model_dump())
+        db.add(tag_obj)
+        db.commit()
+        db.refresh(tag_obj)
+        return tag_obj
+
+    def update_tag(
+        self, db: Session, *, tag_id: int, tag_in: TagSchema, user_id: int
+    ) -> TagModel:
+        """Update a tag."""
+        tag_obj = db.query(TagModel).get(tag_id)
+        if not tag_obj:
+            raise ValueError("Tag not found")
+        
+        update_data = tag_in.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(tag_obj, field, value)
+            
+        db.add(tag_obj)
+        db.commit()
+        db.refresh(tag_obj)
+        return tag_obj
+
+    def delete_tag(self, db: Session, *, tag_id: int, user_id: int) -> TagModel:
+        """Delete a tag."""
+        tag_obj = db.query(TagModel).get(tag_id)
+        if not tag_obj:
+            raise ValueError("Tag not found")
+            
+        db.delete(tag_obj)
+        db.commit()
+        return tag_obj
+
     def create_with_user(
         self, db: Session, *, obj_in: JournalEntryCreate, user_id: int
     ) -> JournalEntry:  # Change return type to JournalEntry schema
@@ -145,7 +186,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         """
         # Extract tags
         tag_names = obj_in.tags or []
-        obj_data = obj_in.dict(exclude={"tags"})
+        obj_data = obj_in.model_dump(exclude={"tags"})
 
         # ✅ ZERO-KNOWLEDGE: Store content as provided by client
         # Client handles encryption for secret tag entries
@@ -194,7 +235,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         if isinstance(obj_in, dict):
             tag_names = obj_in.pop("tags", None)
         else:
-            update_data = obj_in.dict(exclude_unset=True)
+            update_data = obj_in.model_dump(exclude_unset=True)
             tag_names = update_data.pop("tags", None)
             obj_in = update_data
 
@@ -261,19 +302,10 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
 
     def get_tags_by_user(self, db: Session, *, user_id: int) -> list[TagModel]:
         """
-        Get all tags used by a user
+        Get all tags (tags are global, not user-specific)
         """
-        # Find all tag IDs used by this user's journal entries
-        tag_ids = (
-            db.query(TagModel.id)
-            .join(JournalEntryTag)
-            .join(JournalEntryModel)
-            .filter(JournalEntryModel.user_id == user_id)
-            .distinct()
-        )
-
-        # Get the tags
-        return db.query(TagModel).filter(TagModel.id.in_(tag_ids)).all()
+        # Return all tags since they are global in this system
+        return db.query(TagModel).all()
 
     # Legacy static methods removed - use instance methods instead
 

@@ -6,10 +6,9 @@ from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Text
 from sqlalchemy import LargeBinary
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .base import Base
+from .base import Base, UUID
 from .base import TimestampMixin
 
 
@@ -25,7 +24,7 @@ class JournalEntry(Base, TimestampMixin):
     )  # When the entry was recorded
 
     # New Secret Tag Encryption Fields (server-side hash verification)
-    secret_tag_id = Column(UUID(as_uuid=True), ForeignKey("secret_tags.id"), nullable=True, index=True)  # UUID of the secret tag (if any)
+    secret_tag_id = Column(UUID(), ForeignKey("secret_tags.id"), nullable=True, index=True)  # UUID of the secret tag (if any)
     encrypted_content = Column(LargeBinary, nullable=True)  # AES-encrypted content for secret entries
     wrapped_key = Column(LargeBinary, nullable=True)  # Entry key wrapped with phrase-derived key
     encryption_iv = Column(LargeBinary, nullable=True)  # Initialization vector for content encryption

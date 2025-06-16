@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import datetime, time
 
 from sqlalchemy.orm import Session
 
 from app.models.journal_entry import JournalEntry
 from app.models.reminder import Reminder
-from app.models.tag import Tag
+from app.models.tag import Tag, JournalEntryTag
 from app.models.user import User
 
 
@@ -49,8 +49,8 @@ def test_journal_entry_model(db: Session):
     db.commit()
     db.refresh(user)
 
-    # Create a journal entry
-    entry_date = datetime.utcnow().date()
+    # Create a journal entry with datetime instead of date
+    entry_date = datetime.now()
     entry = JournalEntry(
         title="Test Entry",
         content="This is test content",
@@ -67,7 +67,8 @@ def test_journal_entry_model(db: Session):
     assert entry.id is not None
     assert entry.title == "Test Entry"
     assert entry.content == "This is test content"
-    assert entry.entry_date == entry_date
+    # Compare just the date part since SQLite may adjust the exact time
+    assert entry.entry_date.date() == entry_date.date()
     assert entry.user_id == user.id
     assert entry.created_at is not None
     assert entry.updated_at is not None
@@ -111,11 +112,12 @@ def test_reminder_model(db: Session):
     db.commit()
     db.refresh(user)
 
-    # Create a reminder
+    # Create a reminder with proper datetime object for time field
+    reminder_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
     reminder = Reminder(
         title="Test Reminder",
         message="Remember to do this",
-        time="08:00:00",
+        time=reminder_time,
         frequency="daily",
         is_active=True,
         user_id=user.id,
@@ -130,7 +132,8 @@ def test_reminder_model(db: Session):
     assert reminder.id is not None
     assert reminder.title == "Test Reminder"
     assert reminder.message == "Remember to do this"
-    assert reminder.time == "08:00:00"
+    assert reminder.time.hour == 8
+    assert reminder.time.minute == 0
     assert reminder.frequency == "daily"
     assert reminder.is_active is True
     assert reminder.user_id == user.id
@@ -159,10 +162,12 @@ def test_relationships(db: Session):
     entry = JournalEntry(
         title="Relationship Test Entry",
         content="Testing relationships",
-        entry_date=datetime.utcnow().date(),
+        entry_date=datetime.now(),
         user_id=user.id,
     )
     db.add(entry)
+    db.commit()
+    db.refresh(entry)
 
     # Create tags
     tag1 = Tag(name="TestTag1")
@@ -173,9 +178,11 @@ def test_relationships(db: Session):
     db.refresh(tag1)
     db.refresh(tag2)
 
-    # Associate tags with the entry
-    entry.tags.append(tag1)
-    entry.tags.append(tag2)
+    # Associate tags with the entry using JournalEntryTag
+    entry_tag1 = JournalEntryTag(entry_id=entry.id, tag_id=tag1.id)
+    entry_tag2 = JournalEntryTag(entry_id=entry.id, tag_id=tag2.id)
+    db.add(entry_tag1)
+    db.add(entry_tag2)
     db.commit()
     db.refresh(entry)
 
@@ -184,14 +191,16 @@ def test_relationships(db: Session):
 
     # Test journal entry - tags relationship
     assert len(entry.tags) == 2
-    assert tag1 in entry.tags
-    assert tag2 in entry.tags
+    tag_ids = [tag_rel.tag_id for tag_rel in entry.tags]
+    assert tag1.id in tag_ids
+    assert tag2.id in tag_ids
 
     # Create a reminder for the user
+    reminder_time = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
     reminder = Reminder(
         title="Relationship Test Reminder",
         message="Testing user-reminder relationship",
-        time="10:00:00",
+        time=reminder_time,
         frequency="daily",
         is_active=True,
         user_id=user.id,
@@ -201,6 +210,8 @@ def test_relationships(db: Session):
 
     # Clean up
     db.delete(reminder)
+    db.delete(entry_tag1)
+    db.delete(entry_tag2)
     db.delete(entry)
     db.delete(tag1)
     db.delete(tag2)
