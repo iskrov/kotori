@@ -373,47 +373,96 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     const entryCount = 0;
     logger.info(`Attempting to delete ${activeTagType} tag: ${name} (ID: ${id})`);
     
-    Alert.alert(
-      'Delete Tag',
-      `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              logger.info(`Starting deletion of ${activeTagType} tag: ${name} (ID: ${id})`);
-              
-              if (activeTagType === 'secret') {
-                logger.info(`Calling tagManager.deleteSecretTag(${id})`);
-                await tagManager.deleteSecretTag(id);
-                logger.info(`Secret tag deleted successfully, reloading tags`);
-                await loadSecretTags();
-              } else {
-                logger.info(`Calling tagManager.deleteRegularTag(${id})`);
-                await tagManager.deleteRegularTag(id);
-                logger.info(`Regular tag deleted successfully, reloading tags`);
-                await loadRegularTags();
-              }
-              
-              logger.info(`Tag "${name}" deleted successfully`);
-              Alert.alert('Success', `Tag "${name}" deleted successfully.`);
-            } catch (error) {
-              logger.error(`Failed to delete tag ${name}:`, error);
-              logger.error(`Error details:`, {
-                message: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined,
-                response: (error as any)?.response?.data,
-                status: (error as any)?.response?.status
-              });
-              Alert.alert('Error', `Failed to delete tag "${name}". Check console for details.`);
-            }
+    // For web environment, use window.confirm as fallback
+    const isWeb = typeof window !== 'undefined' && window.confirm;
+    
+    if (isWeb) {
+      logger.info('Using window.confirm for web environment');
+      const confirmed = window.confirm(
+        `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries.`
+      );
+      
+      if (confirmed) {
+        logger.info(`User confirmed deletion via window.confirm`);
+        try {
+          logger.info(`Starting deletion of ${activeTagType} tag: ${name} (ID: ${id})`);
+          
+          if (activeTagType === 'secret') {
+            logger.info(`Calling tagManager.deleteSecretTag(${id})`);
+            await tagManager.deleteSecretTag(id);
+            logger.info(`Secret tag deleted successfully, reloading tags`);
+            await loadSecretTags();
+          } else {
+            logger.info(`Calling tagManager.deleteRegularTag(${id})`);
+            await tagManager.deleteRegularTag(id);
+            logger.info(`Regular tag deleted successfully, reloading tags`);
+            await loadRegularTags();
+          }
+          
+          logger.info(`Tag "${name}" deleted successfully`);
+          alert(`Tag "${name}" deleted successfully.`);
+        } catch (error) {
+          logger.error(`Failed to delete tag ${name}:`, error);
+          logger.error(`Error details:`, {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            response: (error as any)?.response?.data,
+            status: (error as any)?.response?.status
+          });
+          alert(`Failed to delete tag "${name}". Check console for details.`);
+        }
+      } else {
+        logger.info(`User cancelled deletion via window.confirm`);
+      }
+    } else {
+      logger.info('Using Alert.alert for native environment');
+      Alert.alert(
+        'Delete Tag',
+        `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries.`,
+        [
+          { 
+            text: 'Cancel', 
+            style: 'cancel',
+            onPress: () => logger.info(`User cancelled deletion via Alert.alert`)
           },
-        },
-      ],
-      { cancelable: true }
-    );
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              logger.info(`User confirmed deletion via Alert.alert`);
+              try {
+                logger.info(`Starting deletion of ${activeTagType} tag: ${name} (ID: ${id})`);
+                
+                if (activeTagType === 'secret') {
+                  logger.info(`Calling tagManager.deleteSecretTag(${id})`);
+                  await tagManager.deleteSecretTag(id);
+                  logger.info(`Secret tag deleted successfully, reloading tags`);
+                  await loadSecretTags();
+                } else {
+                  logger.info(`Calling tagManager.deleteRegularTag(${id})`);
+                  await tagManager.deleteRegularTag(id);
+                  logger.info(`Regular tag deleted successfully, reloading tags`);
+                  await loadRegularTags();
+                }
+                
+                logger.info(`Tag "${name}" deleted successfully`);
+                Alert.alert('Success', `Tag "${name}" deleted successfully.`);
+              } catch (error) {
+                logger.error(`Failed to delete tag ${name}:`, error);
+                logger.error(`Error details:`, {
+                  message: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined,
+                  response: (error as any)?.response?.data,
+                  status: (error as any)?.response?.status
+                });
+                Alert.alert('Error', `Failed to delete tag "${name}". Check console for details.`);
+              }
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    }
   }, [activeTagType, loadRegularTags, loadSecretTags]);
 
   /**
