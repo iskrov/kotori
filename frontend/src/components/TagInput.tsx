@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -44,9 +44,10 @@ const TagInput: React.FC<TagInputProps> = ({
   // Filter suggestions based on input
   useEffect(() => {
     if (inputValue.trim()) {
+      const currentTagNames = tags.map(tag => tag.name.toLowerCase());
       const filtered = suggestions.filter(suggestion => 
         suggestion.toLowerCase().includes(inputValue.toLowerCase()) &&
-        !tags.some(tag => tag.name.toLowerCase() === suggestion.toLowerCase())
+        !currentTagNames.includes(suggestion.toLowerCase())
       );
       setFilteredSuggestions(filtered);
       setShowSuggestions(filtered.length > 0);
@@ -67,7 +68,7 @@ const TagInput: React.FC<TagInputProps> = ({
         useNativeDriver,
       }).start();
     }
-  }, [inputValue, suggestions, tags]);
+  }, [inputValue, suggestions, tags, fadeAnim]);
 
   const handleAddTag = (tagName?: string) => {
     const newTagName = (tagName || inputValue).trim().toLowerCase();
@@ -77,7 +78,8 @@ const TagInput: React.FC<TagInputProps> = ({
     }
     
     // Check for duplicates and max tags
-    if (tags.some(tag => tag.name.toLowerCase() === newTagName) || tags.length >= maxTags) {
+    const currentTagNames = tags.map(tag => tag.name.toLowerCase());
+    if (currentTagNames.includes(newTagName) || tags.length >= maxTags) {
       setInputValue('');
       setShowSuggestions(false);
       return;
