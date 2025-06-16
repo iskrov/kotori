@@ -253,13 +253,13 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
         <Text style={styles.statusTitle}>Current Status</Text>
         <View style={styles.statusRow}>
           <Text style={styles.statusText}>
-            {`${securityModes.find(m => m.mode === currentMode)?.title} active`}
+            {`${securityModes.find(m => m.mode === currentMode)?.title || 'Unknown'} active`}
           </Text>
           {isChanging && (
             <View style={styles.changingIndicator}>
               <ActivityIndicator size="small" color={theme.colors.primary} />
               <Text style={styles.changingText}>
-                {currentMode === 'offline' ? 'Clearing device...' : 'Switching mode...'}
+                {`${currentMode === 'offline' ? 'Clearing device...' : 'Switching mode...'}`}
               </Text>
             </View>
           )}
