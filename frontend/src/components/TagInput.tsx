@@ -41,18 +41,22 @@ const TagInput: React.FC<TagInputProps> = ({
   const inputRef = useRef<TextInput>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Memoize suggestions to prevent unnecessary re-renders
+  const memoizedSuggestions = useMemo(() => suggestions, [suggestions]);
+
   // Filter suggestions based on input
   useEffect(() => {
     if (inputValue.trim()) {
       const currentTagNames = tags.map(tag => tag.name.toLowerCase());
-      const filtered = suggestions.filter(suggestion => 
-        suggestion.toLowerCase().includes(inputValue.toLowerCase()) &&
-        !currentTagNames.includes(suggestion.toLowerCase())
+      const filtered = memoizedSuggestions.filter(
+        suggestion =>
+          suggestion.toLowerCase().includes(inputValue.toLowerCase()) &&
+          !currentTagNames.includes(suggestion.toLowerCase()),
       );
       setFilteredSuggestions(filtered);
       setShowSuggestions(filtered.length > 0);
-      
-      // Animate suggestions appearance
+
+      // Animate suggestions appearance only if there are suggestions
       if (filtered.length > 0) {
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -68,7 +72,7 @@ const TagInput: React.FC<TagInputProps> = ({
         useNativeDriver,
       }).start();
     }
-  }, [inputValue, suggestions, tags, fadeAnim]);
+  }, [inputValue, memoizedSuggestions]); // Use memoized suggestions to prevent infinite loops
 
   const handleAddTag = (tagName?: string) => {
     const newTagName = (tagName || inputValue).trim().toLowerCase();

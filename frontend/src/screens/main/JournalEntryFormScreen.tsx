@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -84,15 +84,15 @@ const JournalEntryFormScreen = () => {
         const entryData: any = {
           title: title || `Entry ${new Date().toLocaleDateString()}`,
           content,
-          tags,
+          tags: tags.map(tag => tag.name), // Convert Tag objects to string array
           entry_date: entryDate || new Date().toISOString(),
         };
 
         if (journalId) {
-          await JournalAPI.updateEntry(journalId, entryData);
+          await JournalAPI.updateEntry(parseInt(journalId, 10), entryData);
           setOriginalTitle(entryData.title);
           setOriginalContent(entryData.content);
-          setOriginalTags(entryData.tags);
+          setOriginalTags(tags); // Keep the current Tag objects, not the string array
           setOriginalEntryDate(entryData.entry_date);
           setHasUnsavedChanges(false);
           Alert.alert('Success', 'Journal entry updated', [
@@ -169,7 +169,7 @@ const JournalEntryFormScreen = () => {
       if (!journalId) return;
       try {
         setIsFetchingEntry(true);
-        const response = await JournalAPI.getEntry(journalId);
+        const response = await JournalAPI.getEntry(parseInt(journalId, 10));
         const entry = response.data;
         setTitle(entry.title || '');
         setContent(entry.content || '');
@@ -264,6 +264,13 @@ const JournalEntryFormScreen = () => {
     }
   };
 
+  const handleTagsChange = useCallback((newTags: Tag[]) => {
+    setTags(newTags);
+  }, []);
+
+  // Stable suggestions array to prevent TagInput infinite loops
+  const tagSuggestions = useMemo(() => [], []);
+
   if (isFetchingEntry) {
     return (
       <View style={styles.loadingContainer}>
@@ -349,7 +356,11 @@ const JournalEntryFormScreen = () => {
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Tags</Text>
-          <TagInput tags={tags} onChangeTags={setTags} />
+          <TagInput 
+            tags={tags} 
+            onChangeTags={handleTagsChange}
+            suggestions={tagSuggestions}
+          />
         </View>
 
         {showRecorder && (
