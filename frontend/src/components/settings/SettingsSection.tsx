@@ -53,37 +53,35 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
   return (
     <View style={styles.container}>
       {/* Section Header */}
-      <TouchableOpacity
-        style={styles.header}
-        onPress={toggleExpanded}
-        disabled={!collapsible}
-        activeOpacity={collapsible ? 0.7 : 1}
-        accessibilityRole={collapsible ? 'button' : 'text'}
-        accessibilityLabel={`${title} section${collapsible ? (isExpanded ? ', expanded' : ', collapsed') : ''}`}
-        accessibilityHint={collapsible ? 'Tap to toggle section visibility' : undefined}
-      >
-        <View style={styles.headerLeft}>
-          {icon && (
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={icon}
-                size={24}
-                color={theme.colors.primary}
-              />
-            </View>
-          )}
-          
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{title}</Text>
-            {subtitle && (
-              <Text style={styles.subtitle}>{subtitle}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerTouchable}
+          onPress={toggleExpanded}
+          disabled={!collapsible}
+          activeOpacity={collapsible ? 0.7 : 1}
+          accessibilityRole={collapsible ? 'button' : 'text'}
+          accessibilityLabel={`${title} section${collapsible ? (isExpanded ? ', expanded' : ', collapsed') : ''}`}
+          accessibilityHint={collapsible ? 'Tap to toggle section visibility' : undefined}
+        >
+          <View style={styles.headerLeft}>
+            {icon && (
+              <View style={styles.iconContainer}>
+                <Ionicons
+                  name={icon}
+                  size={24}
+                  color={theme.colors.primary}
+                />
+              </View>
             )}
+            
+            <View style={styles.titleContainer}>
+              <Text style={styles.title}>{title}</Text>
+              {subtitle && (
+                <Text style={styles.subtitle}>{subtitle}</Text>
+              )}
+            </View>
           </View>
-        </View>
 
-        <View style={styles.headerRight}>
-          {headerAction}
-          
           {collapsible && (
             <View style={styles.chevronContainer}>
               <Ionicons
@@ -93,8 +91,15 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
               />
             </View>
           )}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+
+        {/* Header Action - Outside of TouchableOpacity to prevent conflicts */}
+        {headerAction && (
+          <View style={styles.headerActionContainer}>
+            {headerAction}
+          </View>
+        )}
+      </View>
 
       {/* Section Content */}
       {isExpanded && (
@@ -125,6 +130,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderBottomColor: theme.colors.border,
     minHeight: 64,
   },
+  headerTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerActionContainer: {
+    marginLeft: theme.spacing.md,
+  },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -154,11 +167,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     lineHeight: 18,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: theme.spacing.md,
-  },
+
   chevronContainer: {
     marginLeft: theme.spacing.sm,
     padding: theme.spacing.xs,

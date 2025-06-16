@@ -60,7 +60,7 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
       activeOpacity={isInteractive ? 0.7 : 1}
       testID={testID}
       accessibilityRole={isInteractive ? 'button' : 'text'}
-      accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
+      accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       accessibilityHint={isInteractive ? 'Tap to modify this setting' : undefined}
     >
       <View style={styles.leftSection}>

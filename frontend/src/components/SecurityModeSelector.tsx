@@ -100,10 +100,10 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
         '🔒 Switch to Online Mode',
         '⚠️ SECURITY WARNING ⚠️\n\n' +
         'Switching to Online Mode will:\n\n' +
-        '• PERMANENTLY DELETE all secret data from this device\n' +
-        '• Clear all cached secret tags and phrases\n' +
-        '• Remove all encryption keys from device storage\n' +
-        '• Deactivate all currently active secret tags\n\n' +
+        '- PERMANENTLY DELETE all secret data from this device\n' +
+        '- Clear all cached secret tags and phrases\n' +
+        '- Remove all encryption keys from device storage\n' +
+        '- Deactivate all currently active secret tags\n\n' +
         'This ensures maximum security - your device will appear completely normal with no secret data.\n\n' +
         'The server remains the only source of your secret tags. You can switch back to Offline Mode later to re-cache data.\n\n' +
         'Are you sure you want to proceed?',
@@ -145,7 +145,7 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
     else {
       Alert.alert(
         `Switch to ${modeInfo.title}?`,
-        `${modeInfo.description}\n\nFeatures:\n• ${modeInfo.features.join('\n• ')}`,
+        `${modeInfo.description}\n\nFeatures:\n- ${modeInfo.features.join('\n- ')}`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -225,7 +225,7 @@ const SecurityModeSelector: React.FC<SecurityModeSelectorProps> = ({
               styles.featureText,
               isActive && styles.activeFeatureText
             ]}>
-              • {feature}
+              - {feature}
             </Text>
           ))}
         </View>
