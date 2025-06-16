@@ -58,26 +58,18 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
 
-  // UI state
   const [activeTagType, setActiveTagType] = useState<TagType>('regular');
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'usage' | 'recent'>('name');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Tag data
   const [regularTags, setRegularTags] = useState<RegularTagWithStats[]>([]);
   const [secretTags, setSecretTags] = useState<SecretTagWithStats[]>([]);
-
-  // Form state
   const [tagName, setTagName] = useState('');
   const [activationPhrase, setActivationPhrase] = useState('');
   const [tagColor, setTagColor] = useState('#007AFF');
   const [editingTag, setEditingTag] = useState<RegularTagWithStats | SecretTagWithStats | null>(null);
-
-  // Tag manager state
   const [securityMode, setSecurityMode] = useState<SecurityMode>('offline');
   const [networkStatus, setNetworkStatus] = useState<NetworkStatus>('unknown');
   const [cacheStatus, setCacheStatus] = useState<CacheStatus>({
@@ -93,49 +85,34 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     '#FF2D92', '#A2845E', '#8E8E93', '#000000'
   ];
 
-  /**
-   * Load regular tags
-   */
   const loadRegularTags = useCallback(async () => {
     try {
       const tags = await tagManager.getRegularTags();
-      
-      // TODO: Get actual usage statistics from API
       const tagsWithStats: RegularTagWithStats[] = tags.map(tag => ({
         ...tag,
-        entryCount: 0,
+        entryCount: 0, 
         lastUsed: undefined
       }));
-      
       setRegularTags(tagsWithStats);
     } catch (error) {
       logger.error('Failed to load regular tags:', error);
     }
   }, []);
 
-  /**
-   * Load secret tags
-   */
   const loadSecretTags = useCallback(async () => {
     try {
       const tags = await tagManager.getSecretTags();
-      
-      // TODO: Get actual usage statistics 
       const tagsWithStats: SecretTagWithStats[] = tags.map(tag => ({
         ...tag,
         entryCount: 0,
         lastUsed: undefined
       }));
-      
       setSecretTags(tagsWithStats);
     } catch (error) {
       logger.error('Failed to load secret tags:', error);
     }
   }, []);
 
-  /**
-   * Load all tags
-   */
   const loadAllTags = useCallback(async () => {
     await Promise.all([
       loadRegularTags(),
@@ -143,15 +120,11 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     ]);
   }, [loadRegularTags, loadSecretTags]);
 
-  /**
-   * Load tag manager status
-   */
   const loadTagStatus = useCallback(async () => {
     try {
       const config = tagManager.getConfig();
       const networkStatus = tagManager.getNetworkStatus();
       const cacheStatus = await tagManager.getCacheStatus();
-
       setSecurityMode(config.securityMode);
       setNetworkStatus(networkStatus);
       setCacheStatus(cacheStatus);
@@ -160,9 +133,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     }
   }, []);
 
-  /**
-   * Initialize component
-   */
   useEffect(() => {
     const initializeManager = async () => {
       setIsLoading(true);
@@ -171,13 +141,9 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
       await loadTagStatus();
       setIsLoading(false);
     };
-
     initializeManager();
   }, [loadAllTags, loadTagStatus]);
 
-  /**
-   * Handle refresh
-   */
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await loadAllTags();
@@ -186,70 +152,45 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     setIsRefreshing(false);
   }, [loadAllTags, loadTagStatus, onRefresh]);
 
-  /**
-   * Handle security mode change
-   */
   const handleSecurityModeChange = useCallback(async (mode: SecurityMode) => {
     try {
       await tagManager.setSecurityMode(mode);
       await loadTagStatus();
-      await loadSecretTags(); // Reload secret tags as they may change
+      await loadSecretTags();
     } catch (error) {
       logger.error('Failed to change security mode:', error);
       Alert.alert('Error', 'Failed to change security mode');
     }
   }, [loadTagStatus, loadSecretTags]);
 
-  /**
-   * Handle clear cache
-   */
   const handleClearCache = useCallback(async () => {
     try {
       await tagManager.clearSecretCache();
       await loadTagStatus();
-      await loadSecretTags(); // Reload secret tags after cache clear
+      await loadSecretTags();
     } catch (error) {
       logger.error('Failed to clear cache:', error);
       Alert.alert('Error', 'Failed to clear cache');
     }
   }, [loadTagStatus, loadSecretTags]);
 
-  /**
-   * Handle sync with server
-   */
   const handleSync = useCallback(async () => {
     try {
       await tagManager.syncWithServer();
       await loadTagStatus();
-      await loadSecretTags(); // Reload secret tags after sync
+      await loadSecretTags();
     } catch (error) {
       logger.error('Failed to sync with server:', error);
       Alert.alert('Sync Failed', 'Could not sync with server');
     }
   }, [loadTagStatus, loadSecretTags]);
 
-  /**
-   * Get current tags based on active type
-   */
   const getCurrentTags = useCallback((): (RegularTagWithStats | SecretTagWithStats)[] => {
     return activeTagType === 'regular' ? regularTags : secretTags;
   }, [activeTagType, regularTags, secretTags]);
 
-  /**
-   * Filter and sort current tags
-   */
   const filteredAndSortedTags = useCallback(() => {
     let filtered = getCurrentTags();
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(tag => 
-        tag.name.toLowerCase().includes(query)
-      );
-    }
-
-    // Apply sorting
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'usage':
@@ -263,333 +204,215 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           return a.name.localeCompare(b.name);
       }
     });
-
     return filtered;
-  }, [getCurrentTags, searchQuery, sortBy]);
+  }, [getCurrentTags, sortBy]);
 
-  /**
-   * Validate tag name
-   */
-  const validateTagName = useCallback((name: string): string | null => {
-    if (!name.trim()) {
-      return 'Tag name cannot be empty';
-    }
-    
-    if (name.length < 2) {
-      return 'Tag name must be at least 2 characters';
-    }
-    
-    if (name.length > 50) {
-      return 'Tag name must be less than 50 characters';
-    }
-    
+  const validateTagName = (name: string): string | null => {
+    if (!name.trim()) return "Tag name cannot be empty.";
+    if (name.length < 2) return "Tag name must be at least 2 characters long.";
+    if (name.length > 50) return "Tag name cannot exceed 50 characters.";
     const currentTags = getCurrentTags();
     const existingTag = currentTags.find(tag => 
-      tag.name.toLowerCase() === name.toLowerCase() && 
+      tag.name.toLowerCase() === name.toLowerCase() &&
       (!editingTag || tag.id !== editingTag.id)
     );
-    
-    if (existingTag) {
-      return 'A tag with this name already exists';
-    }
-    
+    if (existingTag) return `Tag "${name}" already exists.`;
     return null;
-  }, [getCurrentTags, editingTag]);
+  };
 
-  /**
-   * Validate activation phrase for secret tags
-   */
-  const validateActivationPhrase = useCallback((phrase: string): string | null => {
+  const validateActivationPhrase = (phrase: string): string | null => {
     if (activeTagType !== 'secret') return null;
-    
-    if (!phrase.trim()) {
-      return 'Activation phrase cannot be empty';
-    }
-    
-    if (phrase.length < 3) {
-      return 'Activation phrase must be at least 3 characters';
-    }
-    
-    if (phrase.length > 100) {
-      return 'Activation phrase must be less than 100 characters';
-    }
-    
+    if (!phrase.trim()) return "Activation phrase cannot be empty.";
+    if (phrase.length < 3) return "Phrase must be at least 3 characters long.";
+    if (phrase.length > 100) return "Phrase cannot exceed 100 characters.";
     return null;
-  }, [activeTagType]);
+  };
 
-  /**
-   * Handle create/edit tag
-   */
-  const handleSubmitTag = useCallback(async () => {
+  const handleSubmitTag = async () => {
     const nameValidation = validateTagName(tagName);
     if (nameValidation) {
       Alert.alert('Invalid Tag Name', nameValidation);
       return;
     }
-
-    if (activeTagType === 'secret') {
-      const phraseValidation = validateActivationPhrase(activationPhrase);
-      if (phraseValidation) {
-        Alert.alert('Invalid Activation Phrase', phraseValidation);
-        return;
-      }
+  
+    const phraseValidation = validateActivationPhrase(activationPhrase);
+    if (phraseValidation) {
+      Alert.alert('Invalid Activation Phrase', phraseValidation);
+      return;
     }
-
+  
     setIsSubmitting(true);
     try {
       if (editingTag) {
         Alert.alert('Coming Soon', 'Tag editing will be available in a future update.');
       } else {
         if (activeTagType === 'secret') {
-          // Create secret tag
           await tagManager.createSecretTag(tagName, activationPhrase, tagColor);
-          await loadSecretTags();
         } else {
-          // Create regular tag
           await tagManager.createRegularTag(tagName, tagColor);
-          await loadRegularTags();
         }
       }
-      
-      // Reset form
+      await loadAllTags();
+      setShowCreateModal(false);
+      setEditingTag(null);
       setTagName('');
       setActivationPhrase('');
       setTagColor('#007AFF');
-      setShowCreateModal(false);
-      setEditingTag(null);
     } catch (error) {
       logger.error('Failed to save tag:', error);
       Alert.alert('Error', 'Failed to save tag');
     } finally {
       setIsSubmitting(false);
     }
-  }, [tagName, activationPhrase, tagColor, activeTagType, editingTag, validateTagName, validateActivationPhrase, loadSecretTags, loadRegularTags]);
+  };
+  
+  const handleEditTag = (tag: RegularTagWithStats | SecretTagWithStats) => {
+    Alert.alert('Coming Soon', 'This feature will be implemented in a future update.');
+  };
 
-  /**
-   * Handle delete tag
-   */
-  const handleDeleteTag = useCallback(async (id: string, name: string) => {
-    // TODO: Get real entry count
-    const entryCount = 0;
-    logger.info(`Attempting to delete ${activeTagType} tag: ${name} (ID: ${id})`);
-    
-    // For web environment, use window.confirm as fallback
+  const handleDeleteTag = (id: string, name: string) => {
+    const tagToDelete = getCurrentTags().find(t => String(t.id) === id);
+    const entryCount = tagToDelete?.entryCount || 0;
+  
     const isWeb = typeof window !== 'undefined' && window.confirm;
-    
+  
     if (isWeb) {
       logger.info('Using window.confirm for web environment');
       const confirmed = window.confirm(
         `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries.`
       );
-      
       if (confirmed) {
         logger.info(`User confirmed deletion via window.confirm`);
-        try {
+        (async () => {
           logger.info(`Starting deletion of ${activeTagType} tag: ${name} (ID: ${id})`);
-          
-          if (activeTagType === 'secret') {
-            logger.info(`Calling tagManager.deleteSecretTag(${id})`);
-            await tagManager.deleteSecretTag(id);
-            logger.info(`Secret tag deleted successfully, reloading tags`);
-            await loadSecretTags();
-          } else {
-            logger.info(`Calling tagManager.deleteRegularTag(${id})`);
-            await tagManager.deleteRegularTag(id);
-            logger.info(`Regular tag deleted successfully, reloading tags`);
-            await loadRegularTags();
+          try {
+            if (activeTagType === 'secret') {
+              logger.info(`Calling tagManager.deleteSecretTag(${id})`);
+              await tagManager.deleteSecretTag(id);
+              logger.info(`Secret tag deleted successfully, reloading tags`);
+            } else {
+              logger.info(`Calling tagManager.deleteRegularTag(${id})`);
+              await tagManager.deleteRegularTag(id);
+              logger.info(`Regular tag deleted successfully, reloading tags`);
+            }
+            await loadAllTags();
+            logger.info('Tags reloaded after deletion');
+          } catch (error) {
+            logger.error(`Failed to delete ${activeTagType} tag:`, error);
+            Alert.alert('Delete Failed', `Could not delete tag "${name}"`);
           }
-          
-          logger.info(`Tag "${name}" deleted successfully`);
-          alert(`Tag "${name}" deleted successfully.`);
-        } catch (error) {
-          logger.error(`Failed to delete tag ${name}:`, error);
-          logger.error(`Error details:`, {
-            message: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-            response: (error as any)?.response?.data,
-            status: (error as any)?.response?.status
-          });
-          alert(`Failed to delete tag "${name}". Check console for details.`);
-        }
+        })();
       } else {
-        logger.info(`User cancelled deletion via window.confirm`);
+        logger.info('User cancelled deletion via window.confirm');
       }
     } else {
-      logger.info('Using Alert.alert for native environment');
       Alert.alert(
-        'Delete Tag',
-        `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries.`,
+        `Delete "${name}"?`,
+        `This will remove the tag from ${entryCount} journal entries. This action cannot be undone.`,
         [
-          { 
-            text: 'Cancel', 
-            style: 'cancel',
-            onPress: () => logger.info(`User cancelled deletion via Alert.alert`)
-          },
+          { text: 'Cancel', style: 'cancel' },
           {
             text: 'Delete',
             style: 'destructive',
             onPress: async () => {
-              logger.info(`User confirmed deletion via Alert.alert`);
               try {
-                logger.info(`Starting deletion of ${activeTagType} tag: ${name} (ID: ${id})`);
-                
                 if (activeTagType === 'secret') {
-                  logger.info(`Calling tagManager.deleteSecretTag(${id})`);
                   await tagManager.deleteSecretTag(id);
-                  logger.info(`Secret tag deleted successfully, reloading tags`);
-                  await loadSecretTags();
                 } else {
-                  logger.info(`Calling tagManager.deleteRegularTag(${id})`);
                   await tagManager.deleteRegularTag(id);
-                  logger.info(`Regular tag deleted successfully, reloading tags`);
-                  await loadRegularTags();
                 }
-                
-                logger.info(`Tag "${name}" deleted successfully`);
-                Alert.alert('Success', `Tag "${name}" deleted successfully.`);
+                await loadAllTags();
               } catch (error) {
-                logger.error(`Failed to delete tag ${name}:`, error);
-                logger.error(`Error details:`, {
-                  message: error instanceof Error ? error.message : String(error),
-                  stack: error instanceof Error ? error.stack : undefined,
-                  response: (error as any)?.response?.data,
-                  status: (error as any)?.response?.status
-                });
-                Alert.alert('Error', `Failed to delete tag "${name}". Check console for details.`);
+                logger.error(`Failed to delete ${activeTagType} tag:`, error);
+                Alert.alert('Delete Failed', `Could not delete tag "${name}"`);
               }
             },
           },
-        ],
-        { cancelable: true }
+        ]
       );
     }
-  }, [activeTagType, loadRegularTags, loadSecretTags]);
+  };
 
-  /**
-   * Handle edit tag
-   */
-  const handleEditTag = useCallback((tag: RegularTagWithStats | SecretTagWithStats) => {
-    setEditingTag(tag);
-    setTagName(tag.name);
-    setTagColor(tagColor); // TODO: Get actual color from tag
-    if (activeTagType === 'secret') {
-      // TODO: Get activation phrase from secret tag (if editable)
-      setActivationPhrase('');
-    }
-    setShowCreateModal(true);
-  }, [activeTagType, tagColor]);
-
-  /**
-   * Render tag type toggle
-   */
-  const renderTagTypeToggle = () => (
-    <View style={styles.toggleContainer}>
-      <TouchableOpacity
-        style={[
-          styles.toggleButton,
-          activeTagType === 'regular' && styles.activeToggleButton
-        ]}
-        onPress={() => setActiveTagType('regular')}
-      >
-        <Ionicons 
-          name="pricetag" 
-          size={16} 
-          color={activeTagType === 'regular' ? theme.colors.background : theme.colors.textSecondary} 
-        />
-        <Text style={[
-          styles.toggleButtonText,
-          activeTagType === 'regular' && styles.activeToggleButtonText
-        ]}>
-          Tags
-        </Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={[
-          styles.toggleButton,
-          activeTagType === 'secret' && styles.activeToggleButton
-        ]}
-        onPress={() => setActiveTagType('secret')}
-      >
-        <Ionicons 
-          name="shield" 
-          size={16} 
-          color={activeTagType === 'secret' ? theme.colors.background : theme.colors.textSecondary} 
-        />
-        <Text style={[
-          styles.toggleButtonText,
-          activeTagType === 'secret' && styles.activeToggleButtonText
-        ]}>
-          Secret Tags
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  /**
-   * Render statistics
-   */
-  const renderTagStats = () => {
-    const currentTags = getCurrentTags();
-    const totalTags = currentTags.length;
-    const totalUsage = currentTags.reduce((sum, tag) => sum + tag.entryCount, 0);
-    const averageUsage = totalTags > 0 ? totalUsage / totalTags : 0;
-
+  const renderTagTypeToggle = () => {
     return (
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{totalTags}</Text>
-          <Text style={styles.statLabel}>
-            {`${activeTagType === 'regular' ? 'Tags' : 'Secret Tags'}`}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            activeTagType === 'regular' && styles.activeToggleButton
+          ]}
+          onPress={() => setActiveTagType('regular')}
+        >
+          <Ionicons 
+            name="pricetag" 
+            size={16} 
+            color={activeTagType === 'regular' ? theme.colors.background : theme.colors.textSecondary} 
+          />
+          <Text style={[
+            styles.toggleButtonText,
+            activeTagType === 'regular' && styles.activeToggleButtonText
+          ]}>
+            Tags
           </Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{totalUsage}</Text>
-          <Text style={styles.statLabel}>Total Usage</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{averageUsage.toFixed(1)}</Text>
-          <Text style={styles.statLabel}>Avg Usage</Text>
-        </View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            activeTagType === 'secret' && styles.activeToggleButton
+          ]}
+          onPress={() => setActiveTagType('secret')}
+        >
+          <Ionicons 
+            name="shield" 
+            size={16} 
+            color={activeTagType === 'secret' ? theme.colors.background : theme.colors.textSecondary} 
+          />
+          <Text style={[
+            styles.toggleButtonText,
+            activeTagType === 'secret' && styles.activeToggleButtonText
+          ]}>
+            Secret Tags
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
 
-  /**
-   * Render tag card
-   */
-  const renderTagCard = (tag: RegularTagWithStats | SecretTagWithStats) => (
-    <View key={String(tag.id)} style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.cardColorIndicator, { backgroundColor: tag.colorCode || tagColor }]} />
-        <Text style={styles.cardTitle}>{tag.name}</Text>
-        <View style={styles.cardActions}>
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => handleEditTag(tag)}
-          >
-            <Ionicons name="pencil" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => handleDeleteTag(String(tag.id), tag.name)}
-          >
-            <Ionicons name="trash-bin" size={20} color={theme.colors.error} />
-          </TouchableOpacity>
+  const renderTagCard = (tag: RegularTagWithStats | SecretTagWithStats) => {
+    return (
+      <View key={String(tag.id)} style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.cardColorIndicator, { backgroundColor: tag.colorCode || tagColor }]} />
+          <Text style={styles.cardTitle}>{tag.name}</Text>
+          <View style={styles.cardActions}>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => handleEditTag(tag)}
+            >
+              <Ionicons name="pencil" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => handleDeleteTag(String(tag.id), tag.name)}
+            >
+              <Ionicons name="trash-bin" size={20} color={theme.colors.error} />
+            </TouchableOpacity>
+          </View>
         </View>
+        
+        {activeTagType === 'secret' && (
+          <View style={styles.cardSection}>
+            <Text style={styles.label}>Usage</Text>
+            <Text style={styles.value}>{tag.entryCount} entries</Text>
+            {tag.lastUsed && (
+              <Text style={styles.value}>Last used: {new Date(tag.lastUsed).toLocaleDateString()}</Text>
+            )}
+          </View>
+        )}
       </View>
-      
-      {activeTagType === 'secret' && (
-        <View style={styles.cardSection}>
-          <Text style={styles.label}>Usage</Text>
-          <Text style={styles.value}>{tag.entryCount} entries</Text>
-          {tag.lastUsed && (
-            <Text style={styles.value}>Last used: {new Date(tag.lastUsed).toLocaleDateString()}</Text>
-          )}
-        </View>
-      )}
-    </View>
-  );
+    );
+  };
 
   if (isLoading) {
     return (
@@ -599,13 +422,11 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
       </View>
     );
   }
-
+  
   return (
     <View style={styles.container}>
-      {/* Header with toggle */}
       {renderTagTypeToggle()}
 
-      {/* Secret tags security controls */}
       {activeTagType === 'secret' && (
         <View style={styles.securitySection}>
           <SecurityModeSelector
@@ -613,7 +434,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
             onModeChange={handleSecurityModeChange}
             disabled={isLoading || isRefreshing}
           />
-          
           <CacheStatusIndicator
             cacheStatus={cacheStatus}
             networkStatus={networkStatus}
@@ -625,28 +445,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         </View>
       )}
 
-      {/* Statistics */}
-      {renderTagStats()}
-
-      {/* Search and sort controls */}
       <View style={styles.controlsContainer}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={`Search ${activeTagType} tags...`}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-
         <View style={styles.sortContainer}>
           <Text style={styles.sortLabel}>Sort:</Text>
           {(['name', 'usage', 'recent'] as const).map((option) => (
@@ -662,14 +461,13 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                 styles.sortButtonText,
                 sortBy === option && styles.activeSortButtonText
               ]}>
-                {`${option === 'name' ? 'Name' : option === 'usage' ? 'Usage' : 'Recent'}`}
+                {option.charAt(0).toUpperCase() + option.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Tags list */}
       <ScrollView
         style={styles.tagsList}
         refreshControl={
@@ -681,9 +479,9 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           />
         }
       >
-        {filteredAndSortedTags().map(renderTagCard)}
-        
-        {filteredAndSortedTags().length === 0 && (
+        {filteredAndSortedTags().length > 0 ? (
+          filteredAndSortedTags().map(renderTagCard)
+        ) : (
           <View style={styles.emptyState}>
             <Ionicons
               name={activeTagType === 'secret' ? 'shield-outline' : 'pricetag-outline'}
@@ -691,18 +489,15 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
               color={theme.colors.textSecondary}
             />
             <Text style={styles.emptyStateTitle}>
-              {`No ${activeTagType} tags ${searchQuery ? 'found' : 'yet'}`}
+              No {activeTagType} tags yet
             </Text>
             <Text style={styles.emptyStateMessage}>
-              {searchQuery 
-                ? `No tags match "${searchQuery}"`
-                : `Create your first ${activeTagType} tag to get started`}
+              Create your first {activeTagType} tag to get started
             </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Create button */}
       <TouchableOpacity
         style={styles.createButton}
         onPress={() => setShowCreateModal(true)}
@@ -710,7 +505,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         <Ionicons name="add" size={24} color={theme.colors.background} />
       </TouchableOpacity>
 
-      {/* Create/Edit Modal */}
       <Modal
         visible={showCreateModal}
         transparent={true}
@@ -727,10 +521,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {activeTagType === 'secret' 
-                  ? `${editingTag ? 'Edit' : 'Create'} Secret Tag`
-                  : `${editingTag ? 'Edit' : 'Create'} Tag`
-                }
+                {editingTag ? 'Edit' : 'Create'} {activeTagType === 'secret' ? 'Secret Tag' : 'Tag'}
               </Text>
               <TouchableOpacity
                 style={styles.modalCloseButton}
@@ -842,7 +633,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                     <ActivityIndicator size="small" color={theme.colors.background} />
                   ) : (
                     <Text style={styles.submitButtonText}>
-                      {`${editingTag ? 'Update' : 'Create'}`}
+                      {editingTag ? 'Update' : 'Create'}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -872,8 +663,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
   },
-
-  // Tag type toggle
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: theme.colors.surface,
@@ -904,62 +693,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   activeToggleButtonText: {
     color: theme.colors.background,
   },
-
-  // Security section
   securitySection: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
   },
-
-  // Statistics
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
-    marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    borderRadius: 12,
-    padding: theme.spacing.lg,
-    ...theme.shadows.sm,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: theme.typography.fontSizes.xl,
-    fontWeight: '600',
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-  },
-  statLabel: {
-    fontSize: theme.typography.fontSizes.xs,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.regular,
-    marginTop: theme.spacing.xs,
-    textAlign: 'center',
-  },
-
-  // Controls
   controlsContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    ...theme.shadows.sm,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.sm,
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.regular,
+    paddingBottom: theme.spacing.sm,
   },
   sortContainer: {
     flexDirection: 'row',
@@ -988,8 +729,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   activeSortButtonText: {
     color: theme.colors.primary,
   },
-
-  // Tags list
   tagsList: {
     flex: 1,
     paddingHorizontal: theme.spacing.md,
@@ -1043,8 +782,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,
   },
-
-  // Empty state
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1066,8 +803,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: theme.spacing.lg,
   },
-
-  // Create button
   createButton: {
     position: 'absolute',
     bottom: theme.spacing.lg,
@@ -1080,8 +815,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     ...theme.shadows.lg,
   },
-
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1194,4 +927,4 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
 });
 
-export default TagsManager; 
+export default TagsManager;
