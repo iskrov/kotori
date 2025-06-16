@@ -371,6 +371,8 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   const handleDeleteTag = useCallback(async (id: string, name: string) => {
     // TODO: Get real entry count
     const entryCount = 0;
+    logger.info(`Attempting to delete ${activeTagType} tag: ${name} (ID: ${id})`);
+    
     Alert.alert(
       'Delete Tag',
       `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries.`,
@@ -381,17 +383,31 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           style: 'destructive',
           onPress: async () => {
             try {
+              logger.info(`Starting deletion of ${activeTagType} tag: ${name} (ID: ${id})`);
+              
               if (activeTagType === 'secret') {
+                logger.info(`Calling tagManager.deleteSecretTag(${id})`);
                 await tagManager.deleteSecretTag(id);
+                logger.info(`Secret tag deleted successfully, reloading tags`);
                 await loadSecretTags();
               } else {
+                logger.info(`Calling tagManager.deleteRegularTag(${id})`);
                 await tagManager.deleteRegularTag(id);
+                logger.info(`Regular tag deleted successfully, reloading tags`);
                 await loadRegularTags();
               }
+              
+              logger.info(`Tag "${name}" deleted successfully`);
               Alert.alert('Success', `Tag "${name}" deleted successfully.`);
             } catch (error) {
               logger.error(`Failed to delete tag ${name}:`, error);
-              Alert.alert('Error', `Failed to delete tag "${name}".`);
+              logger.error(`Error details:`, {
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                response: (error as any)?.response?.data,
+                status: (error as any)?.response?.status
+              });
+              Alert.alert('Error', `Failed to delete tag "${name}". Check console for details.`);
             }
           },
         },

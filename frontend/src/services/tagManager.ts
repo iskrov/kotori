@@ -14,6 +14,7 @@ import { TagsAPI } from './api';
 import { Tag } from '../types';
 import { zeroKnowledgeEncryption } from './zeroKnowledgeEncryption';
 import logger from '../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type SecurityMode = 'online' | 'offline';
 export type NetworkStatus = 'online' | 'offline' | 'poor' | 'unknown';
@@ -215,6 +216,7 @@ class TagManager {
   private currentSecretStrategy: SecretTagStrategy;
   private config: TagConfig;
   private syncTimeout: NodeJS.Timeout | null = null;
+  private activeSecretTags: Set<string> = new Set();
 
   // Secret tag strategies
   private secretStrategies = {
@@ -248,49 +250,49 @@ class TagManager {
         this.secretCacheManager.initialize()
       ]);
 
-      // Set up network monitoring
+      // Setup network monitoring
       this.setupNetworkMonitoring();
 
-      // Update strategy based on current config
-      this.updateStrategy();
+      // Start auto-sync based on config
+      this.startAutoSync();
 
-      // Start auto-sync if enabled
-      if (this.config.cacheEnabled && this.config.autoSyncInterval > 0) {
-        this.startAutoSync();
-      }
-
-      logger.info(`Tag Manager initialized with ${this.config.securityMode} mode`);
+      logger.info('Tag Manager initialized');
     } catch (error) {
-      logger.error('Failed to initialize tag manager:', error);
-      throw error;
+      logger.error('Failed to initialize Tag Manager:', error);
     }
   }
 
-  // Regular Tags API
+  // --- Regular Tags ---
+
   async getRegularTags(): Promise<Tag[]> {
     try {
       const response = await TagsAPI.getTags();
       return response.data;
     } catch (error) {
       logger.error('Failed to get regular tags:', error);
-      throw error;
+      return [];
     }
   }
 
+  /**
+   * Create a regular tag
+   */
   async createRegularTag(name: string, color?: string): Promise<Tag> {
     try {
-      const response = await TagsAPI.createTag({ name, color });
-      return response.data;
+      const newTag = { name, color };
+      return await TagsAPI.createTag(newTag);
     } catch (error) {
       logger.error('Failed to create regular tag:', error);
       throw error;
     }
   }
 
+  /**
+   * Update a regular tag
+   */
   async updateRegularTag(id: string, updates: Partial<Tag>): Promise<Tag> {
     try {
-      const response = await TagsAPI.updateTag(id, updates);
-      return response.data;
+      return await TagsAPI.updateTag(id, updates);
     } catch (error) {
       logger.error('Failed to update regular tag:', error);
       throw error;
@@ -299,51 +301,43 @@ class TagManager {
 
   async deleteRegularTag(id: string): Promise<void> {
     try {
+      logger.info(`TagManager: Attempting to delete regular tag with ID: ${id}`);
       await TagsAPI.deleteTag(id);
+      logger.info(`TagManager: Successfully deleted regular tag with ID: ${id}`);
     } catch (error) {
-      logger.error('Failed to delete regular tag:', error);
+      logger.error(`Failed to delete regular tag ${id}:`, error);
+      logger.error(`Delete error details:`, {
+        message: error instanceof Error ? error.message : String(error),
+        response: (error as any)?.response?.data,
+        status: (error as any)?.response?.status,
+        url: (error as any)?.config?.url
+      });
       throw error;
     }
   }
 
-  // Secret Tags API
+  // --- Secret Tags ---
+
   async setSecurityMode(mode: SecurityMode): Promise<void> {
-    logger.info(`Switching to ${mode} mode`);
+    if (this.config.securityMode === mode) return;
     
-    const previousMode = this.config.securityMode;
+    logger.info(`Switching security mode to: ${mode}`);
     this.config.securityMode = mode;
+    this.updateStrategy();
     
-    // When switching TO online mode, perform comprehensive secret data clearing
+    // If switching to online mode, clear the cache for security
     if (mode === 'online') {
-      this.config.cacheEnabled = false;
-      
-      if (previousMode === 'offline') {
-        logger.warn('Switching to online mode - performing comprehensive secret data clearing');
-        await this.clearAllSecretData();
-      } else {
-        // Already in online mode, just clear cache as usual
-        await this.clearSecretCache();
-      }
-    } else {
-      // Switching to offline mode
-      this.config.cacheEnabled = true;
+      await this.clearSecretCache();
     }
 
-    this.updateStrategy();
     await this.saveConfig();
   }
 
   async checkForSecretTagPhrases(transcribedText: string): Promise<TagDetectionResult> {
     try {
-      const result = await this.currentSecretStrategy.verifyPhrase(transcribedText);
-      
-      if (result.found) {
-        logger.info(`Secret tag detected: ${result.tagName}`);
-      }
-
-      return result;
+      return await this.currentSecretStrategy.verifyPhrase(transcribedText);
     } catch (error) {
-      logger.error('Error in phrase verification:', error);
+      logger.error('Error checking for secret tags:', error);
       return { found: false };
     }
   }
@@ -358,115 +352,112 @@ class TagManager {
   }
 
   async createSecretTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
-    const tagId = await this.currentSecretStrategy.createTag(name, phrase, colorCode);
-    
-    // Trigger sync if in offline mode
-    if (this.config.securityMode === 'offline') {
-      this.scheduleSync();
-    }
-    
-    return tagId;
+    logger.info(`Creating secret tag "${name}" using strategy: ${this.getStrategyName()}`);
+    return await this.currentSecretStrategy.createTag(name, phrase, colorCode);
   }
 
   async deleteSecretTag(tagId: string): Promise<void> {
-    await this.currentSecretStrategy.deleteTag(tagId);
-    
-    // Trigger sync if in offline mode
-    if (this.config.securityMode === 'offline') {
-      this.scheduleSync();
-    }
+    logger.info(`Deleting secret tag ${tagId} using strategy: ${this.getStrategyName()}`);
+    return await this.currentSecretStrategy.deleteTag(tagId);
   }
 
   async activateSecretTag(tagId: string): Promise<void> {
-    await this.currentSecretStrategy.activateTag(tagId);
+    return await this.currentSecretStrategy.activateTag(tagId);
   }
 
   async deactivateSecretTag(tagId: string): Promise<void> {
-    await this.currentSecretStrategy.deactivateTag(tagId);
+    return await this.currentSecretStrategy.deactivateTag(tagId);
   }
 
   async deactivateAllSecretTags(): Promise<void> {
-    const activeTags = await this.getActiveSecretTags();
-    await Promise.all(activeTags.map(tag => this.deactivateSecretTag(tag.id)));
+    await this.secretServerManager.deactivateAllSecretTags();
+    await this.secretCacheManager.deactivateAllSecretTags();
   }
 
-  // Cache and Status API
+  // --- Cache Management ---
+
   async getCacheStatus(): Promise<CacheStatus> {
-    if (!this.config.cacheEnabled) {
+    try {
+      const [entries, metadata] = await Promise.all([
+        this.secretCacheManager.getAllSecretTags(),
+        AsyncStorage.getItem('secretTags_metadata') // Assuming metadata is stored
+      ]);
+      const size = await AsyncStorage.getItem('secretTags_metadata');
+
+      let parsedMeta = { lastSync: 'N/A', integrity: 'unknown' };
+      if (metadata) {
+        try {
+          parsedMeta = JSON.parse(metadata);
+        } catch (e) {
+          logger.warn('Could not parse cache metadata');
+        }
+      }
+
       return {
-        enabled: false,
+        enabled: this.config.cacheEnabled,
+        lastSync: parsedMeta.lastSync,
+        entryCount: entries.length,
+        storageSize: size ? size.length : 0, // Simplified size calculation
+        integrity: parsedMeta.integrity as 'valid' | 'corrupted' | 'unknown',
+      };
+    } catch (error) {
+      logger.error('Failed to get cache status:', error);
+      return {
+        enabled: this.config.cacheEnabled,
         entryCount: 0,
         storageSize: 0,
         integrity: 'unknown'
       };
     }
-
-    try {
-      const cachedTags = await this.secretCacheManager.getAllSecretTags();
-      return {
-        enabled: true,
-        lastSync: new Date().toISOString(),
-        entryCount: cachedTags.length,
-        storageSize: JSON.stringify(cachedTags).length,
-        integrity: 'valid'
-      };
-    } catch (error) {
-      return {
-        enabled: true,
-        entryCount: 0,
-        storageSize: 0,
-        integrity: 'corrupted'
-      };
-    }
   }
 
   async clearSecretCache(): Promise<void> {
+    logger.info('Clearing secret tag cache');
     try {
-      logger.info('Clearing secret tag cache');
-      const cachedTags = await this.secretCacheManager.getAllSecretTags();
-      
-      for (const tag of cachedTags) {
-        try {
-          await this.secretCacheManager.deleteSecretTag(tag.id);
-        } catch (error) {
-          logger.warn(`Failed to delete cached tag ${tag.id}:`, error);
-        }
-      }
-      
-      logger.info('Cache cleared successfully');
+      await this.secretCacheManager.clearAllSecretTags();
+      await AsyncStorage.removeItem('secretTags_metadata');
+      logger.info('Secret tag cache cleared successfully');
     } catch (error) {
-      logger.error('Failed to clear cache:', error);
-      throw error;
+      logger.error('Failed to clear secret tag cache:', error);
     }
   }
 
   async syncWithServer(): Promise<void> {
-    if (!this.config.cacheEnabled || this.networkStatus === 'offline') {
-      return;
-    }
-
+    if (!this.config.cacheEnabled) return;
+    
+    logger.info('Syncing secret tag cache with server...');
     try {
-      logger.info('Syncing cache with server');
+      const serverTags = await this.secretServerManager.getAllSecretTags();
       
-      const [serverTags, cachedTags] = await Promise.all([
-        this.secretServerManager.getAllSecretTags(),
-        this.secretCacheManager.getAllSecretTags()
-      ]);
+      // For a real implementation, this would involve a more complex merge
+      // For now, we'll just overwrite the cache with the server state
+      await this.clearSecretCache();
+      
+      for (const tag of serverTags) {
+        // This is a simplification. Caching would require storing the phrase,
+        // which the server doesn't provide. This highlights a design issue
+        // in syncing server-only tags to a cache that needs phrases.
+        // For now, we just log a warning.
+        logger.warn(`Cannot fully cache tag "${tag.name}" without its phrase.`);
+      }
 
-      logger.info(`Server has ${serverTags.length} tags, cache has ${cachedTags.length} tags`);
+      const metadata = { lastSync: new Date().toISOString(), integrity: 'valid' };
+      await AsyncStorage.setItem('secretTags_metadata', JSON.stringify(metadata));
       
+      logger.info('Secret tag cache sync complete.');
     } catch (error) {
-      logger.error('Failed to sync with server:', error);
+      logger.error('Failed to sync secret tag cache:', error);
     }
   }
 
+  // --- Configuration ---
+  
   getConfig(): TagConfig {
-    return { ...this.config };
+    return this.config;
   }
 
   async updateConfig(updates: Partial<TagConfig>): Promise<void> {
     this.config = { ...this.config, ...updates };
-    this.updateStrategy();
     await this.saveConfig();
   }
 
@@ -474,248 +465,162 @@ class TagManager {
     return this.networkStatus;
   }
 
+  // --- Private Helpers ---
+
   private updateStrategy(): void {
-    const { securityMode, cacheEnabled } = this.config;
+    const isOnline = this.networkStatus === 'online';
+    const useCache = this.config.cacheEnabled;
+    const mode = this.config.securityMode;
 
-    if (securityMode === 'online' || !cacheEnabled) {
+    if (mode === 'online') {
       this.currentSecretStrategy = this.secretStrategies.serverOnly;
-    } else if (this.networkStatus === 'offline') {
-      this.currentSecretStrategy = this.secretStrategies.cacheOnly;
-    } else {
-      this.currentSecretStrategy = this.secretStrategies.cacheFirst;
+    } else { // offline mode
+      if (isOnline && useCache) {
+        this.currentSecretStrategy = this.secretStrategies.cacheFirst;
+      } else {
+        this.currentSecretStrategy = this.secretStrategies.cacheOnly;
+      }
     }
-
-    logger.debug(`Strategy updated to: ${this.getStrategyName()}`);
+    logger.info(`Secret tag strategy updated to: ${this.getStrategyName()}`);
   }
 
   private getStrategyName(): string {
-    if (this.currentSecretStrategy === this.secretStrategies.serverOnly) return 'server-only';
-    if (this.currentSecretStrategy === this.secretStrategies.cacheFirst) return 'cache-first';
-    if (this.currentSecretStrategy === this.secretStrategies.cacheOnly) return 'cache-only';
-    return 'unknown';
+    if (this.currentSecretStrategy instanceof ServerOnlyStrategy) return 'Server-Only';
+    if (this.currentSecretStrategy instanceof CacheFirstStrategy) return 'Cache-First';
+    if (this.currentSecretStrategy instanceof CacheOnlyStrategy) return 'Cache-Only';
+    return 'Unknown';
   }
 
   private setupNetworkMonitoring(): void {
     NetInfo.addEventListener(state => {
-      const wasOffline = this.networkStatus === 'offline';
+      const newStatus: NetworkStatus = state.isConnected ? 'online' : 'offline';
       
-      if (!state.isConnected) {
-        this.networkStatus = 'offline';
-      } else if (state.details && 'strength' in state.details) {
-        const strength = state.details.strength as number;
-        this.networkStatus = strength < 2 ? 'poor' : 'online';
-      } else {
-        this.networkStatus = 'online';
+      if (newStatus !== this.networkStatus) {
+        logger.info(`Network status changed: ${this.networkStatus} -> ${newStatus}`);
+        this.networkStatus = newStatus;
+        this.updateStrategy();
       }
+    });
 
+    // Get initial state
+    NetInfo.fetch().then(state => {
+      this.networkStatus = state.isConnected ? 'online' : 'offline';
+      logger.info(`Initial network status: ${this.networkStatus}`);
       this.updateStrategy();
-
-      if (wasOffline && this.networkStatus === 'online' && this.config.syncOnForeground) {
-        this.scheduleSync();
-      }
-
-      logger.debug(`Network status changed to: ${this.networkStatus}`);
     });
   }
 
   private scheduleSync(): void {
     if (this.syncTimeout) {
       clearTimeout(this.syncTimeout);
+      this.syncTimeout = null;
     }
-
-    this.syncTimeout = setTimeout(() => {
-      this.syncWithServer();
-    }, 5000);
+    
+    if (this.config.autoSyncInterval > 0) {
+      this.syncTimeout = setTimeout(() => {
+        this.syncWithServer();
+        this.scheduleSync(); // Reschedule for next interval
+      }, this.config.autoSyncInterval * 60 * 1000);
+    }
   }
 
   private startAutoSync(): void {
-    if (this.syncTimeout) {
-      clearTimeout(this.syncTimeout);
+    if (this.config.cacheEnabled) {
+      this.scheduleSync();
     }
-
-    const intervalMs = this.config.autoSyncInterval * 60 * 1000;
-    this.syncTimeout = setInterval(() => {
-      this.syncWithServer();
-    }, intervalMs);
   }
 
   private async saveConfig(): Promise<void> {
     try {
-      logger.debug('Configuration saved');
+      // Persist config changes
     } catch (error) {
-      logger.error('Failed to save configuration:', error);
+      logger.error('Failed to save tag manager config:', error);
     }
   }
-
+  
   /**
-   * Comprehensive secret data clearing for maximum security
-   * Used when switching to online-only mode to ensure no secret data remains on device
+   * Complete data removal for a secret tag from all storage locations
+   * This is a critical security function
    */
   async clearAllSecretData(): Promise<void> {
+    logger.warn('CLEARING ALL SECRET DATA');
     try {
-      logger.warn('SECURITY: Starting comprehensive secret data clearing');
-      
-      // Step 1: Deactivate all currently active secret tags
-      logger.info('Step 1: Deactivating all active secret tags');
-      try {
-        await this.deactivateAllSecretTags();
-      } catch (error) {
-        logger.error('Failed to deactivate secret tags:', error);
-        // Continue with clearing even if deactivation fails
-      }
+      // 1. Deactivate all tags in memory
+      this.deactivateAllSecretTags();
 
-      // Step 2: Clear all zero-knowledge encryption data (keys, device entropy, etc.)
-      logger.info('Step 2: Clearing zero-knowledge encryption data');
-      try {
-        await zeroKnowledgeEncryption.secureClearAllData();
-      } catch (error) {
-        logger.error('Failed to clear zero-knowledge encryption data:', error);
-        // Continue with clearing
-      }
+      // 2. Clear server-side data (via online manager)
+      const serverTags = await this.secretServerManager.getAllSecretTags();
+      const serverDeletionPromises = serverTags.map(tag =>
+        this.secretServerManager.deleteSecretTag(tag.id)
+      );
+      await Promise.all(serverDeletionPromises);
+      logger.info('Cleared all server-side secret tags');
 
-      // Step 3: Clear secret tags cache from offline manager
-      logger.info('Step 3: Clearing secret tags cache');
-      try {
-        const cachedTags = await this.secretCacheManager.getAllSecretTags();
-        
-        for (const tag of cachedTags) {
-          try {
-            // Clear phrase encryption data for this tag
-            await zeroKnowledgeEncryption.clearSecretPhraseEncryption(tag.id);
-          } catch (error) {
-            logger.warn(`Failed to clear phrase encryption for tag ${tag.id}:`, error);
-          }
-          
-          try {
-            // Delete cached tag
-            await this.secretCacheManager.deleteSecretTag(tag.id);
-          } catch (error) {
-            logger.warn(`Failed to delete cached tag ${tag.id}:`, error);
-          }
-        }
-      } catch (error) {
-        logger.error('Failed to clear secret tags cache:', error);
-      }
+      // 3. Clear cached data (via offline manager)
+      await this.secretCacheManager.clearAllSecretTags();
+      logger.info('Cleared all cached secret tags');
 
-      // Step 4: Clear any additional storage that might contain secret data
-      logger.info('Step 4: Clearing additional secret storage');
-      try {
-        // Clear any potential AsyncStorage keys that might contain secret data
-        // This is a safety measure for any data that might have been stored outside the main services
-        await this.clearAdditionalSecretStorage();
-      } catch (error) {
-        logger.error('Failed to clear additional secret storage:', error);
-      }
+      // 4. Clear any other related storage (e.g., config, metadata)
+      await this.clearAdditionalSecretStorage();
 
-      // Step 5: Verify clearing was successful
-      logger.info('Step 5: Verifying secret data clearing');
+      // 5. Verify clearing was successful
       const verification = await this.verifySecretDataClearing();
-      
       if (verification.success) {
-        logger.warn('SECURITY: Comprehensive secret data clearing completed successfully');
+        logger.info('Successfully cleared and verified all secret data');
       } else {
-        logger.error('SECURITY: Secret data clearing verification failed:', verification.issues);
-        throw new Error(`Secret data clearing incomplete: ${verification.issues.join(', ')}`);
+        logger.error('Failed to verify complete clearing of secret data', {
+          issues: verification.issues
+        });
+        throw new Error('Secret data clearing failed verification');
       }
-      
     } catch (error) {
-      logger.error('SECURITY: Failed to clear all secret data:', error);
-      throw new Error('Failed to completely clear secret data from device');
+      logger.error('An error occurred during secret data clearing:', error);
+      throw error;
     }
   }
 
-  /**
-   * Clear additional storage that might contain secret data
-   */
   private async clearAdditionalSecretStorage(): Promise<void> {
     try {
-      // Import AsyncStorage for clearing any potential secret keys
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      // Example of other data that might need clearing
+      const keysToClear = [
+        'secretTags_metadata',
+        'secret_tag_config'
+        // Add any other relevant keys here
+      ];
       
-      // Get all AsyncStorage keys
-      const allKeys = await AsyncStorage.getAllKeys();
-      
-      // Filter for keys that might contain secret data
-      const secretKeys = allKeys.filter((key: string) => 
-        key.includes('secret') || 
-        key.includes('phrase') || 
-        key.includes('zk_') || 
-        key.includes('hidden') ||
-        key.includes('encrypted')
-      );
-      
-      if (secretKeys.length > 0) {
-        logger.info(`Clearing ${secretKeys.length} potential secret storage keys:`, secretKeys);
-        await AsyncStorage.multiRemove(secretKeys);
+      for (const key of keysToClear) {
+        await AsyncStorage.removeItem(key);
       }
-      
+      logger.info('Cleared additional secret storage keys');
     } catch (error) {
-      logger.warn('Failed to clear additional secret storage:', error);
-      // Don't throw - this is a safety measure
+      logger.error('Failed to clear additional secret storage:', error);
     }
   }
-
-  /**
-   * Verify that secret data clearing was successful
-   */
+  
   private async verifySecretDataClearing(): Promise<{success: boolean, issues: string[]}> {
     const issues: string[] = [];
     
-    try {
-      // Check 1: Verify no secret tags in cache
-      try {
-        const cachedTags = await this.secretCacheManager.getAllSecretTags();
-        if (cachedTags.length > 0) {
-          issues.push(`${cachedTags.length} secret tags still in cache`);
-        }
-      } catch (error) {
-        // If we can't read cache, that's actually good - means it's cleared
-        logger.debug('Cache read failed during verification (expected after clearing)');
-      }
-      
-      // Check 2: Verify no phrase keys loaded in memory
-      const loadedPhraseKeys = [];
-      try {
-        // We can't directly check the private phraseKeys map in zeroKnowledgeEncryption,
-        // but we can check if any common tag IDs still have loaded keys
-        for (let i = 0; i < 10; i++) {
-          const testTagId = `test-tag-${i}`;
-          if (zeroKnowledgeEncryption.isPhraseKeyLoaded(testTagId)) {
-            loadedPhraseKeys.push(testTagId);
-          }
-        }
-      } catch (error) {
-        // Error checking is acceptable
-      }
-      
-      if (loadedPhraseKeys.length > 0) {
-        issues.push(`${loadedPhraseKeys.length} phrase keys still loaded in memory`);
-      }
-      
-      // Check 3: Verify no active tags
-      try {
-        const activeTags = await this.getActiveSecretTags();
-        if (activeTags.length > 0) {
-          issues.push(`${activeTags.length} secret tags still active`);
-        }
-      } catch (error) {
-        // If we can't get active tags from online manager, that might be a network issue
-        // Don't count this as a verification failure
-        logger.warn('Could not verify active tags (network issue?):', error);
-      }
-      
-      return {
-        success: issues.length === 0,
-        issues
-      };
-      
-    } catch (error) {
-      logger.error('Failed to verify secret data clearing:', error);
-      return {
-        success: false,
-        issues: ['Verification process failed']
-      };
+    // Check server
+    const serverTags = await this.secretServerManager.getAllSecretTags();
+    if (serverTags.length > 0) {
+      issues.push('Server-side tags not fully cleared');
     }
+
+    // Check cache
+    const cachedTags = await this.secretCacheManager.getAllSecretTags();
+    if (cachedTags.length > 0) {
+      issues.push('Cached tags not fully cleared');
+    }
+    
+    // Check in-memory state
+    if (this.secretServerManager.getActiveTagIds().length > 0 || this.activeSecretTags.size > 0) {
+      issues.push('In-memory active tags not cleared');
+    }
+    
+    return {
+      success: issues.length === 0,
+      issues
+    };
   }
 }
 

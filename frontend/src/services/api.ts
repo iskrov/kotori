@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { JournalEntryCreate, JournalEntryUpdate, User } from '../types';
+import { JournalEntryCreate, JournalEntryUpdate, User, Tag } from '../types';
 import logger from '../utils/logger';
 
 // Define environment-based API URL
@@ -313,24 +313,21 @@ export const UserAPI = {
       },
     });
   },
+
+  updateMe: (data: Partial<User>) =>
+    api.put('/api/users/me', data),
 };
 
 // Journal entries
 export const JournalAPI = {
-  getEntries: (params?: { 
-    page?: number, 
-    limit?: number, 
-    tags?: string[], 
-    start_date?: string,  // Filter entries from this date (YYYY-MM-DD format)
-    end_date?: string,    // Filter entries to this date (YYYY-MM-DD format)
-    secret_tag_hashes?: string[],  // Filter by secret tag hashes
-    include_public?: boolean       // Include public entries (default: true)
-  }) => api.get('/api/journals/', { params }),
+  getEntries: (params: any) => 
+    api.get('/api/journals', { params }),
   
   getEntry: (id: number) => 
     api.get(`/api/journals/${id}`),
   
-  createEntry: (data: JournalEntryCreate) => api.post('/api/journals/', data),
+  createEntry: (data: JournalEntryCreate) => 
+    api.post('/api/journals', data),
 
   // Enhanced method for creating encrypted secret tag entries
   createEncryptedEntry: (data: {
@@ -363,131 +360,18 @@ export const JournalAPI = {
     secret_tag_hash: data.secret_tag_hash,
   }),
   
-  updateEntry: (id: number, data: JournalEntryUpdate) => {
-    console.log('JournalAPI.updateEntry called with data:', JSON.stringify(data));
-    // Make a defensive copy of data
-    const sanitizedData = { ...data };
-    
-    // Ensure entry_date is present
-    if (!sanitizedData.entry_date) {
-      console.error('Warning: Missing entry_date in updateEntry', sanitizedData);
-      
-      // Fetch the entry to get its entry_date if missing
-      return api.get(`/api/journals/${id}`).then(response => {
-        const existingEntry = response.data;
-        sanitizedData.entry_date = existingEntry.entry_date;
-        
-        console.log('JournalAPI.updateEntry: Added entry_date from fetched entry:', sanitizedData.entry_date);
-        
-        // Continue with tags handling and update
-        return processUpdateWithTags(id, sanitizedData);
-      }).catch(error => {
-        console.error('Failed to fetch journal entry for update:', error);
-        throw new Error(`Failed to prepare journal entry update: ${error.message}`);
-      });
-    } else {
-      // If entry_date is already present, just process tags and update
-      return processUpdateWithTags(id, sanitizedData).catch(error => {
-        console.error('Failed to update journal entry with processUpdateWithTags:', error);
-        
-        // Last resort fallback - try a direct fetch API call
-        if (error.message && error.message.includes('CORS')) {
-          console.log('Attempting final fallback with fetch API for CORS issues');
-          return AsyncStorage.getItem('access_token').then(token => {
-            const apiUrl = getApiUrl();
-            const url = `${apiUrl}/api/journals/${id}`;
-            
-            // Process tags one more time to ensure they're strings
-            if (sanitizedData.tags && Array.isArray(sanitizedData.tags)) {
-              sanitizedData.tags = sanitizedData.tags.map((tag: any) => 
-                typeof tag === 'string' ? tag : (tag && typeof tag === 'object' && 'name' in tag) ? tag.name : String(tag)
-              );
-            }
-            
-            return fetch(url, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': token ? `Bearer ${token}` : '',
-              },
-              credentials: 'include',
-              body: JSON.stringify(sanitizedData)
-            }).then(response => {
-              if (!response.ok) {
-                throw new Error(`Fetch API error: ${response.status} ${response.statusText}`);
-              }
-              return response.json();
-            });
-          });
-        }
-        
-        throw error; // Re-throw if not a CORS issue or if fetch also fails
-      });
-    }
-  },
+  updateEntry: (id: number, data: JournalEntryUpdate) => 
+    api.put(`/api/journals/${id}`, data),
   
-  deleteEntry: (id: number) => {
-    console.log(`[JournalAPI.deleteEntry] Deleting entry with ID: ${id}`);
-    const deletePromise = api.delete(`/api/journals/${id}`);
-    deletePromise.then(result => {
-      console.log(`[JournalAPI.deleteEntry] Delete successful for ID ${id}:`, result);
-    }).catch(error => {
-      console.error(`[JournalAPI.deleteEntry] Delete failed for ID ${id}:`, error);
-    });
-    return deletePromise;
-  },
+  deleteEntry: (id: number) => 
+    api.delete(`/api/journals/${id}`),
   
-  searchEntries: (query: string, options?: {
-    secret_tag_hashes?: string[];
-    include_public?: boolean;
-  }) => {
-    const params = new URLSearchParams({ q: query });
-    
-    if (options?.secret_tag_hashes && options.secret_tag_hashes.length > 0) {
-      options.secret_tag_hashes.forEach(hash => {
-        params.append('secret_tag_hash', hash);
-      });
-    }
-    
-    if (options?.include_public !== undefined) {
-      params.append('include_public', options.include_public.toString());
-    }
-    
-    return api.get(`/api/journals/search?${params.toString()}`);
-  },
+  searchEntries: (query: string) => 
+    api.get('/api/journals/search', { params: { q: query } }),
 
   // Get entries by secret tag (for specific tag filtering)
   getEntriesBySecretTag: (secretTagHash: string, params?: { skip?: number, limit?: number }) =>
     api.get(`/api/journals/secret-tag/${secretTagHash}`, { params }),
-};
-
-// Helper function to process tags and send the update
-const processUpdateWithTags = (id: number, sanitizedData: JournalEntryUpdate) => {
-  // Ensure tags is properly formatted as string[]
-  if (sanitizedData.tags) {
-    // Make sure tags is an array of strings by extracting tag names
-    const stringTags = sanitizedData.tags.map((tag: string | {name: string}) => {
-      // If tag is already a string, use it directly
-      if (typeof tag === 'string') {
-        return tag;
-      }
-      
-      // If tag is an object with name property, extract the name
-      if (typeof tag === 'object' && tag !== null && 'name' in tag) {
-        return tag.name;
-      }
-      
-      // Fallback to string representation (should not happen)
-      console.error('JournalAPI.updateEntry: Unexpected tag format:', tag);
-      return String(tag);
-    });
-    
-    sanitizedData.tags = stringTags;
-    console.log('JournalAPI.updateEntry: Properly extracted tag names:', JSON.stringify(stringTags));
-  }
-  
-  console.log('JournalAPI.updateEntry: Sending payload for api.put:', JSON.stringify(sanitizedData));
-  return api.put(`/api/journals/${id}`, sanitizedData);
 };
 
 // Reminders
@@ -514,14 +398,23 @@ export const TagsAPI = {
   
   getEntriesByTag: (tagName: string) => api.get(`/api/journals/tags/${tagName}/entries`),
   
-  createTag: (data: { name: string; color?: string }) => 
-    api.post('/api/journals/tags', data),
+  createTag: async (tag: { name: string; color?: string }) => {
+    const response = await api.post('/api/journals/tags', tag);
+    return response.data;
+  },
   
-  updateTag: (id: string, data: Partial<{ name: string; color: string }>) => 
-    api.put(`/api/journals/tags/${id}`, data),
+  updateTag: async (id: string, updates: Partial<Tag>) => {
+    const response = await api.put(`/api/journals/tags/${id}`, updates);
+    return response.data;
+  },
   
-  deleteTag: (id: string) => 
-    api.delete(`/api/journals/tags/${id}`),
+  deleteTag: async (id: string) => {
+    logger.info(`API: Attempting to delete tag with ID: ${id}`);
+    logger.info(`API: DELETE request to: /api/journals/tags/${id}`);
+    const response = await api.delete(`/api/journals/tags/${id}`);
+    logger.info(`API: Delete tag response:`, response.data);
+    return response.data;
+  },
 };
 
 // Audio transcription
