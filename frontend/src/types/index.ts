@@ -51,6 +51,7 @@ export interface User {
 export interface Tag {
   id: number;
   name: string;
+  color?: string;
   count?: number;
   created_at?: string;
   updated_at?: string;

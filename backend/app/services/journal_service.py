@@ -168,11 +168,17 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return tag_obj
 
     def delete_tag(self, db: Session, *, tag_id: int, user_id: int) -> TagModel:
-        """Delete a tag."""
+        """Delete a tag and all its associations."""
         tag_obj = db.query(TagModel).get(tag_id)
         if not tag_obj:
             raise ValueError("Tag not found")
-            
+        
+        # First, delete all journal_entry_tags associations for this tag
+        associations = db.query(JournalEntryTag).filter(JournalEntryTag.tag_id == tag_id).all()
+        for assoc in associations:
+            db.delete(assoc)
+        
+        # Now delete the tag itself
         db.delete(tag_obj)
         db.commit()
         return tag_obj

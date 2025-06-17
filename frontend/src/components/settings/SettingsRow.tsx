@@ -16,6 +16,7 @@ interface SettingsRowProps {
   title: string;
   subtitle?: string;
   leftIcon?: keyof typeof Ionicons.glyphMap;
+  leftIconColor?: string;
   rightElement?: React.ReactNode;
   onPress?: () => void;
   disabled?: boolean;
@@ -28,6 +29,7 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
   title,
   subtitle,
   leftIcon,
+  leftIconColor,
   rightElement,
   onPress,
   disabled = false,
@@ -69,7 +71,7 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
             <Ionicons
               name={leftIcon}
               size={22}
-              color={disabled ? theme.colors.disabled : theme.colors.primary}
+              color={disabled ? theme.colors.disabled : (leftIconColor || theme.colors.primary)}
             />
           </View>
         )}

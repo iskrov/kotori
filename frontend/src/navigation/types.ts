@@ -28,6 +28,7 @@ export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Record: RecordScreenParams | undefined;
   TagManagement: undefined;
+  TagDeleteConfirmation: { tagId: string; tagName: string; tagType: 'regular' | 'secret' };
 };
 
 // Auth stack params

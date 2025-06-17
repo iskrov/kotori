@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import MainTabNavigator from './MainTabNavigator';
 import RecordScreen from '../screens/main/RecordScreen';
 import TagManagementScreen from '../screens/main/TagManagementScreen';
+import TagDeleteConfirmationScreen from '../screens/main/TagDeleteConfirmationScreen';
 import { MainStackParamList } from './types';
 
 const Stack = createStackNavigator<MainStackParamList>();
@@ -30,6 +31,14 @@ const MainNavigator = () => {
       <Stack.Screen
         name="TagManagement"
         component={TagManagementScreen}
+        options={{
+          presentation: 'modal',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="TagDeleteConfirmation"
+        component={TagDeleteConfirmationScreen}
         options={{
           presentation: 'modal',
           headerShown: false,

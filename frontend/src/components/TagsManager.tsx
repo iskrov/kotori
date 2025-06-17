@@ -19,9 +19,12 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
 import { Tag } from '../types';
+import { MainStackParamList } from '../navigation/types';
 import { SecretTagV2 } from '../services/secretTagOnlineManager';
 import { 
   SecurityMode, 
@@ -45,23 +48,21 @@ interface TagsManagerProps {
 }
 
 interface RegularTagWithStats extends Tag {
-  entryCount: number;
-  lastUsed?: string;
-  colorCode?: string;
+  // Tag interface now includes color property from backend
 }
 
 interface SecretTagWithStats extends SecretTagV2 {
-  entryCount: number;
-  lastUsed?: string;
+  // SecretTagV2 already has colorCode property
 }
 
 const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
+  const navigation = useNavigation<StackNavigationProp<MainStackParamList>>();
 
   // State
   const [activeTagType, setActiveTagType] = useState<TagType>('regular');
-  const [sortBy, setSortBy] = useState<'name' | 'usage' | 'recent'>('name');
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -93,21 +94,14 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     { value: 'secret', label: 'Secret Tags', subtitle: 'Privacy-protected tags' }
   ];
 
-  // Sort options for selector
-  const sortOptions: SettingsOption[] = [
-    { value: 'name', label: 'Name', subtitle: 'Alphabetical order' },
-    { value: 'usage', label: 'Usage', subtitle: 'Most used first' },
-    { value: 'recent', label: 'Recent', subtitle: 'Recently used first' }
-  ];
+
 
   // Data loading functions
   const loadRegularTags = useCallback(async () => {
     try {
       const tags = await tagManager.getRegularTags();
       const tagsWithStats: RegularTagWithStats[] = tags.map(tag => ({
-        ...tag,
-        entryCount: 0, 
-        lastUsed: undefined
+        ...tag
       }));
       setRegularTags(tagsWithStats);
     } catch (error) {
@@ -119,9 +113,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     try {
       const tags = await tagManager.getSecretTags();
       const tagsWithStats: SecretTagWithStats[] = tags.map(tag => ({
-        ...tag,
-        entryCount: 0,
-        lastUsed: undefined
+        ...tag
       }));
       setSecretTags(tagsWithStats);
     } catch (error) {
@@ -160,6 +152,13 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     };
     initializeManager();
   }, [loadAllTags, loadTagStatus]);
+
+  // Reload tags when screen comes back into focus (e.g., after deleting a tag)
+  useFocusEffect(
+    useCallback(() => {
+      loadAllTags();
+    }, [loadAllTags])
+  );
 
   // Event handlers
   const handleRefresh = useCallback(async () => {
@@ -211,21 +210,10 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   // Filter and sort tags
   const filteredAndSortedTags = useCallback(() => {
     let filtered = getCurrentTags();
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'usage':
-          return b.entryCount - a.entryCount;
-        case 'recent':
-          if (!a.lastUsed && !b.lastUsed) return 0;
-          if (!a.lastUsed) return 1;
-          if (!b.lastUsed) return -1;
-          return new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime();
-        default:
-          return a.name.localeCompare(b.name);
-      }
-    });
+    // Sort alphabetically by name
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
     return filtered;
-  }, [getCurrentTags, sortBy]);
+  }, [getCurrentTags]);
 
   // Validation functions
   const validateTagName = (name: string): string | null => {
@@ -266,8 +254,27 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     setIsSubmitting(true);
     try {
       if (editingTag) {
-        Alert.alert('Coming Soon', 'Tag editing will be available in a future update');
+        // Handle editing
+        if (activeTagType === 'secret') {
+          Alert.alert(
+            'Secret Tag Editing Not Supported', 
+            'For security reasons, secret tags cannot be edited. Please delete and create a new one if needed.'
+          );
+          return;
+        } else {
+          // Update regular tag with color support - send complete tag object
+          const regularTag = editingTag as RegularTagWithStats; // Cast to regular tag
+          const completeTagUpdate = {
+            id: Number(regularTag.id),
+            name: tagName,
+            color: tagColor,
+            created_at: regularTag.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          await tagManager.updateRegularTag(String(editingTag.id), completeTagUpdate);
+        }
       } else {
+        // Handle creation
         if (activeTagType === 'secret') {
           await tagManager.createSecretTag(tagName, activationPhrase, tagColor);
         } else {
@@ -289,89 +296,68 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   };
   
   const handleEditTag = (tag: RegularTagWithStats | SecretTagWithStats) => {
-    Alert.alert('Coming Soon', 'This feature will be implemented in a future update');
+    console.log('Edit button pressed for tag:', tag.name);
+    
+    // Set up the modal for editing
+    setEditingTag(tag);
+    setTagName(tag.name);
+    
+    // Get color based on tag type
+    const tagColor = 'colorCode' in tag ? tag.colorCode : tag.color;
+    setTagColor(tagColor || '#007AFF');
+    
+    // For secret tags, we can't retrieve the activation phrase for security reasons
+    if (activeTagType === 'secret') {
+      setActivationPhrase(''); // User will need to re-enter the phrase
+    }
+    
+    console.log('Opening edit modal for tag:', tag.name, 'with color:', tagColor);
+    setShowCreateModal(true);
   };
 
   const handleDeleteTag = (id: string, name: string) => {
-    const tagToDelete = getCurrentTags().find(t => String(t.id) === id);
-    const entryCount = tagToDelete?.entryCount || 0;
-  
-    const isWeb = typeof window !== 'undefined' && window.confirm;
-  
-    if (isWeb) {
-      logger.info('Using window.confirm for web environment');
-      const confirmed = window.confirm(
-        `Are you sure you want to delete "${name}"? This will remove it from ${entryCount} journal entries`
-      );
-      if (confirmed) {
-        logger.info(`User confirmed deletion via window.confirm`);
-        (async () => {
-          logger.info(`Starting deletion of ${activeTagType} tag: ${name} (ID: ${id})`);
-          try {
-            if (activeTagType === 'secret') {
-              logger.info(`Calling tagManager.deleteSecretTag(${id})`);
-              await tagManager.deleteSecretTag(id);
-              logger.info(`Secret tag deleted successfully, reloading tags`);
-            } else {
-              logger.info(`Calling tagManager.deleteRegularTag(${id})`);
-              await tagManager.deleteRegularTag(id);
-              logger.info(`Regular tag deleted successfully, reloading tags`);
-            }
-            await loadAllTags();
-            logger.info('Tags reloaded after deletion');
-          } catch (error) {
-            logger.error(`Failed to delete ${activeTagType} tag:`, error);
-            Alert.alert('Delete Failed', `Could not delete tag "${name}"`);
-          }
-        })();
-      } else {
-        logger.info('User cancelled deletion via window.confirm');
-      }
-    } else {
-      Alert.alert(
-        `Delete "${name}"?`,
-        `This will remove the tag from ${entryCount} journal entries. This action cannot be undone`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                if (activeTagType === 'secret') {
-                  await tagManager.deleteSecretTag(id);
-                } else {
-                  await tagManager.deleteRegularTag(id);
-                }
-                await loadAllTags();
-              } catch (error) {
-                logger.error(`Failed to delete ${activeTagType} tag:`, error);
-                Alert.alert('Delete Failed', `Could not delete tag "${name}"`);
-              }
-            },
-          },
-        ]
-      );
-    }
+    // Navigate to the delete confirmation screen
+    navigation.navigate('TagDeleteConfirmation', {
+      tagId: id,
+      tagName: name,
+      tagType: activeTagType
+    });
   };
 
   // Render tag row using SettingsRow pattern
   const renderTagRow = (tag: RegularTagWithStats | SecretTagWithStats) => {
-    const usageText = tag.entryCount === 1 ? '1 entry' : `${tag.entryCount} entries`;
-    const lastUsedText = tag.lastUsed ? ` | Last used ${new Date(tag.lastUsed).toLocaleDateString().replace(/\./g, '/')}` : '';
-    const subtitle = `${usageText}${lastUsedText}`;
-
+    // Get color based on tag type: regular tags use 'color', secret tags use 'colorCode'
+    const tagDisplayColor = ('colorCode' in tag ? tag.colorCode : tag.color) || '#007AFF';
+    
     const rightElement = (
-      <View style={styles.tagActions}>
+      <View style={styles.tagActions} pointerEvents="box-none">
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={() => handleEditTag(tag)}
+          onPress={(e) => {
+            e.stopPropagation();
+            console.log('Edit button pressed for tag:', tag.name);
+            handleEditTag(tag);
+          }}
+          activeOpacity={0.7}
+          accessibilityLabel={`Edit ${tag.name} tag`}
+          accessibilityRole="button"
+          accessibilityHint="Tap to edit this tag"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="pencil" size={20} color={theme.colors.textSecondary} />
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={() => handleDeleteTag(String(tag.id), tag.name)}
+          onPress={(e) => {
+            e.stopPropagation();
+            console.log('Delete button pressed for tag:', tag.name);
+            handleDeleteTag(String(tag.id), tag.name);
+          }}
+          activeOpacity={0.7}
+          accessibilityLabel={`Delete ${tag.name} tag`}
+          accessibilityRole="button"
+          accessibilityHint="Tap to delete this tag"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="trash-bin" size={20} color={theme.colors.error} />
         </TouchableOpacity>
@@ -382,14 +368,11 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
       <SettingsRow
         key={String(tag.id)}
         title={tag.name}
-        subtitle={subtitle}
         leftIcon="pricetag"
+        leftIconColor={tagDisplayColor}
         rightElement={rightElement}
-        style={{
-          ...styles.tagRow,
-          borderLeftColor: tag.colorCode || tagColor,
-          borderLeftWidth: 4 
-        }}
+        style={styles.tagRow}
+        onPress={undefined}
       />
     );
   };
@@ -457,21 +440,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         </SettingsSection>
       )}
 
-      {/* Sort Options */}
-      <SettingsSection
-        title="Sort & Display"
-        subtitle="Organize how tags are displayed"
-        icon="funnel"
-      >
-        <SettingsSelector
-          title="Sort By"
-          subtitle="Choose how to order your tags"
-          leftIcon="swap-vertical"
-          options={sortOptions}
-          selectedValue={sortBy}
-          onValueChange={(value) => setSortBy(value as 'name' | 'usage' | 'recent')}
-        />
-      </SettingsSection>
+
 
       {/* Tags List */}
       <SettingsSection
@@ -595,6 +564,11 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                       <Text style={styles.errorText}>{activationPhraseError}</Text>
                     ) : null;
                   })()}
+                  {editingTag && (
+                    <Text style={styles.helpText}>
+                      Note: For security reasons, you must re-enter the activation phrase when editing secret tags.
+                    </Text>
+                  )}
                 </View>
               )}
 
@@ -700,8 +674,15 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
 
   actionButton: {
     padding: theme.spacing.sm,
+    marginLeft: theme.spacing.xs,
     borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.background,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
 
   createButton: {
@@ -823,6 +804,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.error,
     marginTop: theme.spacing.xs,
     fontFamily: theme.typography.fontFamilies.regular,
+  },
+
+  helpText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+    marginTop: theme.spacing.xs,
+    fontStyle: 'italic',
   },
 
   colorGrid: {
