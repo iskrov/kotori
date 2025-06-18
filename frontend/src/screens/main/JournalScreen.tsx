@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -271,7 +272,7 @@ const JournalScreen = () => {
       ) : (
         <>
           {filteredEntries.length === 0 ? (
-            <View style={styles.emptyContainer}>
+            <View style={[styles.emptyContainer, styles.safeBottomPadding]}>
               <Ionicons name="journal-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
               <Text style={styles.emptyText}>No journal entries found</Text>
               <Text style={styles.emptySubtext}>
@@ -285,7 +286,7 @@ const JournalScreen = () => {
               data={groupEntriesByMonth()}
               renderItem={renderMonthSection}
               keyExtractor={item => item.month}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={styles.safeBottomPadding}
               refreshControl={
                 <RefreshControl
                   refreshing={isRefreshing}
@@ -429,6 +430,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.gray100,
     fontFamily: theme.typography.fontFamilies.bold,
+  },
+  safeBottomPadding: {
+    // Base padding plus extra for navigation elements
+    paddingTop: theme.spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 200 : 185,
   },
 });
 

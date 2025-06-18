@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Modal,
@@ -21,6 +20,7 @@ import { JournalAPI } from '../../services/api';
 import AudioRecorder from '../../components/AudioRecorder';
 import logger from '../../utils/logger';
 import TagInput from '../../components/TagInput';
+import SafeScrollView from '../../components/SafeScrollView';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import { Tag } from '../../types';
@@ -281,7 +281,7 @@ const JournalEntryFormScreen = () => {
   
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
+      <SafeScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -383,7 +383,7 @@ const JournalEntryFormScreen = () => {
             />
           </Modal>
         )}
-      </ScrollView>
+      </SafeScrollView>
 
       {/* Buttons are now a regular view at the bottom, not absolute positioned */}
       <View style={styles.buttonContainer}>

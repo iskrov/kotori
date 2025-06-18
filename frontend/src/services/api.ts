@@ -396,6 +396,8 @@ export const ReminderAPI = {
 export const TagsAPI = {
   getTags: () => api.get('/api/journals/tags'),
   
+  getRecentTags: (limit: number = 5) => api.get('/api/journals/tags/recent', { params: { limit } }),
+  
   getEntriesByTag: (tagName: string) => api.get(`/api/journals/tags/${tagName}/entries`),
   
   createTag: async (tag: { name: string; color?: string }) => {

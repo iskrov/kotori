@@ -313,6 +313,49 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Return all tags since they are global in this system
         return db.query(TagModel).all()
 
+    def get_recent_tags_by_user(self, db: Session, *, user_id: int, limit: int = 5) -> list[dict]:
+        """
+        Get recently used tags for a user, ordered by last usage date.
+        Returns tag info with usage statistics.
+        """
+        from sqlalchemy import func, desc
+        
+        # Query to get tags with their last usage date and usage count for this user
+        query = (
+            db.query(
+                TagModel.id,
+                TagModel.name,
+                TagModel.color,
+                TagModel.created_at,
+                TagModel.updated_at,
+                func.max(JournalEntryModel.entry_date).label('last_used'),
+                func.count(JournalEntryTag.entry_id).label('usage_count')
+            )
+            .join(JournalEntryTag, TagModel.id == JournalEntryTag.tag_id)
+            .join(JournalEntryModel, JournalEntryTag.entry_id == JournalEntryModel.id)
+            .filter(JournalEntryModel.user_id == user_id)
+            .group_by(TagModel.id, TagModel.name, TagModel.color, TagModel.created_at, TagModel.updated_at)
+            .order_by(desc('last_used'))
+            .limit(limit)
+        )
+        
+        results = query.all()
+        
+        # Convert to list of dictionaries
+        recent_tags = []
+        for result in results:
+            recent_tags.append({
+                'id': result.id,
+                'name': result.name,
+                'color': result.color,
+                'created_at': result.created_at,
+                'updated_at': result.updated_at,
+                'last_used': result.last_used,
+                'usage_count': result.usage_count
+            })
+        
+        return recent_tags
+
     # Legacy static methods removed - use instance methods instead
 
 

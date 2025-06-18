@@ -94,8 +94,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
     { value: 'secret', label: 'Secret Tags', subtitle: 'Privacy-protected tags' }
   ];
 
-
-
   // Data loading functions
   const loadRegularTags = useCallback(async () => {
     try {
@@ -440,8 +438,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         </SettingsSection>
       )}
 
-
-
       {/* Tags List */}
       <SettingsSection
         title={`${activeTagType === 'secret' ? 'Secret ' : ''}Tags`}
@@ -504,7 +500,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingTag ? 'Edit' : 'Create'} {activeTagType === 'secret' ? 'Secret Tag' : 'Tag'}
+                {`${editingTag ? 'Edit' : 'Create'} ${activeTagType === 'secret' ? 'Secret Tag' : 'Tag'}`}
               </Text>
               <TouchableOpacity
                 style={styles.modalCloseButton}

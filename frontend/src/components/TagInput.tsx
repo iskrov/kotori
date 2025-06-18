@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
 import { Tag } from '../types'; // Make sure this path is correct
+import RecentTagsSelector from './RecentTagsSelector';
 
 // Helper to determine if native driver should be used
 const useNativeDriver = Platform.OS !== 'web';
@@ -136,6 +137,23 @@ const TagInput: React.FC<TagInputProps> = ({
 
   return (
     <View style={styles.container} testID="tag-input-container">
+      {/* Recent Tags Selector */}
+      <RecentTagsSelector
+        onTagSelect={(tag) => {
+          // Add the selected tag to the current tags
+          const newTag: Tag = { 
+            name: tag.name, 
+            id: tag.id,
+            color: tag.color,
+            created_at: tag.created_at,
+            updated_at: tag.updated_at
+          };
+          onChangeTags([...tags, newTag]);
+        }}
+        selectedTags={tags}
+        maxTags={maxTags}
+      />
+      
       {/* Tags Display */}
       {tags.length > 0 && (
         <ScrollView

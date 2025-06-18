@@ -3,10 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +20,7 @@ import { AppTheme } from '../../config/theme';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { SUPPORTED_LANGUAGES } from '../../config/languageConfig';
 import logger from '../../utils/logger';
+import SafeScrollView from '../../components/SafeScrollView';
 
 // Settings components
 import SettingsRow from '../../components/settings/SettingsRow';
@@ -87,7 +87,7 @@ const SettingsScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <SafeScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header Section */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -330,7 +330,7 @@ const SettingsScreen: React.FC = () => {
 
       {/* Bottom spacing */}
       <View style={styles.bottomSpacing} />
-    </ScrollView>
+    </SafeScrollView>
   );
 };
 

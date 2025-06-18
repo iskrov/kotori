@@ -3,7 +3,6 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  ScrollView, 
   TouchableOpacity, 
   ActivityIndicator,
   RefreshControl,
@@ -22,6 +21,7 @@ import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { api } from '../../services/api';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
+import SafeScrollView from '../../components/SafeScrollView';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { logger } from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
@@ -191,7 +191,7 @@ const HomeScreen = () => {
   }
 
   return (
-    <ScrollView 
+    <SafeScrollView 
       style={styles.container}
       refreshControl={
         Platform.OS !== 'web' ? (
@@ -248,7 +248,7 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
       )}
-    </ScrollView>
+    </SafeScrollView>
   );
 };
 

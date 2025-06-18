@@ -3,7 +3,6 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  ScrollView, 
   TouchableOpacity, 
   ActivityIndicator,
   Alert,
@@ -19,6 +18,7 @@ import { JournalAPI } from '../../services/api';
 import { JournalEntry, JournalStackParamList, Tag } from '../../types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import SafeScrollView from '../../components/SafeScrollView';
 
 // Define the type for the route params
 type JournalEntryDetailRouteProp = RouteProp<JournalStackParamList, 'JournalEntryDetail'>;
@@ -94,11 +94,7 @@ const JournalEntryDetailScreen = () => {
   
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <SafeScrollView>
         <View style={styles.header}>
           <Text style={styles.dateText}>
             {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy')}
@@ -142,7 +138,7 @@ const JournalEntryDetailScreen = () => {
             </View>
           )}
         </View>
-      </ScrollView>
+      </SafeScrollView>
       
       <View style={styles.actionBar}>
         <TouchableOpacity 
@@ -182,13 +178,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
   },
   header: {
     marginBottom: theme.spacing.xl,

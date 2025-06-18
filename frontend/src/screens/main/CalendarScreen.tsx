@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  ScrollView
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { JournalAPI } from '../../services/api';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
+import SafeScrollView from '../../components/SafeScrollView';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { tagManager } from '../../services/tagManager';
@@ -236,7 +237,7 @@ const CalendarScreen = () => {
         )}
       </View>
       
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+      <SafeScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
         <View style={styles.calendarHeader}>
           <TouchableOpacity onPress={goToPreviousMonth}>
             <Ionicons name="chevron-back" size={theme.typography.fontSizes.xxl} color={theme.colors.text} />
@@ -305,14 +306,14 @@ const CalendarScreen = () => {
                   data={filteredEntriesForSelectedDate}
                   renderItem={renderEntry}
                   keyExtractor={(item, index) => `calendar-list-${item.id}-${index}`}
-                  contentContainerStyle={styles.listContent}
+                  contentContainerStyle={[styles.listContent, { paddingBottom: 40 }]}
                   scrollEnabled={false} // Let parent ScrollView handle scrolling
                 />
               </View>
             )}
           </View>
         )}
-      </ScrollView>
+      </SafeScrollView>
     </View>
   );
 };
@@ -513,6 +514,7 @@ const getStyles = (theme: AppTheme) => {
     },
     listContent: {
       padding: theme.spacing.md,
+      paddingBottom: Platform.OS === 'ios' ? 60 : 50, // Extra bottom padding for navigation
     },
     scrollContainer: {
       flex: 1,

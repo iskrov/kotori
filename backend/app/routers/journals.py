@@ -255,8 +255,29 @@ def delete_tag(
     tag_id: int,
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Delete a tag."""
-    return journal_service.delete_tag(db=db, tag_id=tag_id, user_id=current_user.id)
+    """
+    Delete a tag.
+    """
+    try:
+        return journal_service.delete_tag(db=db, tag_id=tag_id, user_id=current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/tags/recent", response_model=list[dict])
+def get_recent_tags(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(5, ge=1, le=20, description="Number of recent tags to return")
+) -> Any:
+    """
+    Get recently used tags for the current user, ordered by last usage date.
+    Returns tags with usage statistics.
+    """
+    return journal_service.get_recent_tags_by_user(
+        db=db, user_id=current_user.id, limit=limit
+    )
 
 
 @router.get("/search", response_model=list[JournalEntry])

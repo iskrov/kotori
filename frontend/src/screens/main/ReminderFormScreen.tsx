@@ -7,15 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  ScrollView,
-  Switch,
-  Platform
+  Platform,
+  Switch
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, addHours, parseISO } from 'date-fns';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import api from '../../services/api';
+import SafeScrollView from '../../components/SafeScrollView';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 
@@ -122,7 +123,7 @@ const ReminderFormScreen = () => {
   
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <SafeScrollView 
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -213,7 +214,7 @@ const ReminderFormScreen = () => {
             value={isEnabled}
           />
         </View>
-      </ScrollView>
+      </SafeScrollView>
       
       <View style={styles.buttonContainer}>
         <TouchableOpacity

@@ -9,14 +9,15 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAppTheme } from '../../contexts/ThemeContext';
@@ -28,6 +29,7 @@ import SecretTagCard from '../../components/SecretTagCard';
 import SecretTagIndicator from '../../components/SecretTagIndicator';
 import SecretTagSetup from '../../components/SecretTagSetup';
 import logger from '../../utils/logger';
+import SafeScrollView from '../../components/SafeScrollView';
 
 type SecretTagManagerScreenNavigationProp = StackNavigationProp<MainStackParamList, 'TagManagement'>;
 
@@ -223,7 +225,7 @@ const SecretTagManagerScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <SafeScrollView 
         style={styles.content}
         refreshControl={
           <RefreshControl
@@ -330,7 +332,7 @@ const SecretTagManagerScreen: React.FC = () => {
 
         {/* Bottom spacing */}
         <View style={styles.bottomSpacing} />
-      </ScrollView>
+      </SafeScrollView>
     </View>
   );
 };
