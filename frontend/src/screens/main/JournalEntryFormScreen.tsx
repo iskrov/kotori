@@ -375,28 +375,13 @@ const JournalEntryFormScreen = () => {
             }
           ]}
         >
-          {/* Header Section */}
-          <View style={styles.headerSection}>
-            <View style={styles.headerContent}>
-              <Text style={styles.screenTitle}>
-                {journalId ? 'Edit Your Entry' : 'New Journal Entry'}
-              </Text>
-              <Text style={styles.screenSubtitle}>
-                {journalId ? 'Make changes to your journal entry' : 'Capture your thoughts and experiences'}
-              </Text>
-              {hasUnsavedChanges && (
-                <View style={styles.unsavedBadge}>
-                  <Ionicons name="radio-button-on" size={12} color={theme.colors.warning} />
-                  <Text style={styles.unsavedText}>Unsaved changes</Text>
-                </View>
-              )}
+          {/* Unsaved changes indicator */}
+          {hasUnsavedChanges && (
+            <View style={styles.unsavedBadge}>
+              <Ionicons name="radio-button-on" size={12} color={theme.colors.warning} />
+              <Text style={styles.unsavedText}>Unsaved changes</Text>
             </View>
-            {journalId && (
-              <View style={styles.editIndicator}>
-                <Ionicons name="create" size={24} color={theme.colors.primary} />
-              </View>
-            )}
-          </View>
+          )}
 
           {/* Date Section */}
           <View style={styles.dateSection}>
@@ -416,14 +401,10 @@ const JournalEntryFormScreen = () => {
             </View>
           </View>
 
-          {/* Title Section */}
+          {/* Combined Title and Content Section */}
           <View style={styles.inputSection}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="text" size={20} color={theme.colors.primary} />
-              <Text style={styles.sectionTitle}>Title</Text>
-              <Text style={styles.optionalText}>(Optional)</Text>
-            </View>
-            <View style={styles.inputContainer}>
+            <View style={styles.combinedContainer}>
+              {/* Title Input */}
               <TextInput
                 style={styles.titleInput}
                 value={title}
@@ -433,18 +414,34 @@ const JournalEntryFormScreen = () => {
                 multiline
                 maxLength={100}
               />
-              {title.length > 0 && (
-                <Text style={styles.characterCount}>{title.length}/100</Text>
-              )}
-            </View>
-          </View>
-
-          {/* Content Section */}
-          <View style={styles.inputSection}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="document-text" size={20} color={theme.colors.primary} />
-              <Text style={styles.sectionTitle}>Your Entry</Text>
-              <View style={styles.headerActions}>
+              
+              {/* Separator line */}
+              <View style={styles.inputSeparator} />
+              
+              {/* Content Input */}
+              <TextInput
+                style={styles.contentInput}
+                multiline
+                placeholder="What's on your mind? Share your thoughts, experiences, or reflections..."
+                value={content}
+                onChangeText={setContent}
+                textAlignVertical="top"
+                placeholderTextColor={theme.colors.textSecondary}
+              />
+              
+              {/* Footer with stats and record button */}
+              <View style={styles.inputFooter}>
+                <View style={styles.statsContainer}>
+                  {title.length > 0 && (
+                    <Text style={styles.statsText}>Title: {title.length}/100</Text>
+                  )}
+                  {content.length > 0 && (
+                    <Text style={styles.statsText}>
+                      {content.length} characters • {content.split(' ').filter(word => word.length > 0).length} words
+                    </Text>
+                  )}
+                </View>
+                
                 <TouchableOpacity 
                   style={styles.recordButton} 
                   onPress={handleShowRecorder} 
@@ -459,24 +456,6 @@ const JournalEntryFormScreen = () => {
                   <Text style={styles.recordButtonText}>Record</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.contentContainer}>
-              <TextInput
-                style={styles.contentInput}
-                multiline
-                placeholder="What's on your mind? Share your thoughts, experiences, or reflections..."
-                value={content}
-                onChangeText={setContent}
-                textAlignVertical="top"
-                placeholderTextColor={theme.colors.textSecondary}
-              />
-              {content.length > 0 && (
-                <View style={styles.contentStats}>
-                  <Text style={styles.statsText}>
-                    {content.length} characters • {content.split(' ').filter(word => word.length > 0).length} words
-                  </Text>
-                </View>
-              )}
             </View>
           </View>
 
@@ -784,7 +763,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
     padding: 0,
     margin: 0,
-    minHeight: 200,
+    minHeight: 150,
     textAlignVertical: 'top',
     lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.lg,
   },
@@ -801,6 +780,27 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   tagsContainer: {
     minHeight: 60,
+  },
+  combinedContainer: {
+    position: 'relative',
+  },
+  inputSeparator: {
+    height: 1,
+    backgroundColor: theme.colors.border,
+    marginVertical: theme.spacing.lg,
+  },
+  inputFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  statsContainer: {
+    flex: 1,
+    gap: theme.spacing.xs,
   },
   floatingActions: {
     position: 'absolute',
