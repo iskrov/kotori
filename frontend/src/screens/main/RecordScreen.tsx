@@ -18,6 +18,7 @@ import { MainStackParamList, RecordScreenParams } from '../../navigation/types';
 
 // Components
 import AudioRecorder from '../../components/AudioRecorder';
+import SafeScrollView from '../../components/SafeScrollView';
 import { SecretTagFloatingIndicator } from '../../components/SecretTagIndicator';
 
 // Hooks
@@ -310,66 +311,74 @@ const RecordScreen: React.FC = () => {
       {/* Modal overlay background */}
       <View style={styles.modalOverlay} />
       
-      {showRecorder ? (
-        <View style={styles.recorderContainer}>
-          {/* Modal Header with Drag Handle and Close Button */}
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHandle} />
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name="close"
-                size={24}
-                color={theme.colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+      <SafeScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        extraBottomPadding={0} // No extra padding needed for modal
+      >
+        {showRecorder ? (
+          <View style={styles.recorderContainer}>
+            {/* Modal Header with Drag Handle and Close Button */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHandle} />
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
 
-          {/* Audio Recorder Content */}
-          <View style={styles.recorderContent}>
-            <AudioRecorder
-              onTranscriptionComplete={handleTranscriptionComplete}
-              onCancel={handleRecorderCancel}
-              onManualSave={handleManualSave}
-              onAutoSave={handleAutoSave}
-              saveButtonState={getSaveButtonState()}
-              startRecordingOnMount={startRecordingOnMount}
-              onCommandDetected={handleCommandDetected}
-            />
-            
-            {/* Secret Tag Floating Indicator */}
-            <SecretTagFloatingIndicator
-              activeTags={activeTags}
-              onPress={() => navigation.navigate('TagManagement')}
-            />
-          </View>
-        </View>
-      ) : (
-        <View style={styles.recorderContainer}>
-          {/* Modal Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHandle} />
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name="close"
-                size={24}
-                color={theme.colors.textSecondary}
+            {/* Audio Recorder Content */}
+            <View style={styles.recorderContent}>
+              <AudioRecorder
+                onTranscriptionComplete={handleTranscriptionComplete}
+                onCancel={handleRecorderCancel}
+                onManualSave={handleManualSave}
+                onAutoSave={handleAutoSave}
+                saveButtonState={getSaveButtonState()}
+                startRecordingOnMount={startRecordingOnMount}
+                onCommandDetected={handleCommandDetected}
               />
-            </TouchableOpacity>
+              
+              {/* Secret Tag Floating Indicator */}
+              <SecretTagFloatingIndicator
+                activeTags={activeTags}
+                onPress={() => navigation.navigate('TagManagement')}
+              />
+            </View>
           </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>Processing Recording...</Text>
+        ) : (
+          <View style={styles.recorderContainer}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHandle} />
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.loadingText}>Processing Recording...</Text>
+            </View>
           </View>
-        </View>
-      )}
+        )}
+      </SafeScrollView>
 
       {isSaving && (
         <View style={styles.savingOverlay}> 
@@ -394,11 +403,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 1,
   },
+  scrollContainer: {
+    flex: 1,
+    width: '100%',
+    zIndex: 2,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   recorderContainer: {
     flex: 1,
     width: '100%',
     backgroundColor: theme.colors.background,
-    zIndex: 2,
+    minHeight: '100%', // Ensure full height for modal
   },
   modalHeader: {
     flexDirection: 'row',

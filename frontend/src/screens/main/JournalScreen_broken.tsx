@@ -34,10 +34,13 @@ import { AppTheme } from '../../config/theme';
 const HIDDEN_ENTRY_TAG = "_hidden_entry";
 // ----------------------------------------------------
 
-// Define navigation prop types for tab navigation with access to main stack
+// Define navigation prop types correctly
 type JournalScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<MainTabParamList, 'Journal'>,
-  StackNavigationProp<MainStackParamList>
+  StackNavigationProp<JournalStackParamList, 'JournalList'>,
+  CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList>,
+    StackNavigationProp<MainStackParamList>
+  >
 >;
 
 const JournalScreen = () => {
@@ -119,14 +122,17 @@ const JournalScreen = () => {
   // Fetch journal entries when screen is focused
   useFocusEffect(
     useCallback(() => {
+      console.log('JournalScreen: Screen focused, preparing to fetch data.');
       // Test with a small delay
       const timer = setTimeout(() => {
+        console.log('JournalScreen: Delay complete, fetching fresh data now.');
         fetchEntries();
         fetchTags();
       }, 500); // 500ms delay
 
       return () => {
         clearTimeout(timer);
+        console.log('JournalScreen: Screen unfocused');
         saveScrollPosition();
       };
     }, []) // Use empty dependency array to avoid circular dependency
@@ -198,9 +204,11 @@ const JournalScreen = () => {
   
   // Navigate to entry detail screen
   const handleEntryPress = (entry: JournalEntry) => {
-    console.log('Entry pressed:', entry.id);
+    // navigation here is JournalScreenNavigationProp, which should be able to navigate to JournalEntryDetail
     navigation.navigate('JournalEntryDetail', { entryId: entry.id.toString() });
   };
+  
+
   
   // Group entries by month for SectionList
   const getSectionData = () => {
@@ -222,9 +230,15 @@ const JournalScreen = () => {
       data: entries,
     }));
     
+    // Debug logging
+    console.log('JournalScreen: getSectionData - filteredEntries count:', filteredEntries.length);
+    console.log('JournalScreen: getSectionData - sections count:', sections.length);
+    
     return sections;
   };
   
+
+
   // Scroll to top functionality
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
@@ -232,6 +246,9 @@ const JournalScreen = () => {
   const handleScroll = useCallback((event: any) => {
     const { contentOffset } = event.nativeEvent;
     scrollPosition.current.offset = contentOffset.y;
+    
+    // Debug logging
+    console.log('JournalScreen: Scroll event - contentOffset.y:', contentOffset.y);
     
     // Show scroll-to-top button when scrolled down more than 200px
     setShowScrollToTop(contentOffset.y > 200);
@@ -250,52 +267,8 @@ const JournalScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Journal</Text>
+        <Text style={styles.title}>Journal (Testing SafeScrollView)</Text>
       </View>
-      
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search entries..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </View>
-      
-      {availableTags.length > 0 && (
-        <View style={styles.tagsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {availableTags.map(tag => (
-              <TouchableOpacity
-                key={tag}
-                style={[
-                  styles.tagChip,
-                  selectedTags.includes(tag) && styles.tagChipSelected
-                ]}
-                onPress={() => toggleTag(tag)}
-              >
-                <Text 
-                  style={[
-                    styles.tagText,
-                    selectedTags.includes(tag) && styles.tagTextSelected
-                  ]}
-                >
-                  #{tag}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
       
       <SafeScrollView 
         style={{ flex: 1 }} 
@@ -308,61 +281,23 @@ const JournalScreen = () => {
             tintColor={theme.colors.primary}
           />
         }
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
       >
-        {isLoading ? (
-          <View style={styles.skeletonContainer}>
-            {Array.from({ length: 5 }, (_, index) => (
-              <JournalCardSkeleton key={`skeleton-${index}`} />
-            ))}
+        <Text style={{ color: theme.colors.text, fontSize: 24, textAlign: 'center', padding: 20 }}>
+          Testing SafeScrollView Component
+        </Text>
+        
+        {/* Generate test content */}
+        {Array.from({ length: 50 }, (_, i) => (
+          <View key={i} style={{ backgroundColor: theme.colors.card, margin: 10, padding: 15, borderRadius: 5 }}>
+            <Text style={{ color: theme.colors.text, fontSize: 18 }}>
+              Test Item {i + 1}
+            </Text>
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 14, marginTop: 5 }}>
+              This is test content to check if SafeScrollView works properly for scrolling.
+            </Text>
           </View>
-        ) : (
-          <>
-            {filteredEntries.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="journal-outline" size={theme.spacing.xxl * 1.5} color={theme.colors.disabled} />
-                <Text style={styles.emptyText}>No journal entries found</Text>
-                <Text style={styles.emptySubtext}>
-                  {searchQuery || selectedTags.length > 0 || !isHiddenMode && entries.some(e => e.tags.some(t=>t.name === HIDDEN_ENTRY_TAG)) 
-                    ? 'Try changing your search or filters, or check hidden mode.'
-                    : 'Tap the + button to create your first entry'}
-                </Text>
-              </View>
-            ) : (
-              <>
-                {getSectionData().map((section, sectionIndex) => (
-                  <View key={section.title} style={styles.monthSection}>
-                    <Text style={styles.monthTitle}>{section.title}</Text>
-                    {section.data.map((entry, entryIndex) => (
-                      <JournalCard 
-                        key={`journal-entry-${entry.id}-${entryIndex}`}
-                        entry={entry}
-                        onPress={() => handleEntryPress(entry)}
-                      />
-                    ))}
-                  </View>
-                ))}
-              </>
-            )}
-          </>
-        )}
+        ))}
       </SafeScrollView>
-      
-      {/* Scroll to Top Button */}
-      {showScrollToTop && (
-        <TouchableOpacity
-          style={styles.scrollToTopButton}
-          onPress={scrollToTop}
-          activeOpacity={0.8}
-        >
-          <Ionicons 
-            name="chevron-up" 
-            size={24} 
-            color={theme.colors.white} 
-          />
-        </TouchableOpacity>
-      )}
     </View>
   );
 };
@@ -387,6 +322,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: theme.typography.fontSizes.xxl,
     fontFamily: theme.typography.fontFamilies.bold,
     color: theme.colors.text,
+  },
+  addButton: {
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.spacing.xxl,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
   searchContainer: {
     paddingHorizontal: theme.spacing.md,

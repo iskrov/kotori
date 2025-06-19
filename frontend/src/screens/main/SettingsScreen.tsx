@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  ActivityIndicator,
+  RefreshControl,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +24,7 @@ import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { SUPPORTED_LANGUAGES } from '../../config/languageConfig';
 import logger from '../../utils/logger';
 import SafeScrollView from '../../components/SafeScrollView';
+import { SettingsSkeleton } from '../../components/SkeletonLoader';
 
 // Settings components
 import SettingsRow from '../../components/settings/SettingsRow';
@@ -45,13 +49,36 @@ const SettingsScreen: React.FC = () => {
   const { theme, toggleTheme, isSystemTheme, setUseSystemTheme } = useAppTheme();
   const { settings, updateSetting, isLoading } = useSettings();
   const styles = getStyles(theme);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Scroll to top functionality
+  const scrollViewRef = React.useRef<any>(null);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const scrollToTopOpacity = React.useRef(new Animated.Value(0)).current;
+  
+  const handleScroll = (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const shouldShow = scrollY > 200;
+    
+    if (shouldShow !== showScrollToTop) {
+      setShowScrollToTop(shouldShow);
+      Animated.timing(scrollToTopOpacity, {
+        toValue: shouldShow ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+  
+  const scrollToTop = () => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   // Loading state
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading settings...</Text>
+      <View style={styles.container}>
+        <SettingsSkeleton />
       </View>
     );
   }
@@ -86,8 +113,32 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
+  // Handle pull-to-refresh
+  const onRefresh = React.useCallback(() => {
+    setIsRefreshing(true);
+    // Simulate refresh by resetting the refresh state
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 1000);
+  }, []);
+
   return (
-    <SafeScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      <SafeScrollView 
+        ref={scrollViewRef}
+        style={styles.container} 
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
       {/* Header Section */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -331,6 +382,32 @@ const SettingsScreen: React.FC = () => {
       {/* Bottom spacing */}
       <View style={styles.bottomSpacing} />
     </SafeScrollView>
+    
+    {/* Scroll to top button */}
+    <Animated.View 
+      style={[
+        styles.scrollToTopButton,
+        {
+          opacity: scrollToTopOpacity,
+          transform: [{
+            scale: scrollToTopOpacity.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.8, 1],
+            })
+          }]
+        }
+      ]}
+      pointerEvents={showScrollToTop ? 'auto' : 'none'}
+    >
+      <TouchableOpacity
+        style={styles.scrollToTopButtonInner}
+        onPress={scrollToTop}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="chevron-up" size={24} color={theme.colors.background} />
+      </TouchableOpacity>
+    </Animated.View>
+  </View>
   );
 };
 
@@ -407,6 +484,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   bottomSpacing: {
     height: theme.spacing.xxxl,
+  },
+  scrollToTopButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    zIndex: 1000,
+  },
+  scrollToTopButtonInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.lg,
   },
 });
 

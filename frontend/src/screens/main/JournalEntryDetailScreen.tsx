@@ -15,16 +15,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 
 import { JournalAPI } from '../../services/api';
-import { JournalEntry, JournalStackParamList, Tag } from '../../types';
+import { JournalEntry, Tag } from '../../types';
+import { MainStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import SafeScrollView from '../../components/SafeScrollView';
 
 // Define the type for the route params
-type JournalEntryDetailRouteProp = RouteProp<JournalStackParamList, 'JournalEntryDetail'>;
+type JournalEntryDetailRouteProp = RouteProp<MainStackParamList, 'JournalEntryDetail'>;
 
 // Define the type for the navigation prop
-type JournalEntryDetailNavigationProp = StackNavigationProp<JournalStackParamList, 'JournalEntryDetail'>;
+type JournalEntryDetailNavigationProp = StackNavigationProp<MainStackParamList, 'JournalEntryDetail'>;
 
 const JournalEntryDetailScreen = () => {
   const navigation = useNavigation<JournalEntryDetailNavigationProp>();
@@ -50,7 +51,7 @@ const JournalEntryDetailScreen = () => {
   const fetchEntryDetails = async () => {
     try {
       setIsLoading(true);
-      const response = await JournalAPI.getEntry(entryId);
+      const response = await JournalAPI.getEntry(parseInt(entryId));
       setEntry(response.data);
     } catch (error) {
       console.error('Error fetching entry details', error);
@@ -94,6 +95,19 @@ const JournalEntryDetailScreen = () => {
   
   return (
     <SafeAreaView style={styles.container}>
+      {/* Navigation Header */}
+      <View style={styles.navigationHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Journal Entry</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+      
       <SafeScrollView>
         <View style={styles.header}>
           <Text style={styles.dateText}>
@@ -178,6 +192,26 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.background,
+  },
+  navigationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    ...theme.shadows.sm,
+  },
+  headerTitle: {
+    fontSize: theme.typography.fontSizes.xl,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+  },
+  headerSpacer: {
+    width: 40,
   },
   header: {
     marginBottom: theme.spacing.xl,

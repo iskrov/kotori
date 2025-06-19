@@ -1,167 +1,213 @@
-import React, { useRef, useEffect } from 'react';
-import { View, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated, Dimensions } from 'react-native';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Helper to determine if native driver should be used
-const useNativeDriver = Platform.OS !== 'web';
 
 interface SkeletonLoaderProps {
   width?: number | string;
   height?: number;
   borderRadius?: number;
-  style?: object;
-  variant?: 'text' | 'circular' | 'rectangular' | 'card';
+  style?: any;
+  animated?: boolean;
 }
 
 const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
   width = '100%',
   height = 20,
-  borderRadius,
+  borderRadius = 4,
   style,
-  variant = 'rectangular',
+  animated = true,
 }) => {
   const { theme } = useAppTheme();
-  const styles = getStyles(theme, variant);
-  
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const styles = getStyles(theme);
+  const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const shimmer = Animated.loop(
-      Animated.timing(shimmerAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver,
-      })
-    );
-    
-    shimmer.start();
-    
-    return () => shimmer.stop();
-  }, [shimmerAnim]);
-
-  const getVariantStyles = () => {
-    switch (variant) {
-      case 'text':
-        return {
-          height: 16,
-          borderRadius: theme.borderRadius.sm,
-        };
-      case 'circular':
-        return {
-          width: height,
-          height: height,
-          borderRadius: height / 2,
-        };
-      case 'card':
-        return {
-          height: 200,
-          borderRadius: theme.borderRadius.xl,
-        };
-      default:
-        return {
-          borderRadius: borderRadius || theme.borderRadius.md,
-        };
+    if (animated) {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(animatedValue, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: false,
+          }),
+          Animated.timing(animatedValue, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      animation.start();
+      return () => animation.stop();
     }
-  };
+  }, [animated, animatedValue]);
 
-  const shimmerTranslateX = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-SCREEN_WIDTH, SCREEN_WIDTH],
-  });
-
-  const variantStyles = getVariantStyles();
+  const backgroundColor = animated
+    ? animatedValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [
+          theme.colors.skeleton || theme.colors.gray200,
+          theme.colors.skeletonHighlight || theme.colors.gray300,
+        ],
+      })
+    : theme.colors.skeleton || theme.colors.gray200;
 
   return (
-    <View
+    <Animated.View
       style={[
-        styles.container,
+        styles.skeleton,
         {
           width,
-          height: variantStyles.height || height,
-          borderRadius: variantStyles.borderRadius,
+          height,
+          borderRadius,
+          backgroundColor,
         },
         style,
       ]}
-    >
-      <Animated.View
-        style={[
-          styles.shimmer,
-          {
-            transform: [{ translateX: shimmerTranslateX }],
-          },
-        ]}
-      />
-    </View>
+    />
   );
 };
 
-// Skeleton components for common use cases
-export const SkeletonText: React.FC<Omit<SkeletonLoaderProps, 'variant'>> = (props) => (
-  <SkeletonLoader {...props} variant="text" />
-);
-
-export const SkeletonCircle: React.FC<Omit<SkeletonLoaderProps, 'variant'>> = (props) => (
-  <SkeletonLoader {...props} variant="circular" />
-);
-
-export const SkeletonCard: React.FC<Omit<SkeletonLoaderProps, 'variant'>> = (props) => (
-  <SkeletonLoader {...props} variant="card" />
-);
-
-// Journal card skeleton
+// Predefined skeleton components for common use cases
 export const JournalCardSkeleton: React.FC = () => {
   const { theme } = useAppTheme();
-  
+  const styles = getStyles(theme);
+
   return (
-    <View style={{
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.xl,
-      padding: theme.spacing.lg,
-      marginVertical: theme.spacing.sm,
-      marginHorizontal: theme.spacing.xs,
-      ...theme.shadows.md,
-    }}>
-      {/* Header */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md }}>
-        <View style={{ flex: 1 }}>
-          <SkeletonText width="40%" height={14} style={{ marginBottom: theme.spacing.xs }} />
-          <SkeletonText width="25%" height={12} />
-        </View>
-        <SkeletonCircle height={36} />
+    <View style={styles.journalCardSkeleton}>
+      <View style={styles.journalCardHeader}>
+        <SkeletonLoader width="60%" height={18} />
+        <SkeletonLoader width={80} height={14} />
       </View>
-      
-      {/* Title */}
-      <SkeletonText width="80%" height={20} style={{ marginBottom: theme.spacing.md }} />
-      
-      {/* Content */}
-      <SkeletonText width="100%" height={16} style={{ marginBottom: theme.spacing.sm }} />
-      <SkeletonText width="90%" height={16} style={{ marginBottom: theme.spacing.sm }} />
-      <SkeletonText width="60%" height={16} style={{ marginBottom: theme.spacing.lg }} />
-      
-      {/* Tags */}
-      <View style={{ flexDirection: 'row' }}>
-        <SkeletonText width={60} height={24} borderRadius={12} style={{ marginRight: theme.spacing.sm }} />
-        <SkeletonText width={80} height={24} borderRadius={12} style={{ marginRight: theme.spacing.sm }} />
-        <SkeletonText width={50} height={24} borderRadius={12} />
+      <SkeletonLoader width="100%" height={16} style={{ marginTop: theme.spacing.sm }} />
+      <SkeletonLoader width="85%" height={16} style={{ marginTop: theme.spacing.xs }} />
+      <SkeletonLoader width="70%" height={16} style={{ marginTop: theme.spacing.xs }} />
+      <View style={styles.journalCardFooter}>
+        <SkeletonLoader width={60} height={12} />
+        <SkeletonLoader width={40} height={12} />
       </View>
     </View>
   );
 };
 
-const getStyles = (theme: AppTheme, variant: string) => StyleSheet.create({
-  container: {
-    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray200,
-    overflow: 'hidden',
-  },
-  shimmer: {
-    width: '30%',
-    height: '100%',
-    backgroundColor: theme.isDarkMode ? theme.colors.gray600 : theme.colors.gray300,
-    opacity: 0.5,
-  },
-});
+export const CalendarSkeleton: React.FC = () => {
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
+
+  return (
+    <View style={styles.calendarSkeleton}>
+      {/* Calendar header */}
+      <View style={styles.calendarHeader}>
+        <SkeletonLoader width={30} height={30} borderRadius={15} />
+        <SkeletonLoader width={120} height={20} />
+        <SkeletonLoader width={30} height={30} borderRadius={15} />
+      </View>
+      
+      {/* Calendar grid */}
+      <View style={styles.calendarGrid}>
+        {Array.from({ length: 35 }, (_, index) => (
+          <SkeletonLoader
+            key={index}
+            width={35}
+            height={35}
+            borderRadius={4}
+            style={{ margin: 2 }}
+          />
+        ))}
+      </View>
+    </View>
+  );
+};
+
+export const SettingsSkeleton: React.FC = () => {
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
+
+  return (
+    <View style={styles.settingsSkeleton}>
+      {Array.from({ length: 6 }, (_, index) => (
+        <View key={index} style={styles.settingsRow}>
+          <View style={styles.settingsRowLeft}>
+            <SkeletonLoader width={24} height={24} borderRadius={12} />
+            <View style={styles.settingsRowText}>
+              <SkeletonLoader width="70%" height={16} />
+              <SkeletonLoader width="50%" height={12} style={{ marginTop: theme.spacing.xs }} />
+            </View>
+          </View>
+          <SkeletonLoader width={50} height={20} borderRadius={10} />
+        </View>
+      ))}
+    </View>
+  );
+};
+
+const getStyles = (theme: AppTheme) => {
+  const { width } = Dimensions.get('window');
+  
+  return StyleSheet.create({
+    skeleton: {
+      overflow: 'hidden',
+    },
+    journalCardSkeleton: {
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing.md,
+      marginHorizontal: theme.spacing.md,
+      marginVertical: theme.spacing.sm,
+      borderRadius: theme.spacing.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    journalCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.sm,
+    },
+    journalCardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: theme.spacing.md,
+    },
+    calendarSkeleton: {
+      backgroundColor: theme.colors.card,
+      padding: theme.spacing.md,
+      margin: theme.spacing.md,
+      borderRadius: theme.spacing.sm,
+    },
+    calendarHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.md,
+    },
+    calendarGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-around',
+    },
+    settingsSkeleton: {
+      padding: theme.spacing.md,
+    },
+    settingsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    settingsRowLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    settingsRowText: {
+      marginLeft: theme.spacing.md,
+      flex: 1,
+    },
+  });
+};
 
 export default SkeletonLoader; 

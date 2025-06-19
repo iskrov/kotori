@@ -175,11 +175,8 @@ const HomeScreen = () => {
   };
 
   const navigateToDetail = (entryId: number) => {
-    // Navigate to JournalEntryDetail within the Journal stack
-    navigation.navigate('Journal', { 
-        screen: 'JournalEntryDetail', 
-        params: { entryId: entryId } 
-    });
+    // Navigate to JournalEntryDetail in the main stack
+    navigation.navigate('JournalEntryDetail', { entryId: entryId.toString() });
   };
 
   if (loading && !refreshing) {

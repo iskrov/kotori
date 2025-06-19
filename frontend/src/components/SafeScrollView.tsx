@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { ScrollView, ScrollViewProps, Platform } from 'react-native';
 import { useAppTheme } from '../contexts/ThemeContext';
 
@@ -7,12 +7,12 @@ interface SafeScrollViewProps extends ScrollViewProps {
   extraBottomPadding?: number;
 }
 
-const SafeScrollView: React.FC<SafeScrollViewProps> = ({
+const SafeScrollView = forwardRef<ScrollView, SafeScrollViewProps>(({
   children,
   extraBottomPadding = 0,
   contentContainerStyle,
   ...props
-}) => {
+}, ref) => {
   const { theme } = useAppTheme();
 
   // Calculate safe bottom padding
@@ -23,7 +23,7 @@ const SafeScrollView: React.FC<SafeScrollViewProps> = ({
   const extraSpacing = theme.spacing.xl;
   
   // Use the larger of FAB bottom position or tab bar height, plus extra spacing
-  // Increased padding to ensure content is fully accessible
+  // Increased padding to ensure content is fully accessible past the floating button
   const safeBottomPadding = Math.max(fabBottomMargin + fabHeight/2, tabBarHeight) + extraSpacing + extraBottomPadding + 40;
 
   const safeContentContainerStyle = [
@@ -35,6 +35,7 @@ const SafeScrollView: React.FC<SafeScrollViewProps> = ({
 
   return (
     <ScrollView
+      ref={ref}
       {...props}
       contentContainerStyle={safeContentContainerStyle}
       showsVerticalScrollIndicator={true}
@@ -43,6 +44,8 @@ const SafeScrollView: React.FC<SafeScrollViewProps> = ({
       {children}
     </ScrollView>
   );
-};
+});
+
+SafeScrollView.displayName = 'SafeScrollView';
 
 export default SafeScrollView; 

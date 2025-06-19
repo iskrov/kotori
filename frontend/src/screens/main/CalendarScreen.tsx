@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -21,6 +22,7 @@ import { JournalAPI } from '../../services/api';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import SafeScrollView from '../../components/SafeScrollView';
+import { CalendarSkeleton, JournalCardSkeleton } from '../../components/SkeletonLoader';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { tagManager } from '../../services/tagManager';
@@ -42,6 +44,29 @@ const CalendarScreen = () => {
   const [filteredEntriesForSelectedDate, setFilteredEntriesForSelectedDate] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasActiveSecretTags, setHasActiveSecretTags] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Scroll to top functionality
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const scrollViewRef = useRef<any>(null);
+  
+  // Handle scroll events to show/hide scroll-to-top button
+  const handleScroll = useCallback((event: any) => {
+    const { contentOffset } = event.nativeEvent;
+    
+    // Show scroll-to-top button when scrolled down more than 200px
+    setShowScrollToTop(contentOffset.y > 200);
+  }, []);
+
+  // Scroll to top function
+  const scrollToTop = useCallback(() => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        y: 0,
+        animated: true,
+      });
+    }
+  }, []);
   
   // Check for active secret tags
   useEffect(() => {
@@ -114,8 +139,15 @@ const CalendarScreen = () => {
       Alert.alert('Error', 'Failed to load journal entries');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
+
+  // Handle pull-to-refresh
+  const onRefresh = React.useCallback(() => {
+    setIsRefreshing(true);
+    fetchEntries();
+  }, [selectedDate]);
   
   // New function to fetch entries for a specific date
   const fetchEntriesForSelectedDate = async (date: Date) => {
@@ -168,10 +200,8 @@ const CalendarScreen = () => {
   };
   
   const handleEntryPress = (entry: JournalEntry) => {
-    navigation.navigate('Journal', { 
-      screen: 'JournalEntryDetail', 
-      params: { entryId: String(entry.id) } 
-    });
+    // Navigate to JournalEntryDetail in the main stack
+    navigation.navigate('JournalEntryDetail', { entryId: entry.id.toString() });
   };
   
   const renderDay = (day: Date) => {
@@ -237,7 +267,20 @@ const CalendarScreen = () => {
         )}
       </View>
       
-      <SafeScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+      <SafeScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+        onScroll={handleScroll}
+        ref={scrollViewRef}
+      >
         <View style={styles.calendarHeader}>
           <TouchableOpacity onPress={goToPreviousMonth}>
             <Ionicons name="chevron-back" size={theme.typography.fontSizes.xxl} color={theme.colors.text} />
@@ -282,8 +325,11 @@ const CalendarScreen = () => {
         </View>
         
         {isLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
+          <View style={styles.skeletonContainer}>
+            <CalendarSkeleton />
+            {Array.from({ length: 3 }, (_, index) => (
+              <JournalCardSkeleton key={`skeleton-${index}`} />
+            ))}
           </View>
         ) : (
           <View style={styles.entriesContainer}>
@@ -307,13 +353,29 @@ const CalendarScreen = () => {
                   renderItem={renderEntry}
                   keyExtractor={(item, index) => `calendar-list-${item.id}-${index}`}
                   contentContainerStyle={[styles.listContent, { paddingBottom: 40 }]}
-                  scrollEnabled={false} // Let parent ScrollView handle scrolling
+                  scrollEnabled={true}
+                  nestedScrollEnabled={true}
                 />
               </View>
             )}
           </View>
         )}
       </SafeScrollView>
+      
+      {/* Scroll to Top Button */}
+      {showScrollToTop && (
+        <TouchableOpacity
+          style={styles.scrollToTopButton}
+          onPress={scrollToTop}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="chevron-up" 
+            size={24} 
+            color={theme.colors.white} 
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -479,6 +541,10 @@ const getStyles = (theme: AppTheme) => {
       alignItems: 'center',
       backgroundColor: theme.colors.background,
     },
+    skeletonContainer: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
     entriesContainer: {
       flex: 1,
       maxWidth: calendarMaxWidth,
@@ -524,6 +590,23 @@ const getStyles = (theme: AppTheme) => {
     },
     entriesListContainer: {
       minHeight: isDesktop ? 300 : 200,
+    },
+    scrollToTopButton: {
+      position: 'absolute',
+      bottom: Platform.OS === 'ios' ? 120 : 105, // Above the tab bar
+      right: theme.spacing.lg,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 8,
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      zIndex: 1000,
     },
   });
 };

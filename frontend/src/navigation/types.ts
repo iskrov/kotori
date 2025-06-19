@@ -29,6 +29,10 @@ export type MainStackParamList = {
   Record: RecordScreenParams | undefined;
   TagManagement: undefined;
   TagDeleteConfirmation: { tagId: string; tagName: string; tagType: 'regular' | 'secret' };
+  JournalEntryDetail: { entryId: string };
+  JournalEntryForm: { journalId?: string };
+  ReminderForm: { reminderId?: string };
+  DeleteConfirmation: { entryId: string };
 };
 
 // Auth stack params

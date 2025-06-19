@@ -46,6 +46,9 @@ export interface AppColors {
   gray700: string;
   gray800: string;
   gray900: string;
+  // Skeleton colors
+  skeleton: string;
+  skeletonHighlight: string;
 }
 
 export interface AppTypography {
@@ -177,6 +180,9 @@ export const lightModeColors: AppColors = {
   gray700: '#374151',
   gray800: '#1F2937',
   gray900: '#111827',
+  // Skeleton colors
+  skeleton: '#E5E7EB',
+  skeletonHighlight: '#F3F4F6',
 };
 
 // Enhanced Dark Theme
@@ -225,6 +231,9 @@ export const darkModeColors: AppColors = {
   gray700: '#F1F5F9',
   gray800: '#F8FAFC',
   gray900: '#FFFFFF',
+  // Skeleton colors
+  skeleton: '#334155',
+  skeletonHighlight: '#475569',
 };
 
 export const typography: AppTypography = {

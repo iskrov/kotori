@@ -6,9 +6,6 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   Alert
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -19,6 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
 import { useAuth } from '../../contexts/AuthContext';
+import SafeScrollView from '../../components/SafeScrollView';
 
 // Ensure web browser redirect results are handled
 WebBrowser.maybeCompleteAuthSession();
@@ -113,11 +111,12 @@ const RegisterScreen = () => {
   };
   
   return (
-    <KeyboardAvoidingView 
+    <SafeScrollView 
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      contentContainerStyle={styles.scrollContainer}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={true}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.headerContainer}>
           <TouchableOpacity 
             style={styles.backButton} 
@@ -225,8 +224,7 @@ const RegisterScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </SafeScrollView>
   );
 };
 

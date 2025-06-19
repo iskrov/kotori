@@ -139,7 +139,7 @@ const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
         })}
       >
         <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home'}} />
-        <Tab.Screen name="Journal" component={JournalStack} options={{ tabBarLabel: 'Journal'}} />
+        <Tab.Screen name="Journal" component={JournalScreen} options={{ tabBarLabel: 'Journal'}} />
         <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendar'}} />
         <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings'}}/>
       </Tab.Navigator>

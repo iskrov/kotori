@@ -7,9 +7,6 @@ import {
   StyleSheet, 
   Image, 
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   Alert
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -20,6 +17,7 @@ import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
 import { useAuth } from '../../contexts/AuthContext';
+import SafeScrollView from '../../components/SafeScrollView';
 import logger from '../../utils/logger';
 import LogViewer from '../../utils/LogViewer';
 
@@ -125,111 +123,111 @@ const LoginScreen = () => {
   };
   
   return (
-    <KeyboardAvoidingView 
+    <SafeScrollView 
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      contentContainerStyle={styles.scrollContainer}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={true}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.appName}>Vibes</Text>
-          <Text style={styles.tagline}>Voice Journaling</Text>
+      <View style={styles.logoContainer}>
+        <Text style={styles.appName}>Vibes</Text>
+        <Text style={styles.tagline}>Voice Journaling</Text>
+      </View>
+      
+      <View style={styles.formContainer}>
+        {errorMessage && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={20} color="#d32f2f" />
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        )}
+        
+        <View style={styles.inputContainer}>
+          <Ionicons name="mail-outline" size={22} color="#666" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            placeholderTextColor="#999"
+          />
         </View>
         
-        <View style={styles.formContainer}>
-          {errorMessage && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={20} color="#d32f2f" />
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
-          )}
-          
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={22} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-          </View>
-          
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={22} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-            <TouchableOpacity 
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons 
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
-                size={22} 
-                color="#666" 
-              />
-            </TouchableOpacity>
-          </View>
-          
+        <View style={styles.inputContainer}>
+          <Ionicons name="lock-closed-outline" size={22} color="#666" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            placeholderTextColor="#999"
+          />
           <TouchableOpacity 
-            style={styles.button}
-            onPress={handleLogin}
-            disabled={isLoading || authLoading}
+            onPress={() => setShowPassword(!showPassword)}
+            style={styles.eyeIcon}
           >
-            {isLoading || authLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Login</Text>
-            )}
+            <Ionicons 
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+              size={22} 
+              color="#666" 
+            />
           </TouchableOpacity>
-          
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.googleButton}
-            onPress={handleGoogleLogin}
-            disabled={isLoading || authLoading}
-          >
-            <Ionicons name="logo-google" size={22} color="#EA4335" />
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={navigateToRegister}>
-              <Text style={styles.registerLink}>Register</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {isDev && (
-            <TouchableOpacity 
-              style={styles.debugButton}
-              onPress={openLogViewer}
-            >
-              <Ionicons name="bug-outline" size={16} color="#666" />
-              <Text style={styles.debugButtonText}>Show Logs</Text>
-            </TouchableOpacity>
-          )}
         </View>
-      </ScrollView>
+        
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={handleLogin}
+          disabled={isLoading || authLoading}
+        >
+          {isLoading || authLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Login</Text>
+          )}
+        </TouchableOpacity>
+        
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.googleButton}
+          onPress={handleGoogleLogin}
+          disabled={isLoading || authLoading}
+        >
+          <Ionicons name="logo-google" size={22} color="#EA4335" />
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.registerContainer}>
+          <Text style={styles.registerText}>Don't have an account? </Text>
+          <TouchableOpacity onPress={navigateToRegister}>
+            <Text style={styles.registerLink}>Register</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {isDev && (
+          <TouchableOpacity 
+            style={styles.debugButton}
+            onPress={openLogViewer}
+          >
+            <Ionicons name="bug-outline" size={16} color="#666" />
+            <Text style={styles.debugButtonText}>Show Logs</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       
       <LogViewer 
         visible={showLogViewer} 
         onClose={() => setShowLogViewer(false)} 
       />
-    </KeyboardAvoidingView>
+    </SafeScrollView>
   );
 };
 
