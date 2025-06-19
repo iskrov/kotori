@@ -40,6 +40,7 @@ const SafeScrollView = forwardRef<ScrollView, SafeScrollViewProps>(({
       contentContainerStyle={safeContentContainerStyle}
       showsVerticalScrollIndicator={true}
       keyboardShouldPersistTaps="handled"
+      scrollEventThrottle={16}
     >
       {children}
     </ScrollView>

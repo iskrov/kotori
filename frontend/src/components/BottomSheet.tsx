@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -50,6 +50,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
   const backdropOpacity_ = useRef(new Animated.Value(0)).current;
   const lastGestureY = useRef(0);
   const currentSnapIndex = useRef(initialSnapPoint);
+  const gestureTranslateY = useRef(new Animated.Value(0)).current;
 
   const snapPointsInPixels = snapPoints.map(point => SCREEN_HEIGHT * (1 - point));
 
@@ -99,17 +100,33 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
     }
   }, [visible, initialSnapPoint]);
 
-  const onGestureEvent = Animated.event(
-    [{ nativeEvent: { translationY: translateY } }],
-    { useNativeDriver }
+  // Use a more React-friendly approach for gesture handling
+  const onGestureEvent = useCallback(
+    Animated.event(
+      [{ nativeEvent: { translationY: gestureTranslateY } }],
+      { 
+        useNativeDriver: false, // Set to false for web compatibility
+        listener: (event: any) => {
+          // Optional: Add any additional gesture handling here
+          if (!enablePanGesture) return;
+          
+          const { translationY } = event.nativeEvent;
+          lastGestureY.current = translationY;
+        }
+      }
+    ),
+    [enablePanGesture, gestureTranslateY]
   );
 
-  const onHandlerStateChange = (event: any) => {
+  const onHandlerStateChange = useCallback((event: any) => {
     if (!enablePanGesture) return;
 
     if (event.nativeEvent.oldState === State.ACTIVE) {
       const { translationY, velocityY } = event.nativeEvent;
       const currentY = snapPointsInPixels[currentSnapIndex.current] + translationY;
+      
+      // Reset gesture value
+      gestureTranslateY.setValue(0);
       
       // Determine which snap point to go to
       let targetSnapIndex = currentSnapIndex.current;
@@ -148,7 +165,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
         useNativeDriver,
       }).start();
     }
-  };
+  }, [enablePanGesture, snapPointsInPixels, onClose, translateY]);
 
   const handleBackdropPress = () => {
     onClose();
@@ -157,6 +174,9 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
   if (!visible) {
     return null;
   }
+
+  // Combine translateY and gestureTranslateY for smoother gestures
+  const combinedTranslateY = Animated.add(translateY, gestureTranslateY);
 
   const content = (
     <View style={styles.container}>
@@ -173,7 +193,9 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
             },
           ]}
         />
-      </TouchableWithoutFeedback><PanGestureHandler
+      </TouchableWithoutFeedback>
+
+      <PanGestureHandler
         onGestureEvent={onGestureEvent}
         onHandlerStateChange={onHandlerStateChange}
         enabled={enablePanGesture}
@@ -183,12 +205,15 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
             styles.bottomSheet,
             style,
             {
-              transform: [{ translateY }],
+              transform: [{ translateY: combinedTranslateY }],
             },
           ]}
-        ><View style={styles.handle} /><View style={styles.content}>
+        >
+          <View style={styles.handle} />
+          <View style={styles.content}>
             {children}
-          </View></Animated.View>
+          </View>
+        </Animated.View>
       </PanGestureHandler>
     </View>
   );

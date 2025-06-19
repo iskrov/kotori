@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Platform } from 'react-native';
 import { format, parseISO } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,7 @@ interface JournalCardProps {
 const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
+  const [isPressed, setIsPressed] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const getPreviewText = (content: string, maxLength: number = 120) => {
@@ -38,18 +39,22 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
   );
 
   const handlePressIn = () => {
-    Animated.timing(scaleAnim, {
+    setIsPressed(true);
+    Animated.spring(scaleAnim, {
       toValue: 0.98,
-      duration: 100,
       useNativeDriver,
+      tension: 100,
+      friction: 3,
     }).start();
   };
 
   const handlePressOut = () => {
-    Animated.timing(scaleAnim, {
+    setIsPressed(false);
+    Animated.spring(scaleAnim, {
       toValue: 1,
-      duration: 100,
       useNativeDriver,
+      tension: 100,
+      friction: 3,
     }).start();
   };
 
@@ -58,11 +63,22 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
       onPress(entry);
     }
   };
+
+  const animatedStyle = {
+    transform: [{ scale: scaleAnim }],
+    opacity: scaleAnim.interpolate({
+      inputRange: [0.98, 1],
+      outputRange: [0.8, 1],
+    }),
+  };
   
   return (
-    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
+    <Animated.View style={[animatedStyle, style]}>
       <Pressable 
-        style={[styles.container]} 
+        style={[
+          styles.container,
+          isPressed && styles.pressed
+        ]} 
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -131,6 +147,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderColor: theme.colors.borderLight,
     borderWidth: theme.isDarkMode ? 1 : 0,
     overflow: 'hidden',
+  },
+  pressed: {
+    backgroundColor: theme.isDarkMode 
+      ? theme.colors.gray800 
+      : theme.colors.gray100,
   },
   header: {
     flexDirection: 'row',

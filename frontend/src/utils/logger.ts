@@ -9,17 +9,30 @@ class Logger {
   private logFilePath: string;
   private isWeb: boolean;
   private enabled: boolean = true;
+  private isDev: boolean;
+  private debugEnabled: boolean;
+  private suppressedWarnings: Set<string>;
 
   constructor() {
     this.isWeb = Platform.OS === 'web';
     this.logDirectory = this.isWeb ? '' : `${FileSystem.documentDirectory}logs/`;
     this.logFilePath = this.isWeb ? '' : `${this.logDirectory}app.log`;
+    this.isDev = __DEV__;
+    this.debugEnabled = false; // Default to false, can be enabled via enableDebug()
+    this.suppressedWarnings = new Set([
+      'setNativeProps is deprecated', // Third-party library warning
+    ]);
     this.initializeLogger();
   }
 
   private async initializeLogger() {
-    if (this.isWeb) {
-      console.log('Logger initialized in web mode - logs will appear in console only');
+    if (this.isWeb && !this.isDev) {
+      return; // Don't log initialization message in production web
+    }
+
+    if (this.isWeb && this.isDev) {
+      console.log('Logger initialized in web development mode');
+      this.setupConsoleOverrides();
       return;
     }
 
@@ -43,6 +56,26 @@ class Logger {
     } catch (error) {
       console.error('Failed to initialize logger:', error);
     }
+  }
+
+  private setupConsoleOverrides() {
+    if (!this.isWeb || !this.isDev) return;
+
+    // Override console.warn to filter out suppressed warnings
+    const originalWarn = console.warn;
+    console.warn = (...args: any[]) => {
+      const message = args.join(' ');
+      
+      // Check if this warning should be suppressed
+      for (const suppressedWarning of this.suppressedWarnings) {
+        if (message.includes(suppressedWarning)) {
+          return; // Suppress this warning
+        }
+      }
+      
+      // Allow the warning through
+      originalWarn.apply(console, args);
+    };
   }
 
   private getTimestamp(): string {
@@ -71,7 +104,25 @@ class Logger {
     }
   }
 
+  private shouldLog(level: LogLevel): boolean {
+    if (!this.enabled) return false;
+    if (level === 'error' || level === 'warn') return true;
+    if (level === 'debug' && !this.debugEnabled) return false;
+    if (!this.isDev) return true;
+    return this.debugEnabled;
+  }
+
+  private shouldSuppressMessage(message: string): boolean {
+    for (const suppressedWarning of this.suppressedWarnings) {
+      if (message.includes(suppressedWarning)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public debug(message: string, data?: any) {
+    if (!this.shouldLog('debug')) return;
     if (data !== undefined) {
       console.debug(message, data);
     } else {
@@ -81,6 +132,7 @@ class Logger {
   }
 
   public info(message: string, data?: any) {
+    if (!this.shouldLog('info')) return;
     if (data !== undefined) {
       console.info(message, data);
     } else {
@@ -90,6 +142,11 @@ class Logger {
   }
 
   public warn(message: string, data?: any) {
+    // Check if this warning should be suppressed
+    if (this.shouldSuppressMessage(message)) {
+      return;
+    }
+
     if (data !== undefined) {
       console.warn(message, data);
     } else {
@@ -126,6 +183,22 @@ class Logger {
 
   public disable() {
     this.enabled = false;
+  }
+
+  public enableDebug() {
+    this.debugEnabled = true;
+  }
+
+  public disableDebug() {
+    this.debugEnabled = false;
+  }
+
+  public addSuppressedWarning(warning: string) {
+    this.suppressedWarnings.add(warning);
+  }
+
+  public removeSuppressedWarning(warning: string) {
+    this.suppressedWarnings.delete(warning);
   }
 }
 

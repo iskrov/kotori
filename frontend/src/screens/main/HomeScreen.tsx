@@ -86,12 +86,7 @@ const HomeScreen = () => {
   // Log recentEntries IDs when they change, for debugging key prop warning
   useEffect(() => {
     if (recentEntries.length > 0) {
-      logger.info(
-        'HomeScreen: recentEntries IDs for key check:',
-        recentEntries.map(entry => entry.id)
-      );
-      
-      // Check for duplicate IDs
+      // Only log in debug mode and check for duplicate IDs
       const ids = recentEntries.map(entry => entry.id);
       const uniqueIds = [...new Set(ids)];
       if (ids.length !== uniqueIds.length) {
@@ -103,12 +98,7 @@ const HomeScreen = () => {
   // Log displayedEntries IDs when they change, for debugging key prop warning
   useEffect(() => {
     if (displayedEntries.length > 0) {
-      logger.info(
-        'HomeScreen: displayedEntries IDs for key check:',
-        displayedEntries.map(entry => entry.id)
-      );
-      
-      // Check for duplicate IDs in displayed entries
+      // Only check for duplicate IDs in displayed entries
       const displayedIds = displayedEntries.map(entry => entry.id);
       const uniqueDisplayedIds = [...new Set(displayedIds)];
       if (displayedIds.length !== uniqueDisplayedIds.length) {
@@ -120,12 +110,9 @@ const HomeScreen = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      logger.info("HomeScreen: Fetching data...");
       
       // Fetch user stats from the new backend endpoint with the correct prefix
-      logger.info("HomeScreen: Fetching stats from /api/users/me/stats...");
       const statsResponse = await api.get('/api/users/me/stats');
-      logger.info("HomeScreen: Stats response received", statsResponse.data);
       setStats({
         totalEntries: statsResponse.data.total_entries,
         currentStreak: statsResponse.data.current_streak,
@@ -133,14 +120,12 @@ const HomeScreen = () => {
       });
       
       // Fetch recent entries, ensuring descending order by entry_date
-              logger.info("HomeScreen: Fetching recent journals from /api/journals/...");
-        const entriesResponse = await api.get('/api/journals/', {
+      const entriesResponse = await api.get('/api/journals/', {
         params: { 
           limit: 3, // Only show 3 most recent entries on the home screen
           sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
         }
       });
-      logger.info(`HomeScreen: Recent entries response received (${entriesResponse.data.length} entries)`);
       setRecentEntries(entriesResponse.data);
       
     } catch (error: any) {
