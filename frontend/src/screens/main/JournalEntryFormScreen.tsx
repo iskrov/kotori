@@ -10,7 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  SafeAreaView
+  SafeAreaView,
+  Animated,
+  Dimensions
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +26,9 @@ import SafeScrollView from '../../components/SafeScrollView';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import { Tag } from '../../types';
+import hapticService from '../../services/hapticService';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const JournalEntryFormScreen = () => {
   const navigation = useNavigation();
@@ -50,6 +55,10 @@ const JournalEntryFormScreen = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   // This ref will hold stable versions of the handler functions.
   const handlersRef = useRef({
     handleSave: async () => {},
@@ -57,13 +66,38 @@ const JournalEntryFormScreen = () => {
     handleBackPress: () => navigation.goBack(),
   });
 
+  // Animation on load
+  useEffect(() => {
+    // Set initial values immediately to ensure content is visible
+    fadeAnim.setValue(1);
+    slideAnim.setValue(0);
+    
+    // Then run the animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 80,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
+
   // This `useEffect` runs only ONCE to set up stable navigation options.
   useEffect(() => {
     navigation.setOptions({
       title: journalId ? 'Edit Entry' : 'New Entry',
       headerLeft: () => (
         <TouchableOpacity
-          onPress={() => handlersRef.current.handleBackPress()}
+          onPress={() => {
+            hapticService.light();
+            handlersRef.current.handleBackPress();
+          }}
           style={{ marginLeft: 16, padding: 8 }}
         >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
@@ -76,11 +110,13 @@ const JournalEntryFormScreen = () => {
   useEffect(() => {
     const handleSave = async () => {
       if (!content.trim()) {
+        hapticService.error();
         Alert.alert('Error', 'Please enter some content for your journal entry');
         return;
       }
       try {
         setIsLoading(true);
+        hapticService.light();
         const entryData: any = {
           title: title || `Entry ${new Date().toLocaleDateString()}`,
           content,
@@ -95,16 +131,19 @@ const JournalEntryFormScreen = () => {
           setOriginalTags(tags); // Keep the current Tag objects, not the string array
           setOriginalEntryDate(entryData.entry_date);
           setHasUnsavedChanges(false);
+          hapticService.success();
           Alert.alert('Success', 'Journal entry updated', [
             { text: 'OK', onPress: () => navigation.goBack() },
           ]);
         } else {
           await JournalAPI.createEntry(entryData);
+          hapticService.success();
           Alert.alert('Success', 'Journal entry created', [
             { text: 'OK', onPress: () => navigation.goBack() },
           ]);
         }
       } catch (error) {
+        hapticService.error();
         logger.error('Error saving journal entry', { journalId, error });
         Alert.alert('Error', 'Failed to save journal entry');
       } finally {
@@ -113,6 +152,7 @@ const JournalEntryFormScreen = () => {
     };
 
     const handleDiscard = () => {
+      hapticService.warning();
       Alert.alert(
         'Discard Changes',
         'Are you sure you want to discard all changes?',
@@ -122,6 +162,7 @@ const JournalEntryFormScreen = () => {
             text: 'Discard',
             style: 'destructive',
             onPress: () => {
+              hapticService.light();
               if (journalId) {
                 setTitle(originalTitle);
                 setContent(originalContent);
@@ -143,6 +184,7 @@ const JournalEntryFormScreen = () => {
 
     const handleBackPress = () => {
       if (hasUnsavedChanges) {
+        hapticService.warning();
         Alert.alert(
           'Unsaved Changes',
           'You have unsaved changes. What would you like to do?',
@@ -153,6 +195,7 @@ const JournalEntryFormScreen = () => {
           ]
         );
       } else {
+        hapticService.light();
         navigation.goBack();
       }
     };
@@ -169,8 +212,10 @@ const JournalEntryFormScreen = () => {
       if (!journalId) return;
       try {
         setIsFetchingEntry(true);
+        logger.info('JournalEntryFormScreen: Fetching entry data', { journalId });
         const response = await JournalAPI.getEntry(parseInt(journalId, 10));
         const entry = response.data;
+        logger.info('JournalEntryFormScreen: Entry data loaded', { entry });
         setTitle(entry.title || '');
         setContent(entry.content || '');
         setTags(entry.tags || []);
@@ -189,8 +234,10 @@ const JournalEntryFormScreen = () => {
     };
 
     if (journalId) {
+      logger.info('JournalEntryFormScreen: Edit mode, fetching entry', { journalId });
       fetchEntryData();
     } else {
+      logger.info('JournalEntryFormScreen: New entry mode');
       setEntryDate(new Date().toISOString());
     }
   }, [journalId]);
@@ -227,6 +274,7 @@ const JournalEntryFormScreen = () => {
         return;
       }
 
+      hapticService.light();
       setShowRecorder(true);
       logger.info('JournalEntryFormScreen: Showing AudioRecorder modal');
     } catch (error) {
@@ -239,6 +287,7 @@ const JournalEntryFormScreen = () => {
     setShowRecorder(false);
     
     if (transcribedText) {
+      hapticService.success();
       // For edit mode, append new transcription to existing content with proper formatting
       setContent(prevContent => {
         if (!prevContent.trim()) {
@@ -271,10 +320,40 @@ const JournalEntryFormScreen = () => {
   // Stable suggestions array to prevent TagInput infinite loops
   const tagSuggestions = useMemo(() => [], []);
 
+  // Get formatted date display
+  const getFormattedDate = () => {
+    if (!entryDate) return 'No date set';
+    try {
+      const date = new Date(entryDate);
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
+  // Debug logging removed
+
+  // Debug logging
+  logger.info('JournalEntryFormScreen: Render state', { 
+    isFetchingEntry, 
+    journalId, 
+    hasTitle: !!title, 
+    hasContent: !!content
+  });
+
   if (isFetchingEntry) {
+    logger.info('JournalEntryFormScreen: Showing loading screen');
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <View style={styles.loadingContent}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading your entry...</Text>
+        </View>
       </View>
     );
   }
@@ -287,81 +366,140 @@ const JournalEntryFormScreen = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Edit Mode Indicator */}
-        {journalId && (
-          <View style={styles.editModeIndicator}>
-            <Ionicons name="create" size={20} color={theme.colors.primary} />
-            <Text style={styles.editModeText}>Editing Entry</Text>
-            {hasUnsavedChanges && (
-              <View style={styles.unsavedIndicator}>
-                <Text style={styles.unsavedText}>●</Text>
+        <Animated.View 
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          {/* Header Section */}
+          <View style={styles.headerSection}>
+            <View style={styles.headerContent}>
+              <Text style={styles.screenTitle}>
+                {journalId ? 'Edit Your Entry' : 'New Journal Entry'}
+              </Text>
+              <Text style={styles.screenSubtitle}>
+                {journalId ? 'Make changes to your journal entry' : 'Capture your thoughts and experiences'}
+              </Text>
+              {hasUnsavedChanges && (
+                <View style={styles.unsavedBadge}>
+                  <Ionicons name="radio-button-on" size={12} color={theme.colors.warning} />
+                  <Text style={styles.unsavedText}>Unsaved changes</Text>
+                </View>
+              )}
+            </View>
+            {journalId && (
+              <View style={styles.editIndicator}>
+                <Ionicons name="create" size={24} color={theme.colors.primary} />
               </View>
             )}
           </View>
-        )}
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Title</Text>
-          <TextInput
-            style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Enter a title for your entry (optional)"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-        </View>
+          {/* Date Section */}
+          <View style={styles.dateSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="calendar" size={20} color={theme.colors.primary} />
+              <Text style={styles.sectionTitle}>Entry Date</Text>
+            </View>
+            <View style={styles.dateDisplay}>
+              <Text style={styles.dateText}>{getFormattedDate()}</Text>
+                             <Text style={styles.dateSubtext}>
+                 {new Date(entryDate || new Date()).toLocaleTimeString('en-US', { 
+                   hour: 'numeric', 
+                   minute: '2-digit', 
+                   hour12: true 
+                 })}
+               </Text>
+            </View>
+          </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Entry Date</Text>
-          <TextInput
-            style={styles.input}
-            value={entryDate ? new Date(entryDate).toLocaleDateString() : ''}
-            onChangeText={(text) => {
-              // Simple date parsing - in a real app you'd want a proper date picker
-              try {
-                const date = new Date(text);
-                if (!isNaN(date.getTime())) {
-                  setEntryDate(date.toISOString());
-                }
-              } catch (error) {
-                // Invalid date, ignore
-              }
-            }}
-            placeholder="MM/DD/YYYY"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-        </View>
+          {/* Title Section */}
+          <View style={styles.inputSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="text" size={20} color={theme.colors.primary} />
+              <Text style={styles.sectionTitle}>Title</Text>
+              <Text style={styles.optionalText}>(Optional)</Text>
+            </View>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.titleInput}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Give your entry a memorable title..."
+                placeholderTextColor={theme.colors.textSecondary}
+                multiline
+                maxLength={100}
+              />
+              {title.length > 0 && (
+                <Text style={styles.characterCount}>{title.length}/100</Text>
+              )}
+            </View>
+          </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Entry Content</Text>
-          <TextInput
-            style={styles.textArea}
-            multiline
-            numberOfLines={10}
-            placeholder="Write your journal entry here..."
-            value={content}
-            onChangeText={setContent}
-            textAlignVertical="top"
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-          <TouchableOpacity 
-            style={styles.recordButtonInline} 
-            onPress={handleShowRecorder} 
-            disabled={isRecording || isLoading || isTranscribing}
-          >
-            <Ionicons name="mic" size={theme.typography.fontSizes.xl} color={theme.colors.primary} style={styles.recordIcon} />
-            <Text style={styles.recordButtonText}>Record Audio</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Content Section */}
+          <View style={styles.inputSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="document-text" size={20} color={theme.colors.primary} />
+              <Text style={styles.sectionTitle}>Your Entry</Text>
+              <View style={styles.headerActions}>
+                <TouchableOpacity 
+                  style={styles.recordButton} 
+                  onPress={handleShowRecorder} 
+                  disabled={isRecording || isLoading || isTranscribing}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={isRecording ? "mic" : "mic-outline"} 
+                    size={18} 
+                    color={theme.colors.accent} 
+                  />
+                  <Text style={styles.recordButtonText}>Record</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.contentContainer}>
+              <TextInput
+                style={styles.contentInput}
+                multiline
+                placeholder="What's on your mind? Share your thoughts, experiences, or reflections..."
+                value={content}
+                onChangeText={setContent}
+                textAlignVertical="top"
+                placeholderTextColor={theme.colors.textSecondary}
+              />
+              {content.length > 0 && (
+                <View style={styles.contentStats}>
+                  <Text style={styles.statsText}>
+                    {content.length} characters • {content.split(' ').filter(word => word.length > 0).length} words
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Tags</Text>
-          <TagInput 
-            tags={tags} 
-            onChangeTags={handleTagsChange}
-            suggestions={tagSuggestions}
-          />
-        </View>
+          {/* Tags Section */}
+          <View style={styles.inputSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="pricetags" size={20} color={theme.colors.primary} />
+              <Text style={styles.sectionTitle}>Tags</Text>
+              {tags.length > 0 && (
+                <View style={styles.tagCount}>
+                  <Text style={styles.tagCountText}>{tags.length}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.tagsContainer}>
+              <TagInput 
+                tags={tags} 
+                onChangeTags={handleTagsChange}
+                suggestions={tagSuggestions}
+              />
+            </View>
+                     </View>
+         </Animated.View>
 
         {showRecorder && (
           <Modal
@@ -378,43 +516,61 @@ const JournalEntryFormScreen = () => {
               onTranscriptionComplete={handleTranscriptionComplete}
               onCancel={() => setShowRecorder(false)}
               onAutoSave={handleAutoSave} // Auto-save transcriptions to content
-              showCloseButton={true} // Show close button in modal mode
-              existingContent={content} // Pass existing content for context
             />
           </Modal>
         )}
       </SafeScrollView>
 
-      {/* Buttons are now a regular view at the bottom, not absolute positioned */}
-      <View style={styles.buttonContainer}>
+      {/* Floating Action Buttons */}
+      <Animated.View 
+        style={[
+          styles.floatingActions,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={() => hasUnsavedChanges ? handlersRef.current.handleDiscard() : navigation.goBack()}
+          style={[styles.fab, styles.cancelFab]}
+          onPress={() => {
+            hapticService.light();
+            hasUnsavedChanges ? handlersRef.current.handleDiscard() : navigation.goBack();
+          }}
           disabled={isLoading}
+          activeOpacity={0.8}
         >
-          <Text style={styles.cancelButtonText}>
-            {hasUnsavedChanges ? 'Discard' : 'Cancel'}
-          </Text>
+          <Ionicons 
+            name={hasUnsavedChanges ? "close" : "arrow-back"} 
+            size={24} 
+            color={theme.colors.white} 
+          />
         </TouchableOpacity>
         
         <TouchableOpacity
           style={[
-            styles.button,
-            styles.saveButton,
-            (isLoading || !hasUnsavedChanges) && styles.disabledButton,
+            styles.fab,
+            styles.saveFab,
+            (!hasUnsavedChanges || isLoading) && styles.disabledFab,
           ]}
-          onPress={handlersRef.current.handleSave}
+          onPress={() => {
+            hapticService.medium();
+            handlersRef.current.handleSave();
+          }}
           disabled={isLoading || !hasUnsavedChanges}
+          activeOpacity={0.8}
         >
           {isLoading ? (
             <ActivityIndicator size="small" color={theme.colors.white} />
           ) : (
-            <Text style={styles.saveButtonText}>
-              {journalId ? 'Save Changes' : 'Create Entry'}
-            </Text>
+            <Ionicons 
+              name={journalId ? "checkmark" : "add"} 
+              size={24} 
+              color={theme.colors.white} 
+            />
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -423,145 +579,254 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    paddingBottom: Platform.OS === 'ios' ? 88 : 75, // Account for tab bar height
   },
   loadingContainer: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  loadingContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.xl,
+  },
+  loadingText: {
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.lg,
+    fontFamily: theme.typography.fontFamilies.medium,
   },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: 120, // Space for FABs
   },
-  formGroup: {
-    marginBottom: theme.spacing.lg,
+  content: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
   },
-  label: {
-    fontSize: theme.typography.fontSizes.md,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-    fontFamily: theme.typography.fontFamilies.bold,
-  },
-  input: {
-    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.white,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 5,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.regular,
-  },
-  textArea: {
-    backgroundColor: theme.colors.white,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 5,
-    padding: theme.spacing.md,
-    fontSize: theme.typography.fontSizes.md,
-    color: theme.colors.text,
-    minHeight: 150,
-    fontFamily: theme.typography.fontFamilies.regular,
-  },
-  buttonContainer: {
+  headerSection: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xxl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: theme.spacing.xl,
-    paddingTop: theme.spacing.lg,
-    backgroundColor: theme.colors.background,
-    gap: theme.spacing.lg,
+    alignItems: 'flex-start',
+    ...theme.shadows.lg,
+    borderWidth: theme.isDarkMode ? 1 : 0,
+    borderColor: theme.colors.border,
   },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: 16,
+  headerContent: {
     flex: 1,
-    minHeight: 56,
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  saveButton: {
-    backgroundColor: theme.colors.primary,
-    borderWidth: 2,
-    borderColor: theme.colors.primary + '20',
-  },
-  saveButtonText: {
-    color: theme.colors.white,
-    fontSize: theme.typography.fontSizes.lg,
+  screenTitle: {
+    fontSize: theme.typography.fontSizes.xxxl,
     fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
     fontFamily: theme.typography.fontFamilies.bold,
-    letterSpacing: 0.5,
+    letterSpacing: -1,
   },
-  cancelButton: {
-    backgroundColor: theme.colors.gray200,
-    borderWidth: 2,
-    borderColor: theme.colors.gray200 + '20',
-  },
-  cancelButtonText: {
-    color: theme.colors.textSecondary,
+  screenSubtitle: {
     fontSize: theme.typography.fontSizes.lg,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-    letterSpacing: 0.5,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.medium,
+    lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.lg,
   },
-  disabledButton: {
-    backgroundColor: theme.colors.disabled,
-    opacity: 0.6,
-  },
-  recordButtonInline: {
+  unsavedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.gray100,
-    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.warningLight + '20',
     paddingHorizontal: theme.spacing.md,
-    borderRadius: 5,
-    marginTop: theme.spacing.md,
-  },
-  recordIcon: {
-    marginRight: theme.spacing.sm,
-  },
-  recordButtonText: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.fontSizes.sm,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-  },
-  editModeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary + '10',
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: theme.colors.primary + '30',
-  },
-  editModeText: {
-    fontSize: theme.typography.fontSizes.md,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-    color: theme.colors.primary,
-    marginLeft: theme.spacing.sm,
-    flex: 1,
-  },
-  unsavedIndicator: {
-    marginLeft: theme.spacing.sm,
+    borderColor: theme.colors.warning + '30',
   },
   unsavedText: {
-    fontSize: theme.typography.fontSizes.lg,
+    fontSize: theme.typography.fontSizes.xs,
     color: theme.colors.warning,
+    fontWeight: '600',
+    marginLeft: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  editIndicator: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.primaryLight + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.primary + '30',
+  },
+  dateSection: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xxl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
+    ...theme.shadows.md,
+    borderWidth: theme.isDarkMode ? 1 : 0,
+    borderColor: theme.colors.border,
+  },
+  inputSection: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xxl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
+    ...theme.shadows.md,
+    borderWidth: theme.isDarkMode ? 1 : 0,
+    borderColor: theme.colors.border,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  sectionTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginLeft: theme.spacing.sm,
+    flex: 1,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  optionalText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
+    fontFamily: theme.typography.fontFamilies.regular,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  recordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.accentLight + '20',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.accent + '30',
+  },
+  recordButtonText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.accent,
+    fontWeight: '600',
+    marginLeft: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  tagCount: {
+    backgroundColor: theme.colors.primary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tagCountText: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.white,
+    fontWeight: 'bold',
     fontFamily: theme.typography.fontFamilies.bold,
+  },
+  dateDisplay: {
+    alignItems: 'flex-start',
+  },
+  dateText: {
+    fontSize: theme.typography.fontSizes.xl,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  dateSubtext: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.medium,
+  },
+  inputContainer: {
+    position: 'relative',
+  },
+  titleInput: {
+    fontSize: theme.typography.fontSizes.xl,
+    fontWeight: '600',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    padding: 0,
+    margin: 0,
+    minHeight: 50,
+    textAlignVertical: 'top',
+  },
+  characterCount: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+  },
+  contentContainer: {
+    position: 'relative',
+  },
+  contentInput: {
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
+    padding: 0,
+    margin: 0,
+    minHeight: 200,
+    textAlignVertical: 'top',
+    lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.lg,
+  },
+  contentStats: {
+    marginTop: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  statsText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.medium,
+  },
+  tagsContainer: {
+    minHeight: 60,
+  },
+  floatingActions: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 100 : 85,
+    right: theme.spacing.lg,
+    flexDirection: 'column',
+    gap: theme.spacing.md,
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.xl,
+    elevation: 8,
+  },
+  cancelFab: {
+    backgroundColor: theme.colors.textSecondary,
+  },
+  saveFab: {
+    backgroundColor: theme.colors.primary,
+  },
+  disabledFab: {
+    backgroundColor: theme.colors.disabled,
+    opacity: 0.6,
   },
 });
 
