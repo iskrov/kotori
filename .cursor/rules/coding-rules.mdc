@@ -29,3 +29,6 @@ alwaysApply: true
 
 - Maintain two files: todo.md and done.md. Put all the tasks from the current plan that need to be done in todo.md and move all completed tasks to done.md
 
+- Use ./scripts/stop.sh and ./scripts/start.sh to stop and start backend and frontend.
+- You don't have access to .env file, but all required parameters are stored in there.
+- We are using Postgres 14 database with connection details described in ./script/start_db.sh
