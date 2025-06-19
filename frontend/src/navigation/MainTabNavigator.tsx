@@ -6,7 +6,7 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { MainTabParamList, JournalStackParamList, MainStackParamList } from './types';
+import { MainTabParamList, MainStackParamList } from './types';
 import logger from '../utils/logger';
 import audioPrewarmService from '../services/audioPrewarmService';
 
@@ -17,62 +17,14 @@ import HomeScreen from '../screens/main/HomeScreen';
 import JournalScreen from '../screens/main/JournalScreen';
 import CalendarScreen from '../screens/main/CalendarScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
-import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
-import JournalEntryFormScreen from '../screens/main/JournalEntryFormScreen';
-import ReminderFormScreen from '../screens/main/ReminderFormScreen';
-import DeleteConfirmationScreen from '../screens/main/DeleteConfirmationScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
-const JournalStackNavigator = createStackNavigator<JournalStackParamList>();
 
 type MainTabNavigatorProps = {
   navigation: StackNavigationProp<MainStackParamList, 'MainTabs'>;
 };
 
-const JournalStack = () => {
-  const { theme } = useAppTheme();
 
-  return (
-    <JournalStackNavigator.Navigator
-      screenOptions={{
-        headerShown: false,
-        headerStyle: { backgroundColor: theme.colors.card },
-        headerTintColor: theme.colors.text,
-        headerTitleStyle: { color: theme.colors.text, fontFamily: theme.typography.fontFamilies.bold },
-      }}
-    >
-      <JournalStackNavigator.Screen 
-        name="JournalList" 
-        component={JournalScreen} 
-        options={{ title: 'Journal' }}
-      />
-      <JournalStackNavigator.Screen 
-        name="JournalEntryDetail" 
-        component={JournalEntryDetailScreen} 
-        options={{ title: 'Journal Entry' }}
-      />
-      <JournalStackNavigator.Screen 
-        name="JournalEntryForm" 
-        component={JournalEntryFormScreen} 
-        options={({ route }) => ({ 
-          title: route.params?.journalId ? 'Edit Entry' : 'New Entry'
-        })}
-      />
-      <JournalStackNavigator.Screen 
-        name="ReminderForm" 
-        component={ReminderFormScreen} 
-        options={({ route }) => ({ 
-          title: route.params?.reminderId ? 'Edit Reminder' : 'New Reminder'
-        })}
-      />
-      <JournalStackNavigator.Screen 
-        name="DeleteConfirmation" 
-        component={DeleteConfirmationScreen} 
-        options={{ title: 'Delete Entry' }}
-      />
-    </JournalStackNavigator.Navigator>
-  );
-};
 
 const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
   const { theme } = useAppTheme();
