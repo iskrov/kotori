@@ -142,6 +142,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         handleAcceptTranscript={handleManualSave}
         handleLanguageChange={logic.handleLanguageChange}
         formatDuration={logic.formatDuration}
+        onClose={onCancel}
       />
     </View>
   );
