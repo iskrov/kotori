@@ -46,7 +46,7 @@
 - [x] Create journal interfaces  
   - [x] Journal list screen  
   - [x] Journal entry detail screen  
-  - [x] Journal entry form screen  
+  - [x] Journal entry form screen (replaced with unified inline editing)  
 - [x] Implement tag management  
   - [x] Create tag component  
   - [x] Integrate tag filtering  
@@ -727,7 +727,7 @@ Based on comprehensive analysis of all screens, implementing consistent scrollin
 - [ ] **Discard Button Functionality**: Discard button in Edit Entry screen doesn't work as expected
   - **Status**: Buttons are now visible but discard logic needs investigation
   - **Priority**: Medium - affects user experience when canceling edits
-  - **Location**: `JournalEntryFormScreen.tsx` - discard button behavior
+  - **Note**: `JournalEntryFormScreen.tsx` was removed in favor of unified inline editing in detail screen
 
 ## 🎉 **Project Status: FEATURE-COMPLETE & PRODUCTION-READY**
 
