@@ -90,6 +90,7 @@ const RecordScreen: React.FC = () => {
   // Data states for saving the entry
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [originalContent, setOriginalContent] = useState(''); // Preserve original content for editing mode
   const [tags, setTags] = useState<string[]>(['journal']);
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [isLoadingExistingEntry, setIsLoadingExistingEntry] = useState(false);
@@ -105,7 +106,9 @@ const RecordScreen: React.FC = () => {
            
            logger.info(`[RecordScreen] Loaded existing entry for appending: ${entry.title}`);
            setTitle(entry.title || '');
-           setContent(entry.content || '');
+           const entryContent = entry.content || '';
+           setContent(entryContent);
+           setOriginalContent(entryContent); // Store original content separately
            setTags(entry.tags?.map((tag: any) => tag.name) || ['journal']);
            setAudioUri(entry.audio_url);
          } catch (error) {
@@ -216,8 +219,8 @@ const RecordScreen: React.FC = () => {
     logger.info('[RecordScreen] Manual save triggered.');
     
     // Combine existing content with new transcript
-    const finalContent = journalId && content 
-      ? content + '\n\n' + newTranscript 
+    const finalContent = journalId && originalContent 
+      ? originalContent + '\n\n' + newTranscript 
       : newTranscript;
     
     setContent(finalContent);
@@ -236,7 +239,7 @@ const RecordScreen: React.FC = () => {
     } catch (error) {
       logger.error('[RecordScreen] Manual save failed:', error);
     }
-  }, [save, title, isSaving, journalId, content]);
+  }, [save, title, isSaving, journalId, originalContent]);
 
   // Handle save with complete edited text (for editing mode)
   const handleSaveWithCompleteText = useCallback(async (completeText: string) => {
@@ -302,13 +305,22 @@ const RecordScreen: React.FC = () => {
       setTitle(generatedTitle);
     }
     
-    // Update content state (for UI display)
-    setContent(currentTranscript);
+    // For auto-save, determine the complete content to save
+    let contentToSave;
+    if (journalId && originalContent) {
+      // For existing entries, combine original content with new transcript
+      contentToSave = `${originalContent}\n\n${currentTranscript}`;
+    } else {
+      // For new entries, just use the current transcript
+      contentToSave = currentTranscript;
+      // Update content state for new entries only
+      setContent(currentTranscript);
+    }
     
     // Prepare data for save
     const saveData = {
       title: newTitle,
-      content: currentTranscript,
+      content: contentToSave,
     };
     
     // Use new save function with explicit data and silent mode
@@ -325,7 +337,7 @@ const RecordScreen: React.FC = () => {
     } catch (error) {
       logger.error('[RecordScreen] Auto-save failed:', error);
     }
-  }, [save, title]);
+  }, [save, title, journalId, originalContent]);
 
   // Determine save button state
   const getSaveButtonState = useCallback(() => {
@@ -411,7 +423,7 @@ const RecordScreen: React.FC = () => {
                 saveButtonState={getSaveButtonState()}
                 startRecordingOnMount={startRecordingOnMount}
                 onCommandDetected={handleCommandDetected}
-                existingContent={content}
+                existingContent={originalContent || content}
                 onSaveWithCompleteText={handleSaveWithCompleteText}
               />
               

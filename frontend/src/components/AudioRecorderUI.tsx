@@ -180,37 +180,39 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
     }
   }, [isRecording, pulseAnimRef]);
 
-  // Get the current new transcript (only new segments, not accumulated)
-  const newTranscriptText = transcriptSegments.join('\n').trim();
-  
-  // For editing mode, show existing content + new transcript
-  // For new entries, just show new transcript
-  const displayText = existingContent && existingContent.trim() 
-    ? (newTranscriptText 
-        ? `${existingContent}\n\n${newTranscriptText}` 
-        : existingContent)
-    : newTranscriptText;
-    
-  // Use current segment transcript if actively transcribing, otherwise use display text
-  const currentTranscript = currentSegmentTranscript || displayText;
-
   // Track user-edited text separately to avoid feedback loops
   const [editedText, setEditedText] = useState(existingContent || '');
+  const [hasUserEdited, setHasUserEdited] = useState(false);
 
-  // Append new transcript segments to existing content when they arrive
-  useEffect(() => {
-    if (newTranscriptText && newTranscriptText.trim()) {
-      setEditedText(prev => {
-        if (existingContent && existingContent.trim()) {
-          // If we have existing content, append new transcript to it
-          return prev.includes(newTranscriptText) ? prev : `${existingContent}\n\n${newTranscriptText}`;
-        } else {
-          // No existing content, just use new transcript
-          return newTranscriptText;
-        }
-      });
+  // Compute display text for the TextInput
+  const getDisplayText = () => {
+    // If user has manually edited the text, use that
+    if (hasUserEdited) {
+      return editedText;
     }
-  }, [newTranscriptText, existingContent]);
+    
+    // Build the complete display text from all available sources
+    let displayParts = [];
+    
+    // Add existing content if available
+    if (existingContent && existingContent.trim()) {
+      displayParts.push(existingContent);
+    }
+    
+    // Add completed segments if available
+    if (transcriptSegments.length > 0) {
+      displayParts.push(transcriptSegments.join('\n'));
+    }
+    
+    // Add current segment being transcribed if available and not just "Processing..."
+    if (currentSegmentTranscript && 
+        currentSegmentTranscript.trim() && 
+        currentSegmentTranscript !== 'Processing...') {
+      displayParts.push(currentSegmentTranscript);
+    }
+    
+    return displayParts.join('\n\n');
+  };
 
   // Get effective save button state
   const effectiveSaveButtonState = saveButtonState || {
@@ -222,25 +224,47 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   // Handle save button press
   const handleSavePress = useCallback(() => {
     if (onSaveWithCompleteText && existingContent) {
-      // If we have a complete text handler and existing content, use the edited text
-      onSaveWithCompleteText(editedText);
+      // Get the current text for saving
+      let textToSave;
+      if (hasUserEdited) {
+        // User has manually edited
+        textToSave = editedText;
+      } else {
+        // Build the complete text from all available sources (same as display logic)
+        let saveParts = [];
+        
+        // Add existing content if available
+        if (existingContent && existingContent.trim()) {
+          saveParts.push(existingContent);
+        }
+        
+        // Add completed segments if available
+        if (transcriptSegments.length > 0) {
+          saveParts.push(transcriptSegments.join('\n'));
+        }
+        
+        textToSave = saveParts.join('\n\n');
+      }
+      
+      onSaveWithCompleteText(textToSave);
       // Clear transcript segments after saving to prevent accumulation
       setTranscriptSegments([]);
-      // Reset edited text to just existing content for next recording
+      // Reset edited text to existing content for next recording
       setEditedText(existingContent);
+      setHasUserEdited(false);
     } else {
       // Otherwise use the normal transcript-based save
       handleAcceptTranscript();
     }
-  }, [onSaveWithCompleteText, existingContent, editedText, handleAcceptTranscript, setTranscriptSegments]);
+  }, [onSaveWithCompleteText, existingContent, editedText, hasUserEdited, transcriptSegments, handleAcceptTranscript, setTranscriptSegments]);
 
   // Get display text for transcription area
   const getTranscriptionDisplayText = () => {
     if (isTranscribingSegment) {
       return 'Processing audio...';
     }
-    if (currentTranscript) {
-      return currentTranscript;
+    if (editedText) {
+      return editedText;
     }
     if (isRecording) {
       return 'Listening...';
@@ -356,10 +380,13 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
         {/* Editable Text Area */}
         <TextInput
           style={styles.transcriptTextInput}
-          value={editedText}
+          value={getDisplayText()}
           onChangeText={(text) => {
-            // Simply update the edited text - no complex logic needed
-            setEditedText(text);
+            // Only allow editing when not transcribing
+            if (!isTranscribingSegment) {
+              setEditedText(text);
+              setHasUserEdited(true);
+            }
           }}
           multiline
           placeholder={isTranscribingSegment ? 'Processing audio...' : (isRecording ? 'Listening...' : 'Tap the microphone to start recording')}
