@@ -180,17 +180,27 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
     }
   }, [isRecording, pulseAnimRef]);
 
-  // Combine all transcript segments into one text for display
-  const fullTranscriptText = transcriptSegments.join('\n').trim();
+  // Get the current new transcript (only new segments, not accumulated)
+  const newTranscriptText = transcriptSegments.join('\n').trim();
   
-  // For editing mode, combine existing content with new transcript
+  // For editing mode, show existing content + new transcript
+  // For new entries, just show new transcript
   const displayText = existingContent && existingContent.trim() 
-    ? (fullTranscriptText 
-        ? `${existingContent}\n\n${fullTranscriptText}` 
+    ? (newTranscriptText 
+        ? `${existingContent}\n\n${newTranscriptText}` 
         : existingContent)
-    : fullTranscriptText;
+    : newTranscriptText;
     
+  // Use current segment transcript if actively transcribing, otherwise use display text
   const currentTranscript = currentSegmentTranscript || displayText;
+
+  // Track user-edited text separately to avoid feedback loops
+  const [editedText, setEditedText] = useState(currentTranscript);
+
+  // Update edited text when transcript changes (but not during user editing)
+  useEffect(() => {
+    setEditedText(currentTranscript);
+  }, [currentTranscript]);
 
   // Get effective save button state
   const effectiveSaveButtonState = saveButtonState || {
@@ -202,13 +212,17 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   // Handle save button press
   const handleSavePress = useCallback(() => {
     if (onSaveWithCompleteText && existingContent) {
-      // If we have a complete text handler and existing content, use the complete edited text
-      onSaveWithCompleteText(currentTranscript);
+      // If we have a complete text handler and existing content, use the edited text
+      onSaveWithCompleteText(editedText);
+      // Clear transcript segments after saving to prevent accumulation
+      setTranscriptSegments([]);
+      // Reset edited text to just existing content for next recording
+      setEditedText(existingContent);
     } else {
       // Otherwise use the normal transcript-based save
       handleAcceptTranscript();
     }
-  }, [onSaveWithCompleteText, existingContent, currentTranscript, handleAcceptTranscript]);
+  }, [onSaveWithCompleteText, existingContent, editedText, handleAcceptTranscript, setTranscriptSegments]);
 
   // Get display text for transcription area
   const getTranscriptionDisplayText = () => {
@@ -332,31 +346,10 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
         {/* Editable Text Area */}
         <TextInput
           style={styles.transcriptTextInput}
-          value={currentTranscript}
+          value={editedText}
           onChangeText={(text) => {
-            // If we have existing content, we need to handle the split properly
-            if (existingContent && existingContent.trim()) {
-              // Check if the text still contains the existing content
-              if (text.startsWith(existingContent)) {
-                // Extract only the new part after existing content
-                const newPart = text.slice(existingContent.length).replace(/^\n\n/, '');
-                if (newPart.trim()) {
-                  setTranscriptSegments([newPart]);
-                } else {
-                  setTranscriptSegments([]);
-                }
-              } else {
-                // User has edited the existing content, treat as complete replacement
-                setTranscriptSegments([text]);
-              }
-            } else {
-              // No existing content, handle normally
-              if (text.trim()) {
-                setTranscriptSegments([text]);
-              } else {
-                setTranscriptSegments([]);
-              }
-            }
+            // Simply update the edited text - no complex logic needed
+            setEditedText(text);
           }}
           multiline
           placeholder={isTranscribingSegment ? 'Processing audio...' : (isRecording ? 'Listening...' : 'Tap the microphone to start recording')}
