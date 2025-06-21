@@ -74,6 +74,9 @@ interface AudioRecorderUIProps {
   
   // Optional existing content to show as context
   existingContent?: string;
+  
+  // Optional handler for saving with complete edited text
+  onSaveWithCompleteText?: (completeText: string) => void;
 }
 
 // Waveform component for dynamic visualization
@@ -146,6 +149,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   saveButtonState,
   onClose,
   existingContent,
+  onSaveWithCompleteText,
 }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
@@ -188,14 +192,23 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
     
   const currentTranscript = currentSegmentTranscript || displayText;
 
-
-
   // Get effective save button state
   const effectiveSaveButtonState = saveButtonState || {
     text: 'Save',
     disabled: !canAcceptTranscript,
     isSaving: false
   };
+
+  // Handle save button press
+  const handleSavePress = useCallback(() => {
+    if (onSaveWithCompleteText && existingContent) {
+      // If we have a complete text handler and existing content, use the complete edited text
+      onSaveWithCompleteText(currentTranscript);
+    } else {
+      // Otherwise use the normal transcript-based save
+      handleAcceptTranscript();
+    }
+  }, [onSaveWithCompleteText, existingContent, currentTranscript, handleAcceptTranscript]);
 
   // Get display text for transcription area
   const getTranscriptionDisplayText = () => {
@@ -305,7 +318,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
               styles.saveButtonSmall,
               effectiveSaveButtonState.disabled && styles.saveButtonSmallDisabled
             ]}
-            onPress={handleAcceptTranscript}
+            onPress={handleSavePress}
             disabled={effectiveSaveButtonState.disabled}
           >
             {effectiveSaveButtonState.isSaving ? (

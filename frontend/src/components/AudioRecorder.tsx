@@ -35,6 +35,7 @@ interface AudioRecorderProps {
   saveButtonState?: { text: string; disabled: boolean; isSaving: boolean };
   startRecordingOnMount?: boolean;
   existingContent?: string;
+  onSaveWithCompleteText?: (completeText: string) => void;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
@@ -49,6 +50,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   saveButtonState,
   startRecordingOnMount = true,
   existingContent,
+  onSaveWithCompleteText,
 }) => {
   const handleTranscriptionComplete = (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => {
     logger.info('[AudioRecorder] onTranscriptionComplete triggered.');
@@ -115,27 +117,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
   const handleManualSave = useCallback(() => {
     const fullTranscript = logic.transcriptSegments.join('\n').trim();
-    
-    // Determine the complete final content to save
-    let finalContent;
-    if (existingContent && existingContent.trim()) {
-      // If we have existing content, combine it with new transcript
-      if (fullTranscript) {
-        finalContent = `${existingContent}\n\n${fullTranscript}`;
-      } else {
-        // No new transcript, just keep existing content
-        finalContent = existingContent;
-      }
-    } else {
-      // No existing content, just use the transcript
-      finalContent = fullTranscript;
+    if (fullTranscript) {
+      onManualSave?.(fullTranscript);
+      onSave?.(fullTranscript);
     }
-    
-    if (finalContent && finalContent.trim()) {
-      onManualSave?.(finalContent.trim());
-      onSave?.(finalContent.trim());
-    }
-  }, [logic.transcriptSegments, onManualSave, onSave, existingContent]);
+  }, [logic.transcriptSegments, onManualSave, onSave]);
 
   return (
     <View style={styles.container}>
@@ -162,6 +148,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         formatDuration={logic.formatDuration}
         onClose={onCancel}
         existingContent={existingContent}
+        onSaveWithCompleteText={onSaveWithCompleteText}
       />
     </View>
   );

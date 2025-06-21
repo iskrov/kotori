@@ -210,19 +210,22 @@ const RecordScreen: React.FC = () => {
   }, []);
 
   // Handle manual save from AudioRecorder
-  const handleManualSave = useCallback(async (finalContent: string, finalAudioUri?: string) => {
+  const handleManualSave = useCallback(async (newTranscript: string, finalAudioUri?: string) => {
     if (!mountedRef.current || isSaving) return;
     
     logger.info('[RecordScreen] Manual save triggered.');
     
-    // AudioRecorder now passes the complete final content (existing + new)
-    // So we just use it directly without any additional processing
+    // Combine existing content with new transcript
+    const finalContent = journalId && content 
+      ? content + '\n\n' + newTranscript 
+      : newTranscript;
+    
     setContent(finalContent);
     if (finalAudioUri) setAudioUri(finalAudioUri);
     
     // Only set title if it's empty (don't override existing titles)
-    if (finalContent && !title) {
-      const words = finalContent.split(' ');
+    if (newTranscript && !title) {
+      const words = newTranscript.split(' ');
       setTitle(words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : ''));
     }
     
@@ -232,6 +235,30 @@ const RecordScreen: React.FC = () => {
       await save();
     } catch (error) {
       logger.error('[RecordScreen] Manual save failed:', error);
+    }
+  }, [save, title, isSaving, journalId, content]);
+
+  // Handle save with complete edited text (for editing mode)
+  const handleSaveWithCompleteText = useCallback(async (completeText: string) => {
+    if (!mountedRef.current || isSaving) return;
+    
+    logger.info('[RecordScreen] Save with complete text triggered.');
+    
+    // Use the complete edited text as-is
+    setContent(completeText);
+    
+    // Only set title if it's empty (don't override existing titles)
+    if (completeText && !title) {
+      const words = completeText.split(' ');
+      setTitle(words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : ''));
+    }
+    
+    setHasStartedSaving(true);
+    
+    try {
+      await save();
+    } catch (error) {
+      logger.error('[RecordScreen] Save with complete text failed:', error);
     }
   }, [save, title, isSaving]);
 
@@ -385,6 +412,7 @@ const RecordScreen: React.FC = () => {
                 startRecordingOnMount={startRecordingOnMount}
                 onCommandDetected={handleCommandDetected}
                 existingContent={content}
+                onSaveWithCompleteText={handleSaveWithCompleteText}
               />
               
               {/* Secret Tag Floating Indicator */}
