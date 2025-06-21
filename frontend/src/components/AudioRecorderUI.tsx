@@ -204,8 +204,9 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
       displayParts.push(transcriptSegments.join('\n'));
     }
     
-    // Add current segment being transcribed if available and not just "Processing..."
-    if (currentSegmentTranscript && 
+    // Add current segment being transcribed ONLY during active transcription
+    if (isTranscribingSegment && 
+        currentSegmentTranscript && 
         currentSegmentTranscript.trim() && 
         currentSegmentTranscript !== 'Processing...') {
       displayParts.push(currentSegmentTranscript);
