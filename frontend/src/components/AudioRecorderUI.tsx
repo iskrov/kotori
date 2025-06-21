@@ -178,7 +178,15 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
 
   // Combine all transcript segments into one text for display
   const fullTranscriptText = transcriptSegments.join('\n').trim();
-  const currentTranscript = currentSegmentTranscript || fullTranscriptText;
+  
+  // For editing mode, combine existing content with new transcript
+  const displayText = existingContent && existingContent.trim() 
+    ? (fullTranscriptText 
+        ? `${existingContent}\n\n${fullTranscriptText}` 
+        : existingContent)
+    : fullTranscriptText;
+    
+  const currentTranscript = currentSegmentTranscript || displayText;
 
   // Get effective save button state
   const effectiveSaveButtonState = saveButtonState || {
@@ -311,10 +319,28 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
           style={styles.transcriptTextInput}
           value={currentTranscript}
           onChangeText={(text) => {
-            if (text.trim()) {
-              setTranscriptSegments([text]);
+            // If we have existing content, we need to handle the split properly
+            if (existingContent && existingContent.trim()) {
+              // Check if the text still contains the existing content
+              if (text.startsWith(existingContent)) {
+                // Extract only the new part after existing content
+                const newPart = text.slice(existingContent.length).replace(/^\n\n/, '');
+                if (newPart.trim()) {
+                  setTranscriptSegments([newPart]);
+                } else {
+                  setTranscriptSegments([]);
+                }
+              } else {
+                // User has edited the existing content, treat as complete replacement
+                setTranscriptSegments([text]);
+              }
             } else {
-              setTranscriptSegments([]);
+              // No existing content, handle normally
+              if (text.trim()) {
+                setTranscriptSegments([text]);
+              } else {
+                setTranscriptSegments([]);
+              }
             }
           }}
           multiline

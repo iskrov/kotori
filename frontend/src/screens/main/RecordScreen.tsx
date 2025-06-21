@@ -387,6 +387,7 @@ const RecordScreen: React.FC = () => {
                 saveButtonState={getSaveButtonState()}
                 startRecordingOnMount={startRecordingOnMount}
                 onCommandDetected={handleCommandDetected}
+                existingContent={content}
               />
               
               {/* Secret Tag Floating Indicator */}

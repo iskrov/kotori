@@ -34,6 +34,7 @@ interface AudioRecorderProps {
   isEditingInitialContent?: boolean;
   saveButtonState?: { text: string; disabled: boolean; isSaving: boolean };
   startRecordingOnMount?: boolean;
+  existingContent?: string;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({
@@ -47,6 +48,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   isEditingInitialContent = false,
   saveButtonState,
   startRecordingOnMount = true,
+  existingContent,
 }) => {
   const handleTranscriptionComplete = (text: string, audioUri?: string, detectedLanguage?: string | null, confidence?: number) => {
     logger.info('[AudioRecorder] onTranscriptionComplete triggered.');
@@ -143,6 +145,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         handleLanguageChange={logic.handleLanguageChange}
         formatDuration={logic.formatDuration}
         onClose={onCancel}
+        existingContent={existingContent}
       />
     </View>
   );
