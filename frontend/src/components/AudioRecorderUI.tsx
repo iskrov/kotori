@@ -248,14 +248,23 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
       }
       
       onSaveWithCompleteText(textToSave);
-      // Clear transcript segments after saving to prevent accumulation
+      
+      // After save, update the display to show the saved content
+      setEditedText(textToSave);
+      setHasUserEdited(true); // Mark as edited so it shows the saved content
+      // Clear transcript segments to prevent re-accumulation
       setTranscriptSegments([]);
-      // Reset edited text to existing content for next recording
-      setEditedText(existingContent);
-      setHasUserEdited(false);
     } else {
-      // Otherwise use the normal transcript-based save
-      handleAcceptTranscript();
+      // For new entries, get the current transcript and save it
+      const currentTranscript = transcriptSegments.join('\n').trim();
+      if (currentTranscript) {
+        handleAcceptTranscript();
+        // After save, update display to show the saved content
+        setEditedText(currentTranscript);
+        setHasUserEdited(true);
+        // Clear segments to prevent accumulation
+        setTranscriptSegments([]);
+      }
     }
   }, [onSaveWithCompleteText, existingContent, editedText, hasUserEdited, transcriptSegments, handleAcceptTranscript, setTranscriptSegments]);
 

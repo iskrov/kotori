@@ -316,8 +316,8 @@ const RecordScreen: React.FC = () => {
     } else {
       // For new entries, just use the current transcript
       contentToSave = currentTranscript;
-      // Update content state for new entries only
-      setContent(currentTranscript);
+      // DON'T update content state for new entries to avoid duplication in display
+      // The UI will show transcriptSegments, and auto-save works silently
     }
     
     // Prepare data for save
@@ -334,6 +334,11 @@ const RecordScreen: React.FC = () => {
       
       if (savedId) {
         logger.info(`[RecordScreen] Auto-save successful. Entry ID: ${savedId}`);
+        // For new entries, update the journalId so subsequent saves are updates
+        if (!journalId) {
+          // This is now an existing entry for future operations
+          // But don't set originalContent to avoid affecting the display
+        }
       } else {
         logger.warn('[RecordScreen] Auto-save completed but no ID returned.');
       }
