@@ -4,7 +4,6 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   JournalEntryDetail: { entryId: number } | undefined;
-  JournalEntryForm: { journalId?: number };
   ReminderForm: { reminderId?: string };
   Settings: undefined;
 };
@@ -20,7 +19,6 @@ export type MainTabParamList = {
 export type JournalStackParamList = {
   JournalList: undefined;
   JournalEntryDetail: { entryId: number };
-  JournalEntryForm: { journalId?: number };
   ReminderForm: { reminderId?: string };
   DeleteConfirmation: { entryId: number };
 };

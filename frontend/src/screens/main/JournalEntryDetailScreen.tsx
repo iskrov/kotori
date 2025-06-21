@@ -10,7 +10,8 @@ import {
   SafeAreaView,
   Animated,
   Dimensions,
-  ScrollView
+  ScrollView,
+  TextInput
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -23,6 +24,7 @@ import { MainStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import hapticService from '../../services/hapticService';
+import TagInput from '../../components/TagInput';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -42,11 +44,22 @@ const JournalEntryDetailScreen = () => {
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Unified edit state - everything is editable when enabled
+  const [isEditMode, setIsEditMode] = useState(false); // Start in view mode by default
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editTags, setEditTags] = useState<Tag[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
+  
+  // Text input refs to handle focus issues
+  const titleInputRef = useRef<TextInput>(null);
+  const contentInputRef = useRef<TextInput>(null);
   
   // Animated header
   const headerOpacity = scrollY.interpolate({
@@ -103,7 +116,13 @@ const JournalEntryDetailScreen = () => {
     try {
       setIsLoading(true);
       const response = await JournalAPI.getEntry(parseInt(entryId));
-      setEntry(response.data);
+      const entryData = response.data;
+      setEntry(entryData);
+      
+      // Initialize edit state
+      setEditTitle(entryData.title || '');
+      setEditContent(entryData.content || '');
+      setEditTags(entryData.tags || []);
     } catch (error) {
       console.error('Error fetching entry details', error);
       Alert.alert('Error', 'Failed to load journal entry details');
@@ -112,9 +131,60 @@ const JournalEntryDetailScreen = () => {
     }
   };
   
-  const handleEdit = () => {
+  const handleToggleEdit = () => {
     hapticService.light();
-    navigation.navigate('JournalEntryForm', { journalId: entryId });
+    setIsEditMode(!isEditMode);
+  };
+  
+  const handleSaveChanges = async () => {
+    if (!entry) {
+      console.error('No entry to save');
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      hapticService.light();
+      
+      const updateData = {
+        title: editTitle,
+        content: editContent,
+        tags: editTags.map(tag => tag.name)
+      };
+      
+      const response = await JournalAPI.updateEntry(parseInt(entryId), updateData);
+      console.log('Entry saved successfully');
+      
+      // Update local entry state with new values
+      const updatedEntry = {
+        ...entry,
+        title: editTitle,
+        content: editContent,
+        tags: editTags
+      };
+      setEntry(updatedEntry);
+      setIsEditMode(false);
+      
+      // Show success feedback
+      hapticService.success();
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      Alert.alert('Error', `Failed to save changes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      hapticService.error();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleCancelEdit = () => {
+    hapticService.light();
+    // Reset to original values
+    if (entry) {
+      setEditTitle(entry.title || '');
+      setEditContent(entry.content || '');
+      setEditTags(entry.tags || []);
+    }
+    setIsEditMode(false);
   };
   
   const handleDelete = async () => {
@@ -124,7 +194,36 @@ const JournalEntryDetailScreen = () => {
 
   const handleBack = () => {
     hapticService.light();
-    navigation.goBack();
+    if (isEditMode) {
+      // Ask to save or discard changes
+      Alert.alert(
+        'Unsaved Changes',
+        'You have unsaved changes. What would you like to do?',
+        [
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => {
+              handleCancelEdit();
+              navigation.goBack();
+            }
+          },
+          {
+            text: 'Save & Exit',
+            onPress: async () => {
+              await handleSaveChanges();
+              navigation.goBack();
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
   };
   
   if (isLoading) {
@@ -203,13 +302,42 @@ const JournalEntryDetailScreen = () => {
           <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={styles.headerActionButton}
-            onPress={handleEdit}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="create-outline" size={24} color={theme.colors.primary} />
-          </TouchableOpacity>
+          {isEditMode ? (
+            <>
+              <TouchableOpacity 
+                style={[styles.headerActionButton, isSaving && { opacity: 0.5 }]}
+                onPress={() => {
+                  // Blur text inputs first to prevent focus interference on web
+                  titleInputRef.current?.blur();
+                  contentInputRef.current?.blur();
+                  handleSaveChanges();
+                }}
+                activeOpacity={0.7}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                ) : (
+                  <Ionicons name="checkmark" size={24} color={theme.colors.success} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.headerActionButton}
+                onPress={handleToggleEdit}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="eye-outline" size={24} color={theme.colors.primary} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity 
+              style={styles.headerActionButton}
+              onPress={handleToggleEdit}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="create-outline" size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={[styles.headerActionButton, styles.deleteHeaderButton]}
             onPress={handleDelete}
@@ -263,52 +391,115 @@ const JournalEntryDetailScreen = () => {
             )}
           </View>
 
-          {/* Combined Title and Content Section */}
+          {/* Unified Title and Content Section */}
           <View style={styles.entrySection}>
             <View style={styles.entryHeader}>
               <Ionicons name="document-text" size={20} color={theme.colors.primary} />
               <Text style={styles.entryHeaderText}>Your Entry</Text>
+              {isEditMode && (
+                <Text style={styles.editModeIndicator}>Editing</Text>
+              )}
             </View>
             
-            {entry.title && (
-              <Text style={styles.entryTitle}>{entry.title}</Text>
-            )}
+            {/* Title - Always Visible, Editable in Edit Mode */}
+            <View style={styles.titleSection}>
+              {isEditMode ? (
+                <TextInput
+                  ref={titleInputRef}
+                  style={styles.titleInput}
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  placeholder="Enter title..."
+                  multiline={false}
+                  maxLength={100}
+                />
+              ) : (
+                <Text style={styles.entryTitle}>
+                  {entry.title || 'Untitled Entry'}
+                </Text>
+              )}
+            </View>
             
-            <Text style={styles.entryText}>{entry.content}</Text>
+            {/* Content - Always Visible, Editable in Edit Mode */}
+            <View style={styles.contentSection}>
+              {isEditMode ? (
+                <TextInput
+                  ref={contentInputRef}
+                  style={styles.contentInput}
+                  value={editContent}
+                  onChangeText={setEditContent}
+                  placeholder="What's on your mind?"
+                  multiline={true}
+                  numberOfLines={8}
+                  textAlignVertical="top"
+                />
+              ) : (
+                <Text style={styles.entryText}>{entry.content}</Text>
+              )}
+            </View>
+
+            {/* Record Button - Available in Edit Mode */}
+            {isEditMode && (
+              <View style={styles.recordSection}>
+                <TouchableOpacity 
+                  style={styles.recordButton}
+                  onPress={() => {
+                    hapticService.light();
+                    navigation.navigate('Record', { journalId: entryId });
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="mic" size={20} color={theme.colors.white} />
+                  <Text style={styles.recordButtonText}>Record</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
-          {/* Tags Section */}
-          {entry.tags && entry.tags.length > 0 && (
-            <View style={styles.tagsSection}>
-              <View style={styles.tagsHeader}>
-                <Ionicons name="pricetags" size={20} color={theme.colors.primary} />
-                <Text style={styles.tagsHeaderText}>Tags</Text>
+          {/* Tags Section - Always Editable */}
+          <View style={styles.tagsSection}>
+            <View style={styles.tagsHeader}>
+              <Ionicons name="pricetags" size={20} color={theme.colors.primary} />
+              <Text style={styles.tagsHeaderText}>Tags</Text>
+              {!isEditMode && (
                 <View style={styles.tagCount}>
-                  <Text style={styles.tagCountText}>{entry.tags.length}</Text>
+                  <Text style={styles.tagCountText}>{entry.tags?.length || 0}</Text>
                 </View>
-              </View>
-              <View style={styles.tagsList}>
-                {entry.tags.map((tag: Tag, index: number) => (
-                  <Animated.View 
-                    key={tag.id ? String(tag.id) : `${entry.id}-tag-${index}`}
-                    style={[
-                      styles.tag,
-                      {
-                        transform: [{
-                          scale: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0.8, 1],
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <Text style={styles.tagText}>{tag.name}</Text>
-                  </Animated.View>
-                ))}
-              </View>
+              )}
             </View>
-          )}
+            
+            {isEditMode ? (
+              <TagInput
+                tags={editTags}
+                onChangeTags={setEditTags}
+                placeholder="Add tags..."
+                maxTags={10}
+              />
+            ) : (
+              entry.tags && entry.tags.length > 0 && (
+                <View style={styles.tagsList}>
+                  {entry.tags.map((tag: Tag, index: number) => (
+                    <Animated.View 
+                      key={tag.id ? String(tag.id) : `${entry.id}-tag-${index}`}
+                      style={[
+                        styles.tag,
+                        {
+                          transform: [{
+                            scale: fadeAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.8, 1],
+                            })
+                          }]
+                        }
+                      ]}
+                    >
+                      <Text style={styles.tagText}>{tag.name}</Text>
+                    </Animated.View>
+                  ))}
+                </View>
+              )
+            )}
+          </View>
 
           {/* Stats Section */}
           <View style={styles.statsSection}>
@@ -316,17 +507,26 @@ const JournalEntryDetailScreen = () => {
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
                 <Ionicons name="text-outline" size={24} color={theme.colors.primary} />
-                <Text style={styles.statValue}>{entry.content.length}</Text>
+                <Text style={styles.statValue}>
+                  {isEditMode ? editContent.length : entry.content.length}
+                </Text>
                 <Text style={styles.statLabel}>Characters</Text>
               </View>
               <View style={styles.statItem}>
                 <Ionicons name="library-outline" size={24} color={theme.colors.accent} />
-                <Text style={styles.statValue}>{entry.content.split(' ').length}</Text>
+                <Text style={styles.statValue}>
+                  {isEditMode 
+                    ? editContent.split(' ').filter(word => word.length > 0).length 
+                    : entry.content.split(' ').length
+                  }
+                </Text>
                 <Text style={styles.statLabel}>Words</Text>
               </View>
               <View style={styles.statItem}>
                 <Ionicons name="pricetags-outline" size={24} color={theme.colors.secondary} />
-                <Text style={styles.statValue}>{entry.tags?.length || 0}</Text>
+                <Text style={styles.statValue}>
+                  {isEditMode ? editTags.length : (entry.tags?.length || 0)}
+                </Text>
                 <Text style={styles.statLabel}>Tags</Text>
               </View>
             </View>
@@ -346,7 +546,7 @@ const JournalEntryDetailScreen = () => {
       >
         <TouchableOpacity 
           style={[styles.fab, styles.editFab]} 
-          onPress={handleEdit}
+          onPress={handleToggleEdit}
           activeOpacity={0.8}
         >
           <Ionicons name="create" size={24} color={theme.colors.white} />
@@ -725,6 +925,66 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   deleteFab: {
     backgroundColor: theme.colors.error,
+  },
+  // Inline edit styles
+  editModeIndicator: {
+    marginLeft: 'auto',
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primaryLight + '20',
+    fontSize: theme.typography.fontSizes.sm,
+    fontWeight: '600',
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  titleSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  titleInput: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '600',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    minHeight: 50,
+  },
+  contentSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  contentInput: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.regular,
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    minHeight: 150,
+    lineHeight: theme.typography.lineHeights.loose * theme.typography.fontSizes.md,
+  },
+  recordSection: {
+    alignItems: 'center',
+  },
+  recordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.borderRadius.full,
+    ...theme.shadows.md,
+  },
+  recordButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '600',
+    marginLeft: theme.spacing.sm,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
 });
 

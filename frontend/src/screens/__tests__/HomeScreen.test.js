@@ -128,7 +128,7 @@ describe('HomeScreen', () => {
     fireEvent.press(newEntryButton);
     
     // Check that navigate was called with the right parameters
-    expect(mockNavigate).toHaveBeenCalledWith('JournalEntryForm', {});
+    expect(mockNavigate).toHaveBeenCalledWith('Record', {});
   });
   
   it('shows search results when search is performed', async () => {

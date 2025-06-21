@@ -5,7 +5,7 @@ import RecordScreen from '../screens/main/RecordScreen';
 import TagManagementScreen from '../screens/main/TagManagementScreen';
 import TagDeleteConfirmationScreen from '../screens/main/TagDeleteConfirmationScreen';
 import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
-import JournalEntryFormScreen from '../screens/main/JournalEntryFormScreen';
+
 import ReminderFormScreen from '../screens/main/ReminderFormScreen';
 import DeleteConfirmationScreen from '../screens/main/DeleteConfirmationScreen';
 import { MainStackParamList } from './types';
@@ -55,16 +55,7 @@ const MainNavigator = () => {
           headerShown: false, // Custom header in component
         }}
       />
-      <Stack.Screen
-        name="JournalEntryForm"
-        component={JournalEntryFormScreen}
-        options={{
-          headerShown: true,
-          title: 'Edit Entry',
-          headerStyle: { backgroundColor: '#f8f9fa' },
-          headerTintColor: '#333',
-        }}
-      />
+
       <Stack.Screen
         name="ReminderForm"
         component={ReminderFormScreen}

@@ -1,22 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { JournalAPI } from '../../services/api';
-import { JournalStackParamList } from '../../types';
+import { MainStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import hapticService from '../../services/hapticService';
 
-type DeleteConfirmationRouteProp = RouteProp<JournalStackParamList, 'DeleteConfirmation'>;
-type DeleteConfirmationNavigationProp = StackNavigationProp<JournalStackParamList, 'DeleteConfirmation'>;
+type DeleteConfirmationRouteProp = RouteProp<MainStackParamList, 'DeleteConfirmation'>;
+type DeleteConfirmationNavigationProp = StackNavigationProp<MainStackParamList, 'DeleteConfirmation'>;
 
 const DeleteConfirmationScreen = () => {
   const navigation = useNavigation<DeleteConfirmationNavigationProp>();
@@ -24,26 +26,46 @@ const DeleteConfirmationScreen = () => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
   const { entryId } = route.params;
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleCancel = () => {
+    hapticService.light();
     navigation.goBack();
   };
 
   const handleConfirmDelete = async () => {
+    if (isDeleting) return; // Prevent double-clicking
+    
     try {
+      setIsDeleting(true);
+      hapticService.medium(); // Strong feedback for destructive action
       console.log(`[DeleteConfirmation] Deleting entry with ID: ${entryId}`);
-      await JournalAPI.deleteEntry(entryId);
+      await JournalAPI.deleteEntry(parseInt(entryId));
       console.log('[DeleteConfirmation] Delete successful');
       
-      // Navigate back to the journal list by resetting the navigation stack
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'JournalList' }],
+      hapticService.success(); // Success feedback
+      // Navigate back to the main tabs and then to Journal tab
+      navigation.navigate('MainTabs', {
+        screen: 'Journal',
+        params: { screen: 'JournalList' }
       });
     } catch (error) {
       console.error('[DeleteConfirmation] Error deleting entry:', error);
-      // Navigate back to detail screen on error
-      navigation.goBack();
+      // If entry was already deleted (404), treat as success
+      if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+        console.log('[DeleteConfirmation] Entry already deleted, treating as success');
+        hapticService.success(); // Success feedback for already deleted
+        navigation.navigate('MainTabs', {
+          screen: 'Journal',
+          params: { screen: 'JournalList' }
+        });
+      } else {
+        hapticService.error(); // Error feedback
+        // For other errors, go back to previous screen
+        navigation.goBack();
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -66,17 +88,23 @@ const DeleteConfirmationScreen = () => {
         
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
-            style={[styles.button, styles.cancelButton]}
+            style={[styles.button, styles.cancelButton, isDeleting && { opacity: 0.5 }]}
             onPress={handleCancel}
+            disabled={isDeleting}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.button, styles.deleteButton]}
+            style={[styles.button, styles.deleteButton, isDeleting && { opacity: 0.7 }]}
             onPress={handleConfirmDelete}
+            disabled={isDeleting}
           >
-            <Text style={styles.deleteButtonText}>Delete</Text>
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={theme.colors.white} />
+            ) : (
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>

@@ -10,7 +10,6 @@ export type RecordScreenParams = {
 export type JournalStackParamList = {
   JournalList: undefined;
   JournalEntryDetail: { entryId: string };
-  JournalEntryForm: { journalId?: string };
   ReminderForm: { reminderId?: string };
   DeleteConfirmation: { entryId: string };
 };
@@ -30,7 +29,6 @@ export type MainStackParamList = {
   TagManagement: undefined;
   TagDeleteConfirmation: { tagId: string; tagName: string; tagType: 'regular' | 'secret' };
   JournalEntryDetail: { entryId: string };
-  JournalEntryForm: { journalId?: string };
   ReminderForm: { reminderId?: string };
   DeleteConfirmation: { entryId: string };
 };

@@ -33,6 +33,7 @@ import { SecretTagV2 } from '../../services/secretTagOnlineManager';
 import logger from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import { JournalAPI } from '../../services/api';
 
 // --- Special Tag for Hidden Entries (Client-Side) ---
 const HIDDEN_ENTRY_TAG = "_hidden_entry";
@@ -63,6 +64,7 @@ const RecordScreen: React.FC = () => {
     }
   }, [startRecordingOnMount]);
   const selectedDate = route.params?.selectedDate; // Get selectedDate from route params
+  const journalId = route.params?.journalId; // Get journalId for appending to existing entry
   
   // Log if using a custom date
   useEffect(() => {
@@ -71,7 +73,13 @@ const RecordScreen: React.FC = () => {
     } else {
       logger.info('[RecordScreen] Using current date for new entry');
     }
-  }, [selectedDate]);
+    
+    if (journalId) {
+      logger.info(`[RecordScreen] Appending to existing entry: ${journalId}`);
+    } else {
+      logger.info('[RecordScreen] Creating new entry');
+    }
+  }, [selectedDate, journalId]);
 
   // UI states
   const [isLoading, setIsLoading] = useState(false);
@@ -85,6 +93,33 @@ const RecordScreen: React.FC = () => {
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>(['journal']);
   const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [isLoadingExistingEntry, setIsLoadingExistingEntry] = useState(false);
+  
+  // Load existing entry data if journalId is provided
+  useEffect(() => {
+    if (journalId) {
+             const loadExistingEntry = async () => {
+         try {
+           setIsLoadingExistingEntry(true);
+           const response = await JournalAPI.getEntry(parseInt(journalId));
+           const entry = response.data;
+           
+           logger.info(`[RecordScreen] Loaded existing entry for appending: ${entry.title}`);
+           setTitle(entry.title || '');
+           setContent(entry.content || '');
+           setTags(entry.tags?.map((tag: any) => tag.name) || ['journal']);
+           setAudioUri(entry.audio_url);
+         } catch (error) {
+           logger.error(`[RecordScreen] Failed to load existing entry ${journalId}:`, error);
+           // Continue with empty data if loading fails
+         } finally {
+           setIsLoadingExistingEntry(false);
+         }
+       };
+      
+      loadExistingEntry();
+    }
+  }, [journalId]);
   
   const mountedRef = useRef(true);
 
@@ -100,7 +135,7 @@ const RecordScreen: React.FC = () => {
         currentTags = currentTags.filter(t => t !== HIDDEN_ENTRY_TAG);
       }
       return {
-        id: null, // Always create new entries
+        id: journalId || null, // Use existing entry ID if provided
         title,
         content,
         tags: currentTags,
@@ -120,7 +155,8 @@ const RecordScreen: React.FC = () => {
           logger.warn('[RecordScreen] Save completed but no ID received. Navigating back anyway.');
         }
         
-        // Navigate back to the previous screen (e.g., Home)
+        // If we were appending to an existing entry, go back to the detail screen
+        // Otherwise just go back to the previous screen
         if (navigation.canGoBack()) {
           navigation.goBack();
         }
@@ -180,8 +216,15 @@ const RecordScreen: React.FC = () => {
     
     logger.info('[RecordScreen] Manual save triggered.');
     
-    setContent(finalTranscript);
+    // If we have existing content and this is an append operation, combine the content
+    const newContent = journalId && content 
+      ? content + '\n\n' + finalTranscript // Append with line breaks
+      : finalTranscript; // Replace content for new entries
+    
+    setContent(newContent);
     if (finalAudioUri) setAudioUri(finalAudioUri);
+    
+    // Only set title if it's empty (don't override existing titles)
     if (finalTranscript && !title) {
       const words = finalTranscript.split(' ');
       setTitle(words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : ''));
@@ -194,7 +237,7 @@ const RecordScreen: React.FC = () => {
     } catch (error) {
       logger.error('[RecordScreen] Manual save failed:', error);
     }
-  }, [save, title, isSaving]);
+  }, [save, title, isSaving, journalId, content]);
 
   const handleRecorderCancel = useCallback(() => {
     if (!mountedRef.current) {
@@ -308,8 +351,8 @@ const RecordScreen: React.FC = () => {
   
   return (
     <View style={styles.container}> 
-      {/* Modal overlay background */}
-      <View style={styles.modalOverlay} />
+      {/* Modal overlay background - only show if this is a new entry (not appending) */}
+      {!journalId && <View style={styles.modalOverlay} />}
       
       <SafeScrollView 
         style={styles.scrollContainer}
@@ -322,14 +365,19 @@ const RecordScreen: React.FC = () => {
           <View style={styles.recorderContainer}>
             {/* Modal Header with Drag Handle and Close Button */}
             <View style={styles.modalHeader}>
-              <View style={styles.modalHandle} />
+              {!journalId && <View style={styles.modalHandle} />}
+              {journalId && (
+                <Text style={styles.headerTitle}>
+                  Add to Entry
+                </Text>
+              )}
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={handleClose}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons
-                  name="close"
+                  name={journalId ? "arrow-back" : "close"}
                   size={24}
                   color={theme.colors.textSecondary}
                 />
@@ -471,6 +519,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: theme.typography.fontSizes.md,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.regular,
+  },
+  headerTitle: {
+    fontSize: theme.typography.fontSizes.lg,
+    fontWeight: '600',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
 });
 
