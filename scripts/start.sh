@@ -76,10 +76,21 @@ fi
 echo "Starting FastAPI server on port $BACKEND_PORT..."
 python run.py --port $BACKEND_PORT > "$LOGS_DIR/backend.log" 2> "$LOGS_DIR/backend_error.log" & echo $! > "$BACKEND_PID_FILE"
 
-# Wait a moment for the server to start
-sleep 5
+# Wait for the server to start (increased timeout)
+echo "Waiting for backend server to start..."
+sleep 2
 
-# Check if the server started successfully
+# Check multiple times with a longer timeout
+for i in {1..10}; do
+    if check_port $BACKEND_PORT; then
+        echo "Backend server is responding on port $BACKEND_PORT"
+        break
+    fi
+    echo "Attempt $i/10: Backend not ready yet, waiting..."
+    sleep 2
+done
+
+# Final check if the server started successfully
 if ! check_port $BACKEND_PORT; then
     echo "Failed to start backend server on port $BACKEND_PORT. Check $LOGS_DIR/backend_error.log for details."
     # Optional: attempt to kill the potentially failed process

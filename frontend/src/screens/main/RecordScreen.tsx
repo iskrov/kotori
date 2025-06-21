@@ -18,7 +18,6 @@ import { MainStackParamList, RecordScreenParams } from '../../navigation/types';
 
 // Components
 import AudioRecorder from '../../components/AudioRecorder';
-import SafeScrollView from '../../components/SafeScrollView';
 import { SecretTagFloatingIndicator } from '../../components/SecretTagIndicator';
 
 // Hooks
@@ -354,13 +353,7 @@ const RecordScreen: React.FC = () => {
       {/* Modal overlay background - only show if this is a new entry (not appending) */}
       {!journalId && <View style={styles.modalOverlay} />}
       
-      <SafeScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        extraBottomPadding={0} // No extra padding needed for modal
-      >
+      <View style={styles.contentContainer}>
         {showRecorder ? (
           <View style={styles.recorderContainer}>
             {/* Modal Header with Drag Handle and Close Button */}
@@ -426,7 +419,7 @@ const RecordScreen: React.FC = () => {
             </View>
           </View>
         )}
-      </SafeScrollView>
+      </View>
 
       {isSaving && (
         <View style={styles.savingOverlay}> 
@@ -451,21 +444,15 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 1,
   },
-  scrollContainer: {
+  contentContainer: {
     flex: 1,
     width: '100%',
     zIndex: 2,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   recorderContainer: {
     flex: 1,
     width: '100%',
     backgroundColor: theme.colors.background,
-    minHeight: '100%', // Ensure full height for modal
   },
   modalHeader: {
     flexDirection: 'row',
