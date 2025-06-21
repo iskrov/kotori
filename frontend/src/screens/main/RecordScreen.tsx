@@ -247,19 +247,22 @@ const RecordScreen: React.FC = () => {
     
     logger.info('[RecordScreen] Save with complete text triggered.');
     
-    // Use the complete edited text as-is
-    setContent(completeText);
-    
     // Only set title if it's empty (don't override existing titles)
+    let finalTitle = title;
     if (completeText && !title) {
       const words = completeText.split(' ');
-      setTitle(words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : ''));
+      finalTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      setTitle(finalTitle);
     }
     
     setHasStartedSaving(true);
     
     try {
-      await save();
+      // Pass the complete text directly to save function instead of relying on state
+      await save({
+        content: completeText,
+        title: finalTitle,
+      });
     } catch (error) {
       logger.error('[RecordScreen] Save with complete text failed:', error);
     }
