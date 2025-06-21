@@ -115,11 +115,27 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
   const handleManualSave = useCallback(() => {
     const fullTranscript = logic.transcriptSegments.join('\n').trim();
-    if (fullTranscript) {
-      onManualSave?.(fullTranscript);
-      onSave?.(fullTranscript);
+    
+    // Determine the complete final content to save
+    let finalContent;
+    if (existingContent && existingContent.trim()) {
+      // If we have existing content, combine it with new transcript
+      if (fullTranscript) {
+        finalContent = `${existingContent}\n\n${fullTranscript}`;
+      } else {
+        // No new transcript, just keep existing content
+        finalContent = existingContent;
+      }
+    } else {
+      // No existing content, just use the transcript
+      finalContent = fullTranscript;
     }
-  }, [logic.transcriptSegments, onManualSave, onSave]);
+    
+    if (finalContent && finalContent.trim()) {
+      onManualSave?.(finalContent.trim());
+      onSave?.(finalContent.trim());
+    }
+  }, [logic.transcriptSegments, onManualSave, onSave, existingContent]);
 
   return (
     <View style={styles.container}>

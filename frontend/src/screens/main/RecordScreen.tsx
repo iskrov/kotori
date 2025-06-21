@@ -210,22 +210,19 @@ const RecordScreen: React.FC = () => {
   }, []);
 
   // Handle manual save from AudioRecorder
-  const handleManualSave = useCallback(async (finalTranscript: string, finalAudioUri?: string) => {
+  const handleManualSave = useCallback(async (finalContent: string, finalAudioUri?: string) => {
     if (!mountedRef.current || isSaving) return;
     
     logger.info('[RecordScreen] Manual save triggered.');
     
-    // If we have existing content and this is an append operation, combine the content
-    const newContent = journalId && content 
-      ? content + '\n\n' + finalTranscript // Append with line breaks
-      : finalTranscript; // Replace content for new entries
-    
-    setContent(newContent);
+    // AudioRecorder now passes the complete final content (existing + new)
+    // So we just use it directly without any additional processing
+    setContent(finalContent);
     if (finalAudioUri) setAudioUri(finalAudioUri);
     
     // Only set title if it's empty (don't override existing titles)
-    if (finalTranscript && !title) {
-      const words = finalTranscript.split(' ');
+    if (finalContent && !title) {
+      const words = finalContent.split(' ');
       setTitle(words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : ''));
     }
     
@@ -236,7 +233,7 @@ const RecordScreen: React.FC = () => {
     } catch (error) {
       logger.error('[RecordScreen] Manual save failed:', error);
     }
-  }, [save, title, isSaving, journalId, content]);
+  }, [save, title, isSaving]);
 
   const handleRecorderCancel = useCallback(() => {
     if (!mountedRef.current) {

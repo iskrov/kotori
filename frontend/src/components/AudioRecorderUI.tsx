@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -187,6 +187,8 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
     : fullTranscriptText;
     
   const currentTranscript = currentSegmentTranscript || displayText;
+
+
 
   // Get effective save button state
   const effectiveSaveButtonState = saveButtonState || {
