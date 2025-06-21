@@ -223,19 +223,26 @@ const RecordScreen: React.FC = () => {
       ? originalContent + '\n\n' + newTranscript 
       : newTranscript;
     
-    setContent(finalContent);
-    if (finalAudioUri) setAudioUri(finalAudioUri);
-    
     // Only set title if it's empty (don't override existing titles)
+    let finalTitle = title;
     if (newTranscript && !title) {
       const words = newTranscript.split(' ');
-      setTitle(words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : ''));
+      finalTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      setTitle(finalTitle);
     }
+    
+    // Update content state for UI consistency
+    setContent(finalContent);
+    if (finalAudioUri) setAudioUri(finalAudioUri);
     
     setHasStartedSaving(true);
     
     try {
-      await save();
+      // Pass the content explicitly to save function instead of relying on state
+      await save({
+        content: finalContent,
+        title: finalTitle,
+      });
     } catch (error) {
       logger.error('[RecordScreen] Manual save failed:', error);
     }
