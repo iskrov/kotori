@@ -195,12 +195,22 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
   const currentTranscript = currentSegmentTranscript || displayText;
 
   // Track user-edited text separately to avoid feedback loops
-  const [editedText, setEditedText] = useState(currentTranscript);
+  const [editedText, setEditedText] = useState(existingContent || '');
 
-  // Update edited text when transcript changes (but not during user editing)
+  // Append new transcript segments to existing content when they arrive
   useEffect(() => {
-    setEditedText(currentTranscript);
-  }, [currentTranscript]);
+    if (newTranscriptText && newTranscriptText.trim()) {
+      setEditedText(prev => {
+        if (existingContent && existingContent.trim()) {
+          // If we have existing content, append new transcript to it
+          return prev.includes(newTranscriptText) ? prev : `${existingContent}\n\n${newTranscriptText}`;
+        } else {
+          // No existing content, just use new transcript
+          return newTranscriptText;
+        }
+      });
+    }
+  }, [newTranscriptText, existingContent]);
 
   // Get effective save button state
   const effectiveSaveButtonState = saveButtonState || {
