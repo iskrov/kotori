@@ -22,6 +22,7 @@ import { JournalAPI, TagsAPI } from '../../services/api';
 import JournalCard from '../../components/JournalCard';
 import { JournalCardSkeleton } from '../../components/SkeletonLoader';
 import SafeScrollView from '../../components/SafeScrollView';
+import ScreenHeader from '../../components/ScreenHeader';
 
 import { JournalEntry, Tag } from '../../types';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
@@ -249,9 +250,7 @@ const JournalScreen = () => {
   
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Journal</Text>
-      </View>
+      <ScreenHeader title="Journal" />
       
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -373,21 +372,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    backgroundColor: theme.colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    fontSize: theme.typography.fontSizes.xxl,
-    fontFamily: theme.typography.fontFamilies.bold,
-    color: theme.colors.text,
-  },
+
   searchContainer: {
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,

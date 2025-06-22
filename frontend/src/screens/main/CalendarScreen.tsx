@@ -22,6 +22,7 @@ import { JournalAPI } from '../../services/api';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import SafeScrollView from '../../components/SafeScrollView';
+import ScreenHeader from '../../components/ScreenHeader';
 import { CalendarSkeleton, JournalCardSkeleton } from '../../components/SkeletonLoader';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
@@ -257,15 +258,11 @@ const CalendarScreen = () => {
   
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Calendar</Text>
-        {hasActiveSecretTags && (
-          <View style={styles.secretTagIndicator}>
-            <Ionicons name="shield-checkmark" size={16} color={theme.colors.primary} />
-            <Text style={styles.secretTagText}>Secret Tags Active</Text>
-          </View>
-        )}
-      </View>
+      <ScreenHeader 
+        title="Calendar" 
+        showSecretTagIndicator={hasActiveSecretTags}
+        secretTagText="Secret Tags Active"
+      />
       
       <SafeScrollView 
         style={{ flex: 1 }} 
@@ -401,35 +398,7 @@ const getStyles = (theme: AppTheme) => {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    header: {
-      backgroundColor: theme.colors.card,
-      paddingHorizontal: theme.spacing.lg,
-      paddingVertical: theme.spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-      alignItems: 'center',
-    },
-    title: {
-      fontSize: theme.typography.fontSizes.xl,
-      fontWeight: 'bold',
-      color: theme.colors.text,
-      fontFamily: theme.typography.fontFamilies.bold,
-    },
-    secretTagIndicator: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: theme.spacing.xs,
-      paddingHorizontal: theme.spacing.sm,
-      paddingVertical: theme.spacing.xs,
-      backgroundColor: theme.colors.primaryLight || theme.colors.primary + '20',
-      borderRadius: 12,
-    },
-    secretTagText: {
-      fontSize: theme.typography.fontSizes.xs,
-      color: theme.colors.primary,
-      marginLeft: theme.spacing.xs,
-      fontFamily: theme.typography.fontFamilies.medium,
-    },
+
     calendarHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
