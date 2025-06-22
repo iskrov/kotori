@@ -64,8 +64,10 @@ const RecordScreen: React.FC = () => {
   }, [startRecordingOnMount]);
   const selectedDate = route.params?.selectedDate; // Get selectedDate from route params
   const journalId = route.params?.journalId; // Get journalId for appending to existing entry
+  const vibeEmoji = route.params?.vibeEmoji; // Get vibe emoji
+  const vibeTag = route.params?.vibeTag; // Get vibe tag
   
-  // Log if using a custom date
+  // Log if using a custom date or vibe parameters
   useEffect(() => {
     if (selectedDate) {
       logger.info(`[RecordScreen] Using selected date from calendar: ${selectedDate}`);
@@ -78,7 +80,11 @@ const RecordScreen: React.FC = () => {
     } else {
       logger.info('[RecordScreen] Creating new entry');
     }
-  }, [selectedDate, journalId]);
+    
+    if (vibeEmoji && vibeTag) {
+      logger.info(`[RecordScreen] Vibe check-in: ${vibeEmoji} (tag: ${vibeTag})`);
+    }
+  }, [selectedDate, journalId, vibeEmoji, vibeTag]);
 
   // UI states
   const [isLoading, setIsLoading] = useState(false);
@@ -91,7 +97,7 @@ const RecordScreen: React.FC = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [originalContent, setOriginalContent] = useState(''); // Preserve original content for editing mode
-  const [tags, setTags] = useState<string[]>(['journal']);
+  const [tags, setTags] = useState<string[]>(vibeTag ? [vibeTag] : ['journal']);
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [isLoadingExistingEntry, setIsLoadingExistingEntry] = useState(false);
   
@@ -227,7 +233,9 @@ const RecordScreen: React.FC = () => {
     let finalTitle = title;
     if (newTranscript && !title) {
       const words = newTranscript.split(' ');
-      finalTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      const baseTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      // Add vibe emoji prefix if this is a vibe check-in
+      finalTitle = vibeEmoji ? `${vibeEmoji} ${baseTitle}` : baseTitle;
       setTitle(finalTitle);
     }
     
@@ -258,7 +266,9 @@ const RecordScreen: React.FC = () => {
     let finalTitle = title;
     if (completeText && !title) {
       const words = completeText.split(' ');
-      finalTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      const baseTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      // Add vibe emoji prefix if this is a vibe check-in
+      finalTitle = vibeEmoji ? `${vibeEmoji} ${baseTitle}` : baseTitle;
       setTitle(finalTitle);
     }
     
@@ -310,7 +320,9 @@ const RecordScreen: React.FC = () => {
     let newTitle = title;
     if (!title && currentTranscript) {
       const words = currentTranscript.split(' ');
-      const generatedTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      const baseTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
+      // Add vibe emoji prefix if this is a vibe check-in
+      const generatedTitle = vibeEmoji ? `${vibeEmoji} ${baseTitle}` : baseTitle;
       newTitle = generatedTitle;
       setTitle(generatedTitle);
     }

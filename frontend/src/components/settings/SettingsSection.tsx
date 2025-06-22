@@ -52,129 +52,83 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Section Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerTouchable}
-          onPress={toggleExpanded}
-          disabled={!collapsible}
-          activeOpacity={collapsible ? 0.7 : 1}
-          accessibilityRole={collapsible ? 'button' : 'text'}
-          accessibilityLabel={`${title} section${collapsible ? (isExpanded ? ', expanded' : ', collapsed') : ''}`}
-          accessibilityHint={collapsible ? 'Tap to toggle section visibility' : undefined}
-        >
-          <View style={styles.headerLeft}>
-            {icon && (
-              <View style={styles.iconContainer}>
-                <Ionicons
-                  name={icon}
-                  size={24}
-                  color={theme.colors.primary}
-                />
-              </View>
-            )}
-            
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>{title}</Text>
-              {subtitle && (
-                <Text style={styles.subtitle}>{subtitle}</Text>
-              )}
-            </View>
-          </View>
-
-          {collapsible && (
-            <View style={styles.chevronContainer}>
-              <Ionicons
-                name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color={theme.colors.textSecondary}
-              />
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Header Action - Outside of TouchableOpacity to prevent conflicts */}
-        {headerAction && (
-          <View style={styles.headerActionContainer}>
-            {headerAction}
-          </View>
+        {icon && (
+          <Ionicons name={icon} size={20} color={theme.colors.textSecondary} style={styles.headerIcon} />
         )}
-      </View>
-
-      {/* Section Content */}
-      {isExpanded && (
-        <View style={styles.content}>
-          {children}
+        <View>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
-      )}
+      </View>
+      <View style={styles.childrenContainer}>{children}</View>
     </View>
   );
 };
 
-const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {
-    marginVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-    ...theme.shadows.sm,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.lg,
-    backgroundColor: theme.colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    minHeight: 64,
-  },
-  headerTouchable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  headerActionContainer: {
-    marginLeft: theme.spacing.md,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.primaryLight + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  titleContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: theme.typography.fontSizes.lg,
-    fontFamily: theme.typography.fontFamilies.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    fontSize: theme.typography.fontSizes.sm,
-    fontFamily: theme.typography.fontFamilies.regular,
-    color: theme.colors.textSecondary,
-    lineHeight: 18,
-  },
-
-  chevronContainer: {
-    marginLeft: theme.spacing.sm,
-    padding: theme.spacing.xs,
-  },
-  content: {
-    backgroundColor: theme.colors.card,
-  },
-});
+const getStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      marginVertical: theme.spacing.sm,
+      marginHorizontal: theme.spacing.md,
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.lg,
+      overflow: 'hidden',
+      ...theme.shadows.sm,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      backgroundColor: theme.colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerTouchable: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    headerIcon: {
+      marginRight: theme.spacing.md,
+    },
+    titleContainer: {
+      flex: 1,
+      fontSize: theme.typography.fontSizes.lg,
+      fontFamily: theme.typography.fontFamilies.bold,
+      color: theme.colors.text,
+    },
+    title: {
+      fontSize: theme.typography.fontSizes.lg,
+      fontFamily: theme.typography.fontFamilies.bold,
+      color: theme.colors.text,
+    },
+    subtitle: {
+      fontSize: theme.typography.fontSizes.sm,
+      color: theme.colors.textSecondary,
+      marginLeft: theme.spacing.sm,
+      padding: theme.spacing.xs,
+    },
+    childrenContainer: {
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: theme.spacing.md,
+    },
+    iconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primaryLight + '20',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: theme.spacing.md,
+    },
+    content: {
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: theme.spacing.sm,
+      backgroundColor: theme.colors.card,
+    },
+  });
 
 export default SettingsSection; 

@@ -25,6 +25,7 @@ import { SUPPORTED_LANGUAGES } from '../../config/languageConfig';
 import logger from '../../utils/logger';
 import SafeScrollView from '../../components/SafeScrollView';
 import { SettingsSkeleton } from '../../components/SkeletonLoader';
+import ScreenHeader from '../../components/ScreenHeader';
 
 // Settings components
 import SettingsRow from '../../components/settings/SettingsRow';
@@ -124,9 +125,11 @@ const SettingsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <ScreenHeader title="Settings" />
       <SafeScrollView 
         ref={scrollViewRef}
         style={styles.container} 
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -415,6 +418,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    paddingBottom: 100,
   },
   centerContent: {
     justifyContent: 'center',

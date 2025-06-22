@@ -171,6 +171,14 @@ const HomeScreen = () => {
     navigation.navigate('JournalEntryDetail', { entryId: entryId.toString() });
   };
 
+  const handleVibePress = (emoji: string, tag: string) => {
+    // Navigate to Record modal with vibe parameters
+    navigation.navigate('Record', {
+      vibeEmoji: emoji,
+      vibeTag: tag,
+    });
+  };
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -215,6 +223,52 @@ const HomeScreen = () => {
           <Ionicons name="calendar" size={24} color={theme.colors.secondary} style={styles.statIcon} />
           <Text style={[styles.statValue, styles.weekValue]}>{stats.entriesThisWeek}</Text>
           <Text style={styles.statLabel}>Week</Text>
+        </View>
+      </View>
+
+      {/* Current Vibe Section */}
+      <View style={styles.vibeContainer}>
+        <Text style={styles.vibeTitle}>Your Current Vibe 💫</Text>
+        <View style={styles.vibeButtonsContainer}>
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('😊', 'happy')}
+          >
+            <Text style={styles.vibeEmoji}>😊</Text>
+            <Text style={styles.vibeLabel}>Happy</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('😐', 'neutral')}
+          >
+            <Text style={styles.vibeEmoji}>😐</Text>
+            <Text style={styles.vibeLabel}>Neutral</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('😢', 'sad')}
+          >
+            <Text style={styles.vibeEmoji}>😢</Text>
+            <Text style={styles.vibeLabel}>Sad</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('🙏', 'gratitude')}
+          >
+            <Text style={styles.vibeEmoji}>🙏</Text>
+            <Text style={styles.vibeLabel}>Grateful</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('🤔', 'journal')}
+          >
+            <Text style={styles.vibeEmoji}>🤔</Text>
+            <Text style={styles.vibeLabel}>Reflection</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -394,6 +448,49 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: theme.typography.fontSizes.md,
     fontWeight: 'bold',
     fontFamily: theme.typography.fontFamilies.bold,
+  },
+  // Vibe section styles
+  vibeContainer: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+  },
+  vibeTitle: {
+    fontSize: theme.typography.fontSizes.xl,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+  },
+  vibeButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  vibeButton: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '18%',
+    elevation: theme.isDarkMode ? 1 : 2,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
+    shadowOpacity: theme.isDarkMode ? 0.15 : 0.08,
+    shadowRadius: theme.isDarkMode ? 2 : 3,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 1 : 0,
+  },
+  vibeEmoji: {
+    fontSize: 28,
+    marginBottom: theme.spacing.xs,
+  },
+  vibeLabel: {
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.medium,
+    textAlign: 'center',
   },
 });
 

@@ -120,8 +120,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
@@ -158,7 +157,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   titleDisabled: {
-    color: theme.colors.disabled,
+    color: theme.colors.textSecondary,
   },
   subtitle: {
     fontSize: theme.typography.fontSizes.sm,
@@ -167,7 +166,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: 18,
   },
   subtitleDisabled: {
-    color: theme.colors.disabled,
+    color: theme.colors.border,
   },
   rightSection: {
     flexDirection: 'row',

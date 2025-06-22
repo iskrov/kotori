@@ -4,6 +4,8 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 export type RecordScreenParams = {
   journalId?: string; // If opening an existing entry for recording
   selectedDate?: string; // Date from calendar in YYYY-MM-DD format
+  vibeEmoji?: string; // Emoji for vibe check-in
+  vibeTag?: string; // Associated tag for vibe
 };
 
 // Journal stack params (nested within Journal tab)
