@@ -142,22 +142,9 @@ const SettingsScreen: React.FC = () => {
           />
         }
       >
-      {/* Header Section */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
       {/* Profile Section */}
       <SettingsSection
         title="Profile"
-        subtitle="Manage your account and preferences"
         icon="person"
       >
         <SettingsRow
@@ -185,7 +172,6 @@ const SettingsScreen: React.FC = () => {
       {/* Language & Transcription Section */}
       <SettingsSection
         title="Language & Transcription"
-        subtitle="Voice recognition preferences"
         icon="language"
       >
         <SettingsSelector
@@ -201,7 +187,6 @@ const SettingsScreen: React.FC = () => {
       {/* Privacy & Security Section */}
       <SettingsSection
         title="Privacy & Security"
-        subtitle="Protect your data and privacy"
         icon="shield-checkmark"
       >
         <SettingsRow
@@ -253,7 +238,6 @@ const SettingsScreen: React.FC = () => {
       {/* App Settings Section */}
       <SettingsSection
         title="App Settings"
-        subtitle="Customize app behavior and appearance"
         icon="settings"
       >
         <SettingsToggle
@@ -276,41 +260,40 @@ const SettingsScreen: React.FC = () => {
           onValueChange={setUseSystemTheme}
         />
 
-        <SettingsSection title="App Behavior">
-          <SettingsToggle
-            title="Haptic Feedback"
-            subtitle="Enable subtle vibrations for interactions"
-            leftIcon="pulse-outline"
-            value={settings.hapticFeedbackEnabled}
-            onValueChange={(value) =>
-              updateSetting('hapticFeedbackEnabled', value)
-            }
-          />
-          <SettingsToggle
-            title="Auto-Save Entry"
-            subtitle="Automatically save during recording"
-            leftIcon="save-outline"
-            value={settings.autoSaveEnabled}
-            onValueChange={(value) =>
-              updateSetting('autoSaveEnabled', value)
-            }
-          />
-          <SettingsToggle
-            title="Auto-Start Recording"
-            subtitle="Automatically start recording when opening record screen"
-            leftIcon="mic-outline"
-            value={settings.autoRecordingEnabled}
-            onValueChange={(value) =>
-              updateSetting('autoRecordingEnabled', value)
-            }
-          />
-        </SettingsSection>
+        <SettingsToggle
+          title="Haptic Feedback"
+          subtitle="Enable subtle vibrations for interactions"
+          leftIcon="pulse-outline"
+          value={settings.hapticFeedbackEnabled}
+          onValueChange={(value) =>
+            updateSetting('hapticFeedbackEnabled', value)
+          }
+        />
+        
+        <SettingsToggle
+          title="Auto-Save Entry"
+          subtitle="Automatically save during recording"
+          leftIcon="save-outline"
+          value={settings.autoSaveEnabled}
+          onValueChange={(value) =>
+            updateSetting('autoSaveEnabled', value)
+          }
+        />
+        
+        <SettingsToggle
+          title="Auto-Start Recording"
+          subtitle="Automatically start recording when opening record screen"
+          leftIcon="mic-outline"
+          value={settings.autoRecordingEnabled}
+          onValueChange={(value) =>
+            updateSetting('autoRecordingEnabled', value)
+          }
+        />
       </SettingsSection>
 
       {/* Notifications Section */}
       <SettingsSection
         title="Notifications"
-        subtitle="Manage notification preferences"
         icon="notifications"
       >
         <SettingsToggle
@@ -349,7 +332,6 @@ const SettingsScreen: React.FC = () => {
       {/* About Section */}
       <SettingsSection
         title="About"
-        subtitle="App information and legal"
         icon="information-circle"
       >
         <SettingsRow

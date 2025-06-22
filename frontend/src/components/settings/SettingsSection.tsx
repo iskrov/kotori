@@ -79,7 +79,6 @@ const getStyles = (theme: AppTheme) =>
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
       paddingVertical: theme.spacing.sm,
       paddingHorizontal: theme.spacing.md,
       backgroundColor: theme.colors.card,
