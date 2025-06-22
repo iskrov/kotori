@@ -66,7 +66,7 @@ const SettingsScreen: React.FC = () => {
       Animated.timing(scrollToTopOpacity, {
         toValue: shouldShow ? 1 : 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: false, // Changed to false for web compatibility
       }).start();
     }
   };
@@ -90,13 +90,6 @@ const SettingsScreen: React.FC = () => {
     label: lang.name,
     subtitle: lang.region ? `${lang.region}` : undefined,
   }));
-
-  // Add auto-detect option at the top
-  languageOptions.unshift({
-    value: 'auto',
-    label: 'Auto-detect',
-    subtitle: 'Automatically detect language',
-  });
 
   const handleSignOut = async () => {
     // For web platform, use window.confirm instead of Alert.alert
@@ -195,27 +188,6 @@ const SettingsScreen: React.FC = () => {
           leftIcon="pricetag"
           onPress={() => navigation.navigate('TagManagement')}
           showChevron={true}
-        />
-
-        <SettingsRow
-          title="Hidden Mode Status"
-          subtitle={settings.hiddenModeEnabled ? "Configured" : "Not configured"}
-          leftIcon="eye-off"
-          rightElement={
-            <Text style={[styles.statusText, { 
-              color: settings.hiddenModeEnabled ? theme.colors.success : theme.colors.textSecondary 
-            }]}>
-              {settings.hiddenModeEnabled ? "Active" : "Inactive"}
-            </Text>
-          }
-        />
-
-        <SettingsToggle
-          title="Default Entry Privacy"
-          subtitle="New entries are hidden by default"
-          leftIcon="lock-closed"
-          value={settings.defaultEntryPrivacy === 'hidden'}
-          onValueChange={(value) => updateSetting('defaultEntryPrivacy', value ? 'hidden' : 'public')}
         />
 
         <SettingsToggle
