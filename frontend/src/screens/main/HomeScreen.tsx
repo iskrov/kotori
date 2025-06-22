@@ -171,11 +171,22 @@ const HomeScreen = () => {
     navigation.navigate('JournalEntryDetail', { entryId: entryId.toString() });
   };
 
-  const handleVibePress = (emoji: string, tag: string) => {
-    // Navigate to Record modal with vibe parameters
+  const handleVibePress = (vibeId: string, tag: string) => {
+    // Define vibe prompts based on evidence-driven recommendations
+    const vibePrompts: Record<string, string> = {
+      grateful: "What are you thankful for?",
+      reflect: "What's been on your mind?", 
+      inspired: "Capture that idea before it fades!",
+      stressed: "Want to unload what's weighing you down?",
+      plan: "What's your next step or goal?"
+    };
+
+    // Navigate to Record modal with vibe parameters and prompt
+    const prompt = vibePrompts[vibeId];
     navigation.navigate('Record', {
-      vibeEmoji: emoji,
+      vibeEmoji: vibeId, // Keep the same parameter name for compatibility
       vibeTag: tag,
+      prefilledPrompt: prompt,
     });
   };
 
@@ -232,42 +243,47 @@ const HomeScreen = () => {
         <View style={styles.vibeButtonsContainer}>
           <TouchableOpacity 
             style={styles.vibeButton}
-            onPress={() => handleVibePress('😊', 'happy')}
+            onPress={() => handleVibePress('grateful', 'gratitude')}
+            activeOpacity={0.7}
           >
-            <Text style={styles.vibeEmoji}>😊</Text>
-            <Text style={styles.vibeLabel}>Happy</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.vibeButton}
-            onPress={() => handleVibePress('😐', 'neutral')}
-          >
-            <Text style={styles.vibeEmoji}>😐</Text>
-            <Text style={styles.vibeLabel}>Neutral</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.vibeButton}
-            onPress={() => handleVibePress('😢', 'sad')}
-          >
-            <Text style={styles.vibeEmoji}>😢</Text>
-            <Text style={styles.vibeLabel}>Sad</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.vibeButton}
-            onPress={() => handleVibePress('🙏', 'gratitude')}
-          >
-            <Text style={styles.vibeEmoji}>🙏</Text>
+            <Ionicons name="heart-outline" size={24} color="#B39DFF" style={styles.vibeIcon} />
             <Text style={styles.vibeLabel}>Grateful</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.vibeButton}
-            onPress={() => handleVibePress('🤔', 'journal')}
+            onPress={() => handleVibePress('reflect', 'reflection')}
+            activeOpacity={0.7}
           >
-            <Text style={styles.vibeEmoji}>🤔</Text>
-            <Text style={styles.vibeLabel}>Reflection</Text>
+            <Ionicons name="book-outline" size={24} color="#6E7CFF" style={styles.vibeIcon} />
+            <Text style={styles.vibeLabel}>Reflective</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('inspired', 'idea')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="bulb-outline" size={24} color="#FFD966" style={styles.vibeIcon} />
+            <Text style={styles.vibeLabel}>Inspired</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('stressed', 'stress')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="rainy-outline" size={24} color="#8CBFFF" style={styles.vibeIcon} />
+            <Text style={styles.vibeLabel}>Stressed</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.vibeButton}
+            onPress={() => handleVibePress('plan', 'plan')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="radio-button-on-outline" size={24} color="#51C1C1" style={styles.vibeIcon} />
+            <Text style={styles.vibeLabel}>Planning</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -482,8 +498,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
     borderWidth: theme.isDarkMode ? 1 : 0,
   },
-  vibeEmoji: {
-    fontSize: 28,
+  vibeIcon: {
     marginBottom: theme.spacing.xs,
   },
   vibeLabel: {
@@ -492,6 +507,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.medium,
     textAlign: 'center',
   },
+  
 });
 
 export default HomeScreen; 

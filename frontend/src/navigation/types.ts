@@ -6,6 +6,8 @@ export type RecordScreenParams = {
   selectedDate?: string; // Date from calendar in YYYY-MM-DD format
   vibeEmoji?: string; // Emoji for vibe check-in
   vibeTag?: string; // Associated tag for vibe
+  prefilledPrompt?: string; // Prefilled prompt based on vibe selection
+  title?: string; // Entry title based on vibe
 };
 
 // Journal stack params (nested within Journal tab)

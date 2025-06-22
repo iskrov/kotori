@@ -267,8 +267,8 @@ const RecordScreen: React.FC = () => {
     if (completeText && !title) {
       const words = completeText.split(' ');
       const baseTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
-      // Add vibe emoji prefix if this is a vibe check-in
-      finalTitle = vibeEmoji ? `${vibeEmoji} ${baseTitle}` : baseTitle;
+      // Generate clean title without vibe prefix
+      finalTitle = baseTitle;
       setTitle(finalTitle);
     }
     
@@ -321,8 +321,8 @@ const RecordScreen: React.FC = () => {
     if (!title && currentTranscript) {
       const words = currentTranscript.split(' ');
       const baseTitle = words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '');
-      // Add vibe emoji prefix if this is a vibe check-in
-      const generatedTitle = vibeEmoji ? `${vibeEmoji} ${baseTitle}` : baseTitle;
+      // Generate clean title without vibe prefix
+      const generatedTitle = baseTitle;
       newTitle = generatedTitle;
       setTitle(generatedTitle);
     }
