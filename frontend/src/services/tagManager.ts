@@ -44,6 +44,7 @@ interface SecretTagStrategy {
   verifyPhrase(phrase: string): Promise<TagDetectionResult>;
   getAllTags(): Promise<SecretTagV2[]>;
   createTag(name: string, phrase: string, colorCode?: string): Promise<string>;
+  updateTagColor(tagId: string, colorCode: string): Promise<void>;
   deleteTag(tagId: string): Promise<void>;
   activateTag(tagId: string): Promise<void>;
   deactivateTag(tagId: string): Promise<void>;
@@ -60,6 +61,10 @@ class ServerOnlyStrategy implements SecretTagStrategy {
 
   async createTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
     return await secretTagOnlineManager.createSecretTag(name, phrase, colorCode);
+  }
+
+  async updateTagColor(tagId: string, colorCode: string): Promise<void> {
+    return await secretTagOnlineManager.updateSecretTagColor(tagId, colorCode);
   }
 
   async deleteTag(tagId: string): Promise<void> {
@@ -113,6 +118,14 @@ class CacheFirstStrategy implements SecretTagStrategy {
       secretTagOfflineManager.createSecretTag(name, phrase, colorCode)
     ]);
     return serverId; // Return server ID as primary
+  }
+
+  async updateTagColor(tagId: string, colorCode: string): Promise<void> {
+    // Update in both cache and server
+    await Promise.all([
+      secretTagOnlineManager.updateSecretTagColor(tagId, colorCode),
+      this.updateCacheTagColor(tagId, colorCode)
+    ]);
   }
 
   async deleteTag(tagId: string): Promise<void> {
@@ -172,6 +185,15 @@ class CacheFirstStrategy implements SecretTagStrategy {
       logger.warn('Cache tag deactivation failed:', error);
     }
   }
+
+  private async updateCacheTagColor(tagId: string, colorCode: string): Promise<void> {
+    try {
+      // Cache doesn't support color updates yet, so we just log a warning
+      logger.warn('Cache tag color update not supported, skipping cache update');
+    } catch (error) {
+      logger.warn('Cache tag color update failed:', error);
+    }
+  }
 }
 
 class CacheOnlyStrategy implements SecretTagStrategy {
@@ -186,6 +208,12 @@ class CacheOnlyStrategy implements SecretTagStrategy {
 
   async createTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
     return await secretTagOfflineManager.createSecretTag(name, phrase, colorCode);
+  }
+
+  async updateTagColor(tagId: string, colorCode: string): Promise<void> {
+    // Cache-only mode doesn't support color updates yet
+    logger.warn('Cache-only mode does not support color updates');
+    throw new Error('Color updates not supported in offline mode');
   }
 
   async deleteTag(tagId: string): Promise<void> {
@@ -376,6 +404,11 @@ class TagManager {
   async createSecretTag(name: string, phrase: string, colorCode = '#007AFF'): Promise<string> {
     logger.info(`Creating secret tag "${name}" using strategy: ${this.getStrategyName()}`);
     return await this.currentSecretStrategy.createTag(name, phrase, colorCode);
+  }
+
+  async updateSecretTagColor(tagId: string, colorCode: string): Promise<void> {
+    logger.info(`Updating secret tag ${tagId} color using strategy: ${this.getStrategyName()}`);
+    return await this.currentSecretStrategy.updateTagColor(tagId, colorCode);
   }
 
   async deleteSecretTag(tagId: string): Promise<void> {

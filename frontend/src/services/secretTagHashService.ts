@@ -57,6 +57,8 @@ export class SecretTagHashService {
         phrase_hash: phraseHash,
         color_code: colorCode
       };
+      
+
 
       // Use the configured api instance instead of raw fetch to ensure correct baseURL
       const response = await api.post(this.API_BASE, requestData);
@@ -136,6 +138,30 @@ export class SecretTagHashService {
     } catch (error) {
       console.error('Error verifying secret phrase:', error);
       return { isValid: false, tagName: '' };
+    }
+  }
+
+  /**
+   * Update a secret tag color (color only for security reasons)
+   */
+  async updateSecretTagColor(tagId: string, colorCode: string): Promise<SecretTagResponse> {
+    try {
+      const updateData = {
+        color_code: colorCode
+      };
+      
+      const response = await api.put(`${this.API_BASE}/${tagId}`, updateData);
+      
+      if (response.status !== 200) {
+        throw new Error(`Failed to update secret tag: ${response.status}`);
+      }
+      
+      console.log(`Updated secret tag color: ${tagId} -> ${colorCode}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to update secret tag color:', error);
+
+      throw error;
     }
   }
 

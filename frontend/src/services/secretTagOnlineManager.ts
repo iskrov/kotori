@@ -278,6 +278,26 @@ class SecretTagOnlineManager {
   }
 
   /**
+   * Update a secret tag color
+   */
+  async updateSecretTagColor(tagId: string, colorCode: string): Promise<void> {
+    try {
+      // Deactivate if currently active (since we're updating it)
+      if (this.isSecretTagActive(tagId)) {
+        await this.deactivateSecretTag(tagId);
+      }
+
+      // Update color on server
+      await secretTagHashService.updateSecretTagColor(tagId, colorCode);
+
+      logger.info(`Updated secret tag color: ${tagId} -> ${colorCode}`);
+    } catch (error) {
+      logger.error('Failed to update secret tag color:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete a secret tag from server
    */
   async deleteSecretTag(tagId: string): Promise<void> {

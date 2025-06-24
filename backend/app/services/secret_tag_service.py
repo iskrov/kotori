@@ -170,6 +170,9 @@ class SecretTagService:
         if tag_update.phrase_salt is not None:
             tag.phrase_salt = bytes(tag_update.phrase_salt)
             
+        if tag_update.color_code is not None:
+            tag.color_code = tag_update.color_code
+            
         db.commit()
         db.refresh(tag)
         

@@ -28,6 +28,7 @@ class SecretTagUpdate(BaseModel):
     """Schema for updating a secret tag."""
     phrase_salt: Optional[List[int]] = Field(None, description="New 32-byte salt as list of integers")
     phrase_hash: Optional[str] = Field(None, min_length=1, max_length=255, description="New Argon2 hash")
+    color_code: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$', description="New hex color code for UI")
     
     @validator('phrase_salt')
     def validate_salt_length(cls, v):

@@ -111,9 +111,11 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   const loadSecretTags = useCallback(async () => {
     try {
       const tags = await tagManager.getSecretTags();
-      const tagsWithStats: SecretTagWithStats[] = tags.map(tag => ({
-        ...tag
-      }));
+      const tagsWithStats: SecretTagWithStats[] = tags.map(tag => {
+        return {
+          ...tag
+        };
+      });
       setSecretTags(tagsWithStats);
     } catch (error) {
       logger.error('Failed to load secret tags:', error);
@@ -238,16 +240,21 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
 
   // Tag operations
   const handleSubmitTag = async () => {
+
+    
     const nameValidation = validateTagName(tagName);
     if (nameValidation) {
       Alert.alert('Invalid Tag Name', nameValidation);
       return;
     }
   
-    const phraseValidation = validateActivationPhrase(activationPhrase);
-    if (phraseValidation) {
-      Alert.alert('Invalid Activation Phrase', phraseValidation);
-      return;
+    // Only validate activation phrase for secret tags when creating (not editing)
+    if (activeTagType === 'secret' && !editingTag) {
+      const phraseValidation = validateActivationPhrase(activationPhrase);
+      if (phraseValidation) {
+        Alert.alert('Invalid Activation Phrase', phraseValidation);
+        return;
+      }
     }
   
     setIsSubmitting(true);
@@ -255,11 +262,11 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
       if (editingTag) {
         // Handle editing
         if (activeTagType === 'secret') {
-          Alert.alert(
-            'Secret Tag Editing Not Supported', 
-            'For security reasons, secret tags cannot be edited. Please delete and create a new one if needed.'
-          );
-          return;
+          // For secret tags, only allow color updates (no name/phrase changes for security)
+          await tagManager.updateSecretTagColor(String(editingTag.id), tagColor);
+          
+          // Refresh the tags list to show the updated color
+          await loadAllTags();
         } else {
           // Update regular tag with color support - send complete tag object
           const regularTag = editingTag as RegularTagWithStats; // Cast to regular tag
@@ -275,6 +282,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
       } else {
         // Handle creation
         if (activeTagType === 'secret') {
+
           await tagManager.createSecretTag(tagName, activationPhrase, tagColor);
         } else {
           await tagManager.createRegularTag(tagName, tagColor);
@@ -295,8 +303,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
   };
   
   const handleEditTag = (tag: RegularTagWithStats | SecretTagWithStats) => {
-    console.log('Edit button pressed for tag:', tag.name);
-    
     // Set up the modal for editing
     setEditingTag(tag);
     setTagName(tag.name);
@@ -310,7 +316,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
       setActivationPhrase(''); // User will need to re-enter the phrase
     }
     
-    console.log('Opening edit modal for tag:', tag.name, 'with color:', tagColor);
     setShowCreateModal(true);
   };
 
@@ -334,7 +339,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           style={styles.actionButton} 
           onPress={(e) => {
             e.stopPropagation();
-            console.log('Edit button pressed for tag:', tag.name);
             handleEditTag(tag);
           }}
           activeOpacity={0.7}
@@ -349,7 +353,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           style={styles.actionButton} 
           onPress={(e) => {
             e.stopPropagation();
-            console.log('Delete button pressed for tag:', tag.name);
+
             handleDeleteTag(String(tag.id), tag.name);
           }}
           activeOpacity={0.7}
@@ -468,7 +472,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
           <TouchableOpacity
             style={styles.createButton}
             onPress={() => {
-              console.log('Create button pressed!');
+          
               setShowCreateModal(true);
             }}
             activeOpacity={0.7}
@@ -543,7 +547,8 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                 <TextInput
                   style={[
                     styles.textInput,
-                    tagName && validateTagName(tagName) ? styles.textInputError : null
+                    tagName && validateTagName(tagName) ? styles.textInputError : null,
+                    (editingTag && activeTagType === 'secret') ? styles.textInputDisabled : null
                   ]}
                   value={tagName}
                   onChangeText={setTagName}
@@ -551,7 +556,13 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                   autoCapitalize="none"
                   autoCorrect={false}
                   maxLength={50}
+                  editable={!(editingTag && activeTagType === 'secret')}
                 />
+                {editingTag && activeTagType === 'secret' && (
+                  <Text style={styles.helpText}>
+                    Tag name cannot be changed for security reasons. Only color can be updated.
+                  </Text>
+                )}
                 {(() => {
                   const tagNameError = tagName ? validateTagName(tagName) : null;
                   return tagNameError ? (
@@ -560,7 +571,7 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                 })()}
               </View>
 
-              {activeTagType === 'secret' && (
+              {activeTagType === 'secret' && !editingTag && (
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Activation Phrase</Text>
                   <TextInput
@@ -581,11 +592,6 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                       <Text style={styles.errorText}>{activationPhraseError}</Text>
                     ) : null;
                   })()}
-                  {editingTag && (
-                    <Text style={styles.helpText}>
-                      Note: For security reasons, you must re-enter the activation phrase when editing secret tags.
-                    </Text>
-                  )}
                 </View>
               )}
 
@@ -629,13 +635,13 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
                 style={[
                   styles.submitButton,
                   (isSubmitting || !tagName.trim() || validateTagName(tagName) || 
-                   (activeTagType === 'secret' && (!activationPhrase.trim() || validateActivationPhrase(activationPhrase)))) 
+                   (activeTagType === 'secret' && !editingTag && (!activationPhrase.trim() || validateActivationPhrase(activationPhrase)))) 
                     ? styles.submitButtonDisabled : null
                 ]}
                 onPress={handleSubmitTag}
                 disabled={
                   isSubmitting || !tagName.trim() || !!validateTagName(tagName) || 
-                  (activeTagType === 'secret' && (!activationPhrase.trim() || !!validateActivationPhrase(activationPhrase)))
+                  (activeTagType === 'secret' && !editingTag && (!activationPhrase.trim() || !!validateActivationPhrase(activationPhrase)))
                 }
               >
                 {isSubmitting ? (
@@ -822,6 +828,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
 
   textInputError: {
     borderColor: theme.colors.error,
+  },
+
+  textInputDisabled: {
+    backgroundColor: theme.colors.disabled + '20',
+    color: theme.colors.textSecondary,
   },
 
   errorText: {
