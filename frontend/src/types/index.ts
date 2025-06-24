@@ -159,6 +159,7 @@ export interface SecretTag {
   id: string;
   tag_name: string;
   phrase_salt: number[]; // 32-byte salt as array of integers
+  color_code: string; // Hex color code for UI
   created_at: string;
   updated_at: string;
   user_id: number;
@@ -168,12 +169,14 @@ export interface SecretTagCreateRequest {
   tag_name: string;
   phrase_salt: number[]; // 32-byte salt as array of integers
   phrase_hash: string; // Argon2 hash of the secret phrase
+  color_code: string; // Hex color code for UI
 }
 
 export interface SecretTagResponse {
   id: string;
   tag_name: string;
   phrase_salt: number[]; // 32-byte salt as array of integers
+  color_code: string; // Hex color code for UI
   created_at: string;
   updated_at: string;
   user_id: number;

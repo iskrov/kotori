@@ -44,7 +44,7 @@ export class SecretTagHashService {
   /**
    * Create a new secret tag with server-side hash verification
    */
-  async createSecretTag(tagName: string, secretPhrase: string): Promise<SecretTagResponse> {
+  async createSecretTag(tagName: string, secretPhrase: string, colorCode: string = '#007AFF'): Promise<SecretTagResponse> {
     try {
       // Generate salt and hash the phrase
       const salt = this.generateSalt();
@@ -54,24 +54,14 @@ export class SecretTagHashService {
       const requestData: SecretTagCreateRequest = {
         tag_name: tagName,
         phrase_salt: Array.from(salt), // Convert to array for JSON serialization
-        phrase_hash: phraseHash
+        phrase_hash: phraseHash,
+        color_code: colorCode
       };
 
-      const response = await fetch(this.API_BASE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`
-        },
-        body: JSON.stringify(requestData)
-      });
+      // Use the configured api instance instead of raw fetch to ensure correct baseURL
+      const response = await api.post(this.API_BASE, requestData);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Failed to create secret tag: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = response.data;
       console.log(`Created secret tag '${tagName}' with server-side hash verification`);
       
       return result;
@@ -156,7 +146,8 @@ export class SecretTagHashService {
     try {
       const response = await api.delete(`${this.API_BASE}/${tagId}`);
 
-      if (response.status === 200) {
+      // Accept both 200 OK and 204 No Content as successful deletion
+      if (response.status === 200 || response.status === 204) {
         console.log(`Deleted secret tag: ${tagId}`);
         return true;
       } else {
@@ -169,17 +160,7 @@ export class SecretTagHashService {
     }
   }
 
-  /**
-   * Get authentication token from storage
-   */
-  private async getAuthToken(): Promise<string> {
-    // This should match your app's authentication token storage
-    const token = await AsyncStorage.getItem('access_token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-    return token;
-  }
+
 
   /**
    * Client-side phrase verification (for immediate feedback)

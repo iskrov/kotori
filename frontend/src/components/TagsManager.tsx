@@ -32,6 +32,7 @@ import {
   CacheStatus, 
   tagManager 
 } from '../services/tagManager';
+import { isSecurityModeSwitchingEnabled, isSecretTagCachingEnabled } from '../config/featureFlags';
 
 // Import settings components for consistent UI
 import SettingsSection from './settings/SettingsSection';
@@ -413,27 +414,47 @@ const TagsManager: React.FC<TagsManagerProps> = ({ onRefresh }) => {
         />
       </SettingsSection>
 
-      {/* Security Settings (only for secret tags) */}
-      {activeTagType === 'secret' && (
+      {/* Security Settings (only for secret tags) - FEATURE FLAG CONTROLLED */}
+      {activeTagType === 'secret' && (isSecurityModeSwitchingEnabled() || isSecretTagCachingEnabled()) && (
         <SettingsSection
           title="Security Settings"
           subtitle="Configure secret tag security and caching"
           icon="shield-checkmark"
         >
           <View style={styles.securityControls}>
-            <SecurityModeSelector
-              currentMode={securityMode}
-              onModeChange={handleSecurityModeChange}
-              disabled={isLoading || isRefreshing}
-            />
-            <CacheStatusIndicator
-              cacheStatus={cacheStatus}
-              networkStatus={networkStatus}
-              onRefresh={loadTagStatus}
-              onClearCache={handleClearCache}
-              onSync={handleSync}
-              disabled={isLoading || isRefreshing}
-            />
+            {/* Security Mode Selector - Only show if mode switching is enabled */}
+            {isSecurityModeSwitchingEnabled() && (
+              <SecurityModeSelector
+                currentMode={securityMode}
+                onModeChange={handleSecurityModeChange}
+                disabled={isLoading || isRefreshing}
+              />
+            )}
+            
+            {/* Cache Status Indicator - Only show if caching is enabled */}
+            {isSecretTagCachingEnabled() && (
+              <CacheStatusIndicator
+                cacheStatus={cacheStatus}
+                networkStatus={networkStatus}
+                onRefresh={loadTagStatus}
+                onClearCache={handleClearCache}
+                onSync={handleSync}
+                disabled={isLoading || isRefreshing}
+              />
+            )}
+            
+            {/* Simplified online-only notice when offline features are disabled */}
+            {!isSecurityModeSwitchingEnabled() && !isSecretTagCachingEnabled() && (
+              <View style={styles.onlineModeNotice}>
+                <Ionicons name="cloud" size={24} color={theme.colors.primary} />
+                <View style={styles.noticeTextContainer}>
+                  <Text style={styles.noticeTitle}>Online-Only Mode</Text>
+                  <Text style={styles.noticeSubtitle}>
+                    Secret tags operate in secure online-only mode. All encryption happens on your device, but verification requires an internet connection.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </SettingsSection>
       )}
@@ -728,6 +749,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.semiBold,
   },
 
+  createButton: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primaryLight + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -870,6 +899,37 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: theme.typography.fontSizes.md,
     fontFamily: theme.typography.fontFamilies.semiBold,
     color: theme.colors.background,
+  },
+
+  // Online mode notice styles
+  onlineModeNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: theme.colors.primaryLight + '20',
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + '30',
+    marginVertical: theme.spacing.md,
+  },
+
+  noticeTextContainer: {
+    flex: 1,
+    marginLeft: theme.spacing.md,
+  },
+
+  noticeTitle: {
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+
+  noticeSubtitle: {
+    fontSize: theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.regular,
+    color: theme.colors.textSecondary,
+    lineHeight: 20,
   },
 });
 

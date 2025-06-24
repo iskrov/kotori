@@ -56,10 +56,15 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
         {icon && (
           <Ionicons name={icon} size={20} color={theme.colors.textSecondary} style={styles.headerIcon} />
         )}
-        <View>
+        <View style={styles.titleContainer}>
           <Text style={styles.title}>{title}</Text>
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
+        {headerAction && (
+          <View style={styles.headerAction}>
+            {headerAction}
+          </View>
+        )}
       </View>
       <View style={styles.childrenContainer}>{children}</View>
     </View>
@@ -95,14 +100,14 @@ const getStyles = (theme: AppTheme) =>
     },
     titleContainer: {
       flex: 1,
-      fontSize: theme.typography.fontSizes.lg,
-      fontFamily: theme.typography.fontFamilies.bold,
-      color: theme.colors.text,
     },
     title: {
       fontSize: theme.typography.fontSizes.lg,
       fontFamily: theme.typography.fontFamilies.bold,
       color: theme.colors.text,
+    },
+    headerAction: {
+      marginLeft: theme.spacing.md,
     },
     subtitle: {
       fontSize: theme.typography.fontSizes.sm,

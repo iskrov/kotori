@@ -3,16 +3,21 @@
  * 
  * Unified manager for both regular and secret tags with two operation modes:
  * - Online mode: Server-only verification, no secrets cached on device
- * - Offline mode: Cached secrets for offline access
+ * - Offline mode: Cached secrets for offline access (FEATURE FLAG CONTROLLED)
  * - Automatic network-aware fallback strategies
+ * 
+ * Note: Offline features are temporarily disabled via feature flags for initial launch.
+ * All offline functionality is preserved and can be re-enabled by changing feature flags.
  */
 
 import NetInfo from '@react-native-community/netinfo';
 import { secretTagOnlineManager, SecretTagV2, TagDetectionResult } from './secretTagOnlineManager';
+// OFFLINE FEATURES: Preserved but conditionally imported based on feature flags
 import { secretTagOfflineManager, SecretTag } from './secretTagOfflineManager';
 import { TagsAPI } from './api';
 import { Tag } from '../types';
 import { zeroKnowledgeEncryption } from './zeroKnowledgeEncryption';
+import { isOfflineSecretTagsEnabled, isSecretTagCachingEnabled } from '../config/featureFlags';
 import logger from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -226,15 +231,24 @@ class TagManager {
   };
 
   constructor() {
+    // FEATURE FLAG: Force online-only mode when offline features are disabled
+    const offlineEnabled = isOfflineSecretTagsEnabled();
+    const cachingEnabled = isSecretTagCachingEnabled();
+    
     this.config = {
-      securityMode: 'offline',
-      cacheEnabled: true,
+      securityMode: offlineEnabled ? 'offline' : 'online', // Force online mode if offline disabled
+      cacheEnabled: cachingEnabled,
       autoSyncInterval: 15,
       maxCacheAge: 24,
       syncOnForeground: true
     };
 
-    this.currentSecretStrategy = this.secretStrategies.cacheFirst;
+    // FEATURE FLAG: Use server-only strategy when offline features are disabled
+    this.currentSecretStrategy = offlineEnabled 
+      ? this.secretStrategies.cacheFirst 
+      : this.secretStrategies.serverOnly;
+    
+    logger.info(`TagManager initialized with security mode: ${this.config.securityMode} (offline features: ${offlineEnabled ? 'enabled' : 'disabled'})`);
   }
 
   /**
@@ -319,14 +333,22 @@ class TagManager {
   // --- Secret Tags ---
 
   async setSecurityMode(mode: SecurityMode): Promise<void> {
+    // FEATURE FLAG: Prevent mode switching when offline features are disabled
+    const offlineEnabled = isOfflineSecretTagsEnabled();
+    
+    if (!offlineEnabled && mode === 'offline') {
+      logger.warn('Attempted to switch to offline mode, but offline features are disabled via feature flag');
+      throw new Error('Offline mode is not available in this version. This feature is temporarily disabled for the initial launch.');
+    }
+    
     if (this.config.securityMode === mode) return;
     
-    logger.info(`Switching security mode to: ${mode}`);
+    logger.info(`Switching security mode to: ${mode} (offline features: ${offlineEnabled ? 'enabled' : 'disabled'})`);
     this.config.securityMode = mode;
     this.updateStrategy();
     
-    // If switching to online mode, clear the cache for security
-    if (mode === 'online') {
+    // If switching to online mode, clear the cache for security (only if caching was enabled)
+    if (mode === 'online' && isSecretTagCachingEnabled()) {
       await this.clearSecretCache();
     }
 
@@ -471,17 +493,21 @@ class TagManager {
     const isOnline = this.networkStatus === 'online';
     const useCache = this.config.cacheEnabled;
     const mode = this.config.securityMode;
-
-    if (mode === 'online') {
+    
+    // FEATURE FLAG: Force server-only strategy when offline features are disabled
+    const offlineEnabled = isOfflineSecretTagsEnabled();
+    
+    if (!offlineEnabled || mode === 'online') {
+      // Always use server-only when offline features are disabled OR in online mode
       this.currentSecretStrategy = this.secretStrategies.serverOnly;
-    } else { // offline mode
+    } else { // offline mode (only when offline features are enabled)
       if (isOnline && useCache) {
         this.currentSecretStrategy = this.secretStrategies.cacheFirst;
       } else {
         this.currentSecretStrategy = this.secretStrategies.cacheOnly;
       }
     }
-    logger.info(`Secret tag strategy updated to: ${this.getStrategyName()}`);
+    logger.info(`Secret tag strategy updated to: ${this.getStrategyName()} (offline features: ${offlineEnabled ? 'enabled' : 'disabled'})`);
   }
 
   private getStrategyName(): string {

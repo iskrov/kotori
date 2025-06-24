@@ -14,7 +14,7 @@
  */
 
 import { secretTagHashService } from './secretTagHashService';
-import { SecretTagResponse } from '../types';
+import { SecretTag, SecretTagResponse } from '../types';
 import logger from '../utils/logger';
 
 export interface SecretTagV2 {
@@ -90,7 +90,7 @@ class SecretTagOnlineManager {
       }
 
       // Create tag on server with hash verification
-      const serverTag = await secretTagHashService.createSecretTag(name.trim(), phrase);
+      const serverTag = await secretTagHashService.createSecretTag(name.trim(), phrase, colorCode);
 
       logger.info(`Secret tag created with server-side verification: ${name} (${serverTag.id})`);
       return serverTag.id;
@@ -225,14 +225,23 @@ class SecretTagOnlineManager {
       const serverTagsResponse = await secretTagHashService.getSecretTags();
       const serverTags = serverTagsResponse.tags || [];
       
+      logger.info('Debug: Raw server tags response:', serverTags);
+      
       // Convert to UI format with active state
-      return serverTags.map((tag: SecretTagResponse) => ({
-        id: tag.id,
-        name: tag.tag_name,
-        colorCode: '#007AFF', // Default color since server doesn't store this
-        createdAt: tag.created_at,
-        isActive: this.isSecretTagActive(tag.id)
-      }));
+      const convertedTags = serverTags.map((tag: SecretTag) => {
+        const converted = {
+          id: tag.id,
+          name: tag.tag_name,
+          colorCode: tag.color_code, // Use actual color from server
+          createdAt: tag.created_at,
+          isActive: this.isSecretTagActive(tag.id)
+        };
+        logger.info(`Debug: Converting tag ${tag.tag_name}: color_code=${tag.color_code} -> colorCode=${converted.colorCode}`);
+        return converted;
+      });
+      
+      logger.info('Debug: Converted tags for UI:', convertedTags);
+      return convertedTags;
     } catch (error) {
       logger.error('Failed to get secret tags:', error);
       return [];
@@ -296,7 +305,8 @@ class SecretTagOnlineManager {
       logger.warn('Activating panic mode - deleting all secret tags');
 
       // Get all tags and delete them
-      const allTags = await secretTagHashService.getSecretTags();
+      const allTagsResponse = await secretTagHashService.getSecretTags();
+      const allTags = allTagsResponse.tags || [];
       
       for (const tag of allTags) {
         try {
