@@ -7,6 +7,7 @@ import uuid
 class SecretTagBase(BaseModel):
     """Base schema for secret tag data."""
     tag_name: str = Field(..., min_length=1, max_length=100, description="Name of the secret tag")
+    color_code: str = Field(default='#007AFF', pattern=r'^#[0-9A-Fa-f]{6}$', description="Hex color code for UI")
 
 
 class SecretTagCreate(SecretTagBase):
@@ -43,6 +44,7 @@ class SecretTagResponse(SecretTagBase):
     id: uuid.UUID = Field(..., description="Unique identifier for the secret tag")
     user_id: int = Field(..., description="ID of the user who owns this tag")
     phrase_salt: List[int] = Field(..., description="32-byte salt as list of integers for phrase verification")
+    color_code: str = Field(..., description="Hex color code for UI")
     created_at: datetime = Field(..., description="When the tag was created")
     updated_at: datetime = Field(..., description="When the tag was last updated")
     

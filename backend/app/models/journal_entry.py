@@ -24,7 +24,9 @@ class JournalEntry(Base, TimestampMixin):
     )  # When the entry was recorded
 
     # New Secret Tag Encryption Fields (server-side hash verification)
-    secret_tag_id = Column(UUID(), ForeignKey("secret_tags.id"), nullable=True, index=True)  # UUID of the secret tag (if any)
+    # Temporarily using String(36) to match current database schema (VARCHAR(36))
+    # TODO: Create migration to convert to proper UUID type
+    secret_tag_id = Column(String(36), ForeignKey("secret_tags.id"), nullable=True, index=True)  # UUID of the secret tag (if any)
     encrypted_content = Column(LargeBinary, nullable=True)  # AES-encrypted content for secret entries
     wrapped_key = Column(LargeBinary, nullable=True)  # Entry key wrapped with phrase-derived key
     encryption_iv = Column(LargeBinary, nullable=True)  # Initialization vector for content encryption

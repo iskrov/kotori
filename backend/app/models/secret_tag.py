@@ -15,11 +15,14 @@ class SecretTag(Base, TimestampMixin):
     """
     __tablename__ = "secret_tags"
 
-    id = Column(UUID(), primary_key=True, default=uuid.uuid4, index=True)
+    # Temporarily using String(36) to match current database schema (VARCHAR(36))
+    # TODO: Create migration to convert to proper UUID type
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     tag_name = Column(String(100), nullable=False)
     phrase_salt = Column(LargeBinary, nullable=False)  # 32-byte salt for Argon2
     phrase_hash = Column(String(255), nullable=False)  # Argon2 hash of phrase
+    color_code = Column(String(7), nullable=False, default='#007AFF')  # Hex color code for UI
 
     # Relationships
     user = relationship("User", back_populates="secret_tags")
