@@ -47,7 +47,8 @@ class SecretTagService:
                 user_id=user_id,
                 tag_name=tag_data.tag_name,
                 phrase_salt=phrase_salt,
-                phrase_hash=tag_data.phrase_hash
+                phrase_hash=tag_data.phrase_hash,
+                color_code=tag_data.color_code
             )
             
             db.add(secret_tag)
