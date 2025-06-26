@@ -17,6 +17,7 @@ import Constants from 'expo-constants';
 
 import { useAuth } from '../../contexts/AuthContext';
 import SafeScrollView from '../../components/SafeScrollView';
+import OpaqueAuthButton from '../../components/OpaqueAuthButton';
 
 // Ensure web browser redirect results are handled
 WebBrowser.maybeCompleteAuthSession();
@@ -190,6 +191,28 @@ const RegisterScreen = () => {
             />
           </View>
           
+          <OpaqueAuthButton
+            mode="register"
+            name={name}
+            email={email}
+            password={password}
+            onSuccess={() => {
+              // Navigation will be handled by AuthContext
+              console.log('Registration successful via OPAQUE button');
+            }}
+            onError={(error) => {
+              Alert.alert('Registration Error', error);
+            }}
+            disabled={!name || !email || !password || !confirmPassword || password !== confirmPassword}
+            style={styles.opaqueButton}
+          />
+          
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          
           <TouchableOpacity 
             style={styles.button}
             onPress={handleRegister}
@@ -198,7 +221,7 @@ const RegisterScreen = () => {
             {isLoading || authLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Register</Text>
+              <Text style={styles.buttonText}>Traditional Register</Text>
             )}
           </TouchableOpacity>
           
@@ -290,6 +313,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  opaqueButton: {
+    marginTop: 8,
   },
   buttonText: {
     color: '#fff',

@@ -8,6 +8,8 @@ import { Platform } from 'react-native';
 import { AuthAPI, api } from '../services/api';
 import { User } from '../types';
 import logger from '../utils/logger';
+import { opaqueAuth, OpaqueSessionResult } from '../services/opaqueAuth';
+import { opaqueKeyManager } from '../services/opaqueKeyManager';
 
 // Security: Remove debug storage function - not safe for production
 
@@ -32,6 +34,10 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (updatedUserData: Partial<User>) => Promise<void>;
+  // OPAQUE-specific methods
+  opaqueLogin: (email: string, password: string) => Promise<void>;
+  opaqueRegister: (name: string, email: string, password: string) => Promise<void>;
+  hasOpaqueSupport: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -245,6 +251,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.removeItem('refresh_token');
       await AsyncStorage.removeItem('user');
       
+      // Clear OPAQUE data
+      await opaqueAuth.clearOpaqueData();
+      opaqueKeyManager.clear();
+      
       // Clear API authorization header
       delete api.defaults.headers.common.Authorization;
       logger.info('API authorization header cleared');
@@ -263,6 +273,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.removeItem('access_token');
       await AsyncStorage.removeItem('refresh_token');
       await AsyncStorage.removeItem('user');
+      
+      // Clear OPAQUE data
+      await opaqueAuth.clearOpaqueData();
+      opaqueKeyManager.clear();
       
       // Clear API authorization header
       delete api.defaults.headers.common.Authorization;
@@ -291,6 +305,88 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // OPAQUE login with zero-knowledge authentication
+  const opaqueLogin = async (email: string, password: string) => {
+    try {
+      logger.info(`OPAQUE login attempt for ${email}`);
+      setIsLoading(true);
+      
+      // Perform OPAQUE authentication
+      const sessionResult: OpaqueSessionResult = await opaqueAuth.login(email, password);
+      
+      // Initialize key manager with derived keys
+      opaqueKeyManager.initialize(sessionResult);
+      
+      // Use session key for API authentication
+      const sessionKeyBase64 = btoa(String.fromCharCode(...sessionResult.sessionKey));
+      
+      // Set authorization header with session key
+      api.defaults.headers.common.Authorization = `Bearer ${sessionKeyBase64}`;
+      
+      // Get user data from server (using session key for auth)
+      const userResponse = await api.get('/api/auth/me');
+      
+      logger.info('OPAQUE login successful', { userId: userResponse.data.id });
+      
+      // Store session key as access token for compatibility
+      await AsyncStorage.setItem('access_token', sessionKeyBase64);
+      await AsyncStorage.setItem('user', JSON.stringify(userResponse.data));
+      
+      setUser(userResponse.data);
+      setIsAuthenticated(true);
+    } catch (error: any) {
+      logger.error('OPAQUE login failed:', { 
+        email,
+        status: error.status,
+        message: error.message,
+        response: error.response?.data
+      });
+      // Clear key manager on failure
+      opaqueKeyManager.clear();
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // OPAQUE registration with zero-knowledge authentication
+  const opaqueRegister = async (name: string, email: string, password: string) => {
+    try {
+      logger.info(`OPAQUE registration attempt for ${email}`);
+      setIsLoading(true);
+      
+      // Perform OPAQUE registration
+      await opaqueAuth.register(name, email, password);
+      
+      // After successful registration, perform login to get session keys
+      await opaqueLogin(email, password);
+      
+      logger.info('OPAQUE registration and login successful');
+    } catch (error: any) {
+      logger.error('OPAQUE registration failed:', { 
+        email,
+        status: error.status,
+        message: error.message,
+        response: error.response?.data
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Check if OPAQUE is supported and available
+  const hasOpaqueSupport = async (): Promise<boolean> => {
+    try {
+      // Check if server supports OPAQUE endpoints
+      const response = await api.get('/api/auth/opaque/support');
+      return response.data.supported === true;
+    } catch (error) {
+      logger.warn('OPAQUE support check failed, assuming not supported', error);
+      return false;
+    }
+  };
+
   const value = {
     isAuthenticated,
     isLoading,
@@ -301,6 +397,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     updateUser,
+    opaqueLogin,
+    opaqueRegister,
+    hasOpaqueSupport,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import SafeScrollView from '../../components/SafeScrollView';
 import logger from '../../utils/logger';
 import LogViewer from '../../utils/LogViewer';
+import OpaqueAuthButton from '../../components/OpaqueAuthButton';
 
 // Ensure web browser redirect results are handled
 WebBrowser.maybeCompleteAuthSession();
@@ -178,6 +179,27 @@ const LoginScreen = () => {
           </TouchableOpacity>
         </View>
         
+        <OpaqueAuthButton
+          mode="login"
+          email={email}
+          password={password}
+          onSuccess={() => {
+            // Navigation will be handled by AuthContext
+            logger.info('Login successful via OPAQUE button');
+          }}
+          onError={(error) => {
+            setErrorMessage(error);
+          }}
+          disabled={!email || !password}
+          style={styles.opaqueButton}
+        />
+        
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+        
         <TouchableOpacity 
           style={styles.button}
           onPress={handleLogin}
@@ -186,7 +208,7 @@ const LoginScreen = () => {
           {isLoading || authLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Login</Text>
+            <Text style={styles.buttonText}>Traditional Login</Text>
           )}
         </TouchableOpacity>
         
@@ -309,6 +331,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  opaqueButton: {
+    marginTop: 8,
   },
   buttonText: {
     color: '#fff',

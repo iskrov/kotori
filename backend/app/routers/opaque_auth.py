@@ -126,12 +126,14 @@ async def get_or_create_user(user_id: str) -> UserSchema:
     try:
         # In a real implementation, this would interact with the database
         # For now, we'll create a simple user object
+        from datetime import datetime
+        now = datetime.utcnow()
         return UserSchema(
             id=hash(user_id) % 1000000,  # Simple ID generation
             email=user_id,
             is_active=True,
-            created_at=None,
-            updated_at=None
+            created_at=now,
+            updated_at=now
         )
     except Exception as e:
         logger.error(f"Error getting/creating user {user_id}: {str(e)}")
