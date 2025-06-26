@@ -755,14 +755,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.semiBold,
   },
 
-  createButton: {
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.primaryLight + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
   // Modal styles
   modalOverlay: {
     flex: 1,

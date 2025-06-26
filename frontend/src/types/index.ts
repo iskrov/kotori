@@ -167,8 +167,7 @@ export interface SecretTag {
 
 export interface SecretTagCreateRequest {
   tag_name: string;
-  phrase_salt: number[]; // 32-byte salt as array of integers
-  phrase_hash: string; // Argon2 hash of the secret phrase
+  phrase: string; // Raw secret phrase (will be hashed server-side)
   color_code: string; // Hex color code for UI
 }
 

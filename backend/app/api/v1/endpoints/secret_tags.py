@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import argon2
 import uuid
+import base64
+import secrets
 
 from app.db.session import get_db
 from app.core.security import get_current_user
@@ -44,13 +46,29 @@ def create_secret_tag(
     
     The client must provide:
     - tag_name: Display name for the tag
-    - phrase_salt: 32-byte salt as list of integers
-    - phrase_hash: Argon2 hash of the secret phrase
+    - phrase: The raw secret phrase (will be hashed server-side)
+    - color_code: Optional color for the tag
     """
     try:
+        # Hash the phrase server-side using Argon2
+        normalized_phrase = tag_data.phrase.strip().lower()
+        phrase_hash = ARGON2_HASHER.hash(normalized_phrase)
+        
+        # Generate a dummy salt for database compatibility
+        # The real salt is embedded in the Argon2 encoded hash
+        phrase_salt = secrets.token_bytes(32)
+        
+        # Create the tag data for storage
+        storage_data = SecretTagCreate(
+            tag_name=tag_data.tag_name,
+            phrase_salt=list(phrase_salt),  # Dummy salt for DB compatibility
+            phrase_hash=phrase_hash,        # Store the full encoded hash (contains real salt)
+            color_code=tag_data.color_code
+        )
+        
         secret_tag = secret_tag_service.create_secret_tag(
             db=db,
-            tag_data=tag_data,
+            tag_data=storage_data,
             user_id=current_user.id
         )
         

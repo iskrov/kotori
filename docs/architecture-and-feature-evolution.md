@@ -207,4 +207,361 @@ A specialized test runner for the Secret Tags feature:
 3. **Database Management:** Use `start_db.sh`/`stop_db.sh` for isolated database control
 4. **Testing:** Use `test-secret-tags.sh` for comprehensive testing of the Secret Tags feature
 
-All scripts include comprehensive error handling, status reporting, and are designed to be idempotent (safe to run multiple times). 
+All scripts include comprehensive error handling, status reporting, and are designed to be idempotent (safe to run multiple times).
+
+# Vibes - Architecture and Feature Evolution
+
+## Current Architecture Overview
+
+Vibes is a cross-platform voice journaling application built with React Native (frontend) and FastAPI (backend), featuring advanced **OPAQUE-based zero-knowledge encryption** for sensitive content protection.
+
+### Technology Stack
+- **Frontend**: React Native with TypeScript
+- **Backend**: FastAPI (Python) with PostgreSQL
+- **Authentication**: Google OAuth 2.0
+- **Speech Processing**: Google Cloud Speech-to-Text V2
+- **Encryption**: OPAQUE protocol with Argon2id, HKDF, AES-GCM
+- **Deployment**: Local development, GCP production planned
+
+## Architecture Evolution
+
+### Phase 1: Basic Voice Journaling (Completed)
+```mermaid
+graph TB
+    A[React Native App] --> B[FastAPI Backend]
+    B --> C[PostgreSQL Database]
+    B --> D[Google Speech-to-Text]
+    A --> E[Google OAuth]
+    
+    subgraph "Core Features"
+        F[Voice Recording]
+        G[Text Transcription]
+        H[Journal Management]
+        I[Tag System]
+    end
+```
+
+### Phase 2: Secret Tags V2 - Argon2 Implementation (Current)
+```mermaid
+graph TB
+    A[Voice Input] --> B[Speech-to-Text]
+    B --> C[Phrase Detection]
+    C --> D[Server Hash Verification]
+    D --> E[Tag Activation]
+    E --> F[Encrypted Storage]
+    
+    subgraph "Security Limitations"
+        G[Metadata Leakage]
+        H[Traffic Analysis Visible]
+        I[Device Evidence Present]
+    end
+```
+
+**Current Limitations:**
+- Server can see authentication attempts
+- Network traffic reveals secret tag existence
+- Client stores tag metadata locally
+
+### Phase 3: OPAQUE Zero-Knowledge V3 (In Development)
+```mermaid
+graph TB
+    A[Voice Input] --> B[Speech-to-Text]
+    B --> C[Deterministic TagID]
+    C --> D[OPAQUE Authentication]
+    D --> E[Zero-Knowledge Verification]
+    E --> F[Vault Key Unwrapping]
+    F --> G[Perfect Forward Secrecy]
+    
+    subgraph "OPAQUE Protocol"
+        H[Client: CredentialRequest]
+        I[Server: CredentialResponse]
+        J[Client: AuthRequest]
+        K[Server: AuthResponse + Keys]
+    end
+    
+    subgraph "Security Properties"
+        L[No Server Knowledge]
+        M[Perfect Deniability]
+        N[Traffic Analysis Resistant]
+        O[Memory-Only Sessions]
+    end
+```
+
+## Cryptographic Architecture Evolution
+
+### Secret Tags V2 (Current - Argon2-based)
+```typescript
+// Current Implementation - Security Limitations
+class SecretTagV2 {
+  // ❌ Client fetches all user's secret tag metadata
+  async getAllSecretTags(): Promise<SecretTag[]> {
+    return await api.get('/api/secret-tags/'); // Reveals existence
+  }
+  
+  // ❌ Loops through all tags for verification
+  async verifyPhrase(phrase: string): Promise<boolean> {
+    const tags = await this.getAllSecretTags(); // Metadata leak
+    for (const tag of tags) {
+      const result = await api.post('/verify-phrase', { // Traffic analysis
+        tag_id: tag.id,
+        phrase: phrase
+      });
+      if (result.isValid) return true;
+    }
+    return false;
+  }
+}
+```
+
+### Secret Tags V3 (OPAQUE - Zero-Knowledge)
+```typescript
+// New Implementation - True Zero-Knowledge
+class SecretTagV3 {
+  // ✅ Deterministic TagID from phrase - no server query needed
+  deriveTagId(phrase: string): Uint8Array {
+    return blake2s(phrase, 16); // 128-bit deterministic ID
+  }
+  
+  // ✅ OPAQUE authentication - server learns nothing
+  async authenticatePhrase(phrase: string): Promise<AuthResult> {
+    const tagId = this.deriveTagId(phrase);
+    
+    // OPAQUE protocol - zero-knowledge authentication
+    const opaque = new OpaqueClient();
+    const credentialRequest = opaque.createCredentialRequest(phrase);
+    
+    const initResponse = await api.post('/api/v3/auth/init', {
+      user_id: getCurrentUserId(),
+      tag_id: tagId,
+      client_msg1: credentialRequest
+    });
+    
+    const authRequest = opaque.createAuthRequest(initResponse.server_msg1);
+    const finalResponse = await api.post('/api/v3/auth/finalize', {
+      session_id: initResponse.session_id,
+      client_msg2: authRequest
+    });
+    
+    if (finalResponse.success) {
+      // Server provided wrapped keys without learning anything
+      return this.unwrapVaultKeys(finalResponse.wrapped_keys, phrase);
+    }
+    
+    return { authenticated: false, phrase }; // Treat as regular text
+  }
+}
+```
+
+## Database Schema Evolution
+
+### Current Schema (V2)
+```sql
+-- Current secret tags with metadata leakage
+CREATE TABLE secret_tags (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    tag_name VARCHAR(100) NOT NULL,        -- ❌ Reveals tag names
+    phrase_salt BYTEA NOT NULL,            -- ❌ Client downloads all salts
+    phrase_hash VARCHAR(255) NOT NULL,     -- ❌ Argon2 hash
+    color_code VARCHAR(7) NOT NULL,        -- ❌ UI metadata exposed
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### New Schema (V3 - OPAQUE)
+```sql
+-- OPAQUE zero-knowledge secret tags
+CREATE TABLE secret_tags_v3 (
+    tag_id BYTEA(16) PRIMARY KEY,          -- ✅ Deterministic from Hash(phrase)
+    user_id UUID NOT NULL,
+    salt BYTEA(16) NOT NULL,               -- ✅ Random salt for Argon2id
+    verifier_kv BYTEA(32) NOT NULL,        -- ✅ OPAQUE verifier only
+    opaque_envelope BYTEA NOT NULL,        -- ✅ OPAQUE registration data
+    created_at TIMESTAMP DEFAULT NOW(),
+    INDEX idx_user_tags (user_id),
+    INDEX idx_tag_lookup (tag_id)
+);
+
+-- Wrapped keys for vault access
+CREATE TABLE wrapped_keys (
+    id UUID PRIMARY KEY,
+    tag_id BYTEA(16) NOT NULL,
+    vault_id UUID NOT NULL,
+    wrapped_key BYTEA(40) NOT NULL,        -- ✅ AES-KW wrapped data key
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Encrypted vault blobs (zero-knowledge storage)
+CREATE TABLE vault_blobs (
+    vault_id UUID NOT NULL,
+    object_id UUID NOT NULL,
+    iv BYTEA(12) NOT NULL,                 -- ✅ AES-GCM IV
+    ciphertext BYTEA NOT NULL,             -- ✅ Encrypted content only
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (vault_id, object_id)
+);
+```
+
+## API Evolution
+
+### Current API (V2 - Metadata Exposure)
+```typescript
+// ❌ Current endpoints expose secret tag existence
+GET  /api/secret-tags/              // Returns all user tags (metadata leak)
+POST /api/secret-tags/verify-phrase // Reveals verification attempts
+POST /api/secret-tags/create        // Direct tag creation
+```
+
+### New API (V3 - Zero-Knowledge)
+```typescript
+// ✅ OPAQUE zero-knowledge endpoints
+POST /api/v3/secret-tags/register   // OPAQUE registration
+POST /api/v3/secret-tags/auth/init  // OPAQUE authentication init
+POST /api/v3/secret-tags/auth/finalize // OPAQUE authentication complete
+
+POST /api/v3/vaults/upload          // Encrypted blob storage
+GET  /api/v3/vaults/{vault_id}/objects // Encrypted blob retrieval
+```
+
+## Security Property Comparison
+
+| Security Property | V2 (Argon2) | V3 (OPAQUE) |
+|-------------------|-------------|-------------|
+| **Server Knowledge** | ❌ Sees authentication attempts | ✅ Zero-knowledge verification |
+| **Device Deniability** | ❌ Tag metadata stored locally | ✅ No persistent evidence |
+| **Traffic Analysis** | ❌ Patterns reveal secret usage | ✅ OPAQUE obscures patterns |
+| **Forward Secrecy** | ❌ Keys may persist | ✅ Memory-only sessions |
+| **Coercion Resistance** | ❌ Cannot deny secret existence | ✅ Perfect deniability |
+| **Database Compromise** | ❌ Reveals tag structure | ✅ Only opaque verifiers |
+
+## Migration Strategy
+
+### Phase 1: Parallel Implementation
+```typescript
+// Run both systems simultaneously
+class HybridSecretTagManager {
+  private v2Manager = new SecretTagOnlineManager();
+  private v3Manager = new OpaqueSecretTagManager();
+  
+  async checkForSecretPhrase(phrase: string): Promise<TagDetectionResult> {
+    // Try V3 first (new tags)
+    const v3Result = await this.v3Manager.authenticatePhrase(phrase);
+    if (v3Result.authenticated) {
+      return { found: true, version: 'v3', ...v3Result };
+    }
+    
+    // Fallback to V2 (existing tags)
+    const v2Result = await this.v2Manager.checkForSecretTagPhrases(phrase);
+    if (v2Result.found) {
+      return { found: true, version: 'v2', ...v2Result };
+    }
+    
+    return { found: false };
+  }
+}
+```
+
+### Phase 2: User Migration
+```typescript
+// Migration flow for existing users
+class SecretTagMigration {
+  async migrateUserToOPAQUE(userId: string): Promise<MigrationResult> {
+    // 1. Identify existing V2 secret tags
+    const existingTags = await this.v2Manager.getAllSecretTags();
+    
+    // 2. User re-enters phrases (security requirement)
+    const migrationData = await this.collectUserPhrases(existingTags);
+    
+    // 3. Create V3 tags with OPAQUE
+    for (const { phrase, tagName } of migrationData) {
+      await this.v3Manager.createSecretTag(phrase, tagName);
+    }
+    
+    // 4. Migrate encrypted vault data
+    await this.migrateVaultData(existingTags);
+    
+    // 5. Securely delete V2 data
+    await this.cleanupV2Data(existingTags);
+    
+    return { success: true, migratedTags: existingTags.length };
+  }
+}
+```
+
+## Performance Considerations
+
+### V2 Performance Profile
+- **Tag Lookup**: O(n) server queries per phrase check
+- **Network Overhead**: Multiple round trips for verification
+- **Memory Usage**: Tag metadata cached locally
+- **Battery Impact**: Frequent network requests
+
+### V3 Performance Profile  
+- **Tag Lookup**: O(1) deterministic TagID generation
+- **Network Overhead**: Fixed 2 round trips for OPAQUE
+- **Memory Usage**: Session-only key storage
+- **Battery Impact**: Optimized with cover traffic batching
+
+## Future Architecture Roadmap
+
+### Phase 4: Advanced Security Features
+```mermaid
+graph TB
+    A[OPAQUE V3 Foundation] --> B[Hardware Security Module]
+    A --> C[Multi-Party Secret Sharing]
+    A --> D[Quantum-Resistant Crypto]
+    
+    B --> E[HSM-Backed Keys]
+    C --> F[Social Recovery]
+    D --> G[Post-Quantum OPAQUE]
+    
+    subgraph "Enterprise Features"
+        H[Audit Logging]
+        I[Compliance Reporting]
+        J[Team Vault Sharing]
+    end
+```
+
+### Phase 5: Cross-Device Synchronization
+```mermaid
+graph TB
+    A[Device A] --> B[Encrypted Sync Protocol]
+    C[Device B] --> B
+    D[Device C] --> B
+    
+    B --> E[Distributed Key Management]
+    E --> F[Conflict Resolution]
+    F --> G[Offline Capability]
+    
+    subgraph "Sync Properties"
+        H[End-to-End Encrypted]
+        I[Zero-Knowledge Server]
+        J[Device Pairing]
+    end
+```
+
+## Technical Debt and Cleanup
+
+### Current Technical Debt
+1. **Mixed Encryption Systems**: V1 (offline) + V2 (online) + V3 (OPAQUE)
+2. **Database Schema Overlap**: Multiple secret tag tables
+3. **API Versioning**: Need clean separation between versions
+4. **Client Code Complexity**: Multiple manager classes
+
+### Cleanup Strategy
+1. **Phase Out V1**: Remove offline-only secret tag system
+2. **Maintain V2**: Keep for backward compatibility during migration
+3. **Promote V3**: Make OPAQUE the default for new users
+4. **Consolidate APIs**: Clean endpoint structure
+5. **Simplify Client**: Single manager interface with version detection
+
+## Conclusion
+
+The evolution from Argon2-based secret tags (V2) to OPAQUE zero-knowledge (V3) represents a fundamental architectural shift that solves previously impossible security requirements:
+
+- **True Zero-Knowledge**: Server learns nothing about user secrets
+- **Perfect Deniability**: No evidence of secret functionality on device
+- **Traffic Analysis Resistance**: OPAQUE protocol obscures patterns
+- **Forward Secrecy**: Session-only key existence
+
+This architecture positions Vibes as the most secure voice journaling platform available, suitable for users with the highest privacy and security requirements while maintaining the intuitive voice-driven user experience. 

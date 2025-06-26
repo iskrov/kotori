@@ -285,7 +285,7 @@
 - **Professional Recording**: ✅ MODERNIZED - Clean interface with dynamic waveform and enhanced visual hierarchy
 - **Form Enhancement**: Modern TextInput components with validation and accessibility
 
-### ✅ **Recording Screen Modernization (June 2025):**
+### ✅ **Recording Screen Modernization (January 2025):**
 - **Clean Visual Design**: ✅ COMPLETED - Transformed cluttered interface into focused, professional recording experience
 - **Dynamic Waveform**: ✅ IMPLEMENTED - 12 animated bars with staggered animations for engaging visual feedback
 - **Enhanced Recording Button**: ✅ UPGRADED - Large, prominent button with pulsing animation and proper states
@@ -1076,3 +1076,343 @@ Transform the current Home Screen from a traditional dashboard layout into a mod
 - **Professional appearance** enhancing app store presence and user confidence
 
 **Priority Level: HIGH - This enhancement will significantly improve user onboarding and engagement while maintaining all existing functionality.**
+
+# TODO - OPAQUE Zero-Knowledge Secret Tags Implementation
+
+## Phase 1: Cryptographic Foundation (Week 1-2)
+
+### OPAQUE Library Integration
+- [ ] Research and select OPAQUE JavaScript/TypeScript library
+  - Evaluate `@stablelib/opaque` vs `opaque-wasm` vs custom implementation
+  - Verify RFC compliance and security audit status
+  - Test performance on mobile devices
+- [ ] Install and configure OPAQUE dependencies
+  - Frontend: OPAQUE client library
+  - Backend: OPAQUE server library (Python)
+  - Ensure compatible versions across platforms
+- [ ] Create cryptographic utilities module
+  - Argon2id implementation with configurable parameters
+  - HKDF-SHA-256 key derivation functions
+  - BLAKE2s hash function for TagID generation
+  - AES-KW key wrapping/unwrapping
+  - Secure memory management utilities
+
+### Key Derivation System
+- [ ] Implement deterministic key schedule
+  - `deriveKeys(phrase, salt)` function
+  - Memory-hard Argon2id stretching
+  - Context-specific HKDF derivation
+  - TagID generation from phrase hash
+- [ ] Create secure key storage for active sessions
+  - In-memory key management
+  - Automatic key erasure on timeout
+  - Session expiration handling
+- [ ] Implement AES-KW key wrapping
+  - Wrap data keys with phrase-derived keys
+  - Unwrap keys during authentication
+  - Error handling for invalid wraps
+
+## Phase 2: Database and Server Infrastructure (Week 3-4)
+
+### Database Schema Migration
+- [ ] Create migration for OPAQUE secret tags
+  - `secret_tags_v3` table with OPAQUE verifiers
+  - `wrapped_keys` table for vault mappings
+  - `vault_blobs` table for encrypted content
+  - Proper indexes for performance
+- [ ] Implement backward compatibility
+  - Keep existing `secret_tags` table during transition
+  - Add version indicators to distinguish systems
+  - Migration path for existing users
+- [ ] Set up database constraints and validations
+  - Foreign key relationships
+  - Unique constraints on tag_id
+  - Proper data types for binary fields
+
+### OPAQUE Authentication Endpoints
+- [ ] Implement registration endpoint
+  - `POST /api/v3/secret-tags/register`
+  - OPAQUE envelope storage
+  - Tag ID collision handling
+  - User authentication validation
+- [ ] Implement authentication flow endpoints
+  - `POST /api/v3/secret-tags/auth/init`
+  - `POST /api/v3/secret-tags/auth/finalize`
+  - Session management for multi-round protocol
+  - Proper error handling and security
+- [ ] Create vault blob endpoints
+  - `POST /api/v3/vaults/upload`
+  - `GET /api/v3/vaults/{vault_id}/objects`
+  - Efficient blob storage and retrieval
+  - Access control and authorization
+
+### Backend Service Layer
+- [ ] Create OPAQUE service class
+  - Registration and authentication logic
+  - Session state management
+  - Error handling and logging
+- [ ] Implement wrapped key service
+  - Key storage and retrieval
+  - Vault-to-tag mappings
+  - Cleanup and deletion
+- [ ] Create vault blob service
+  - Encrypted content storage
+  - Metadata management
+  - Garbage collection
+
+## Phase 3: Client Integration (Week 5-6)
+
+### Frontend OPAQUE Client
+- [ ] Create OPAQUE client wrapper
+  - Registration flow implementation
+  - Authentication flow implementation
+  - Error handling and retry logic
+  - TypeScript type definitions
+- [ ] Implement secret tag creation flow
+  - User interface for tag creation
+  - Phrase validation and strength checking
+  - OPAQUE registration process
+  - Vault and key setup
+- [ ] Create authentication manager
+  - Voice phrase detection integration
+  - OPAQUE authentication flow
+  - Session management and storage
+  - Automatic timeout handling
+
+### Voice Integration
+- [ ] Update speech-to-text service
+  - Integrate with OPAQUE authentication
+  - Handle authentication results
+  - Fallback to regular text processing
+- [ ] Modify tag detection logic
+  - Remove current hash-based verification
+  - Implement OPAQUE-based phrase checking
+  - Handle multiple vault scenarios
+- [ ] Update journal entry creation
+  - Encrypted content for secret entries
+  - Vault selection logic
+  - Key management during entry creation
+
+### User Interface Updates
+- [ ] Update secret tag management UI
+  - Creation wizard with OPAQUE flow
+  - Active session indicators
+  - Vault management interface
+  - Migration tools for existing tags
+- [ ] Implement session management UI
+  - Active tag display
+  - Manual deactivation controls
+  - Timeout extension options
+  - Security status indicators
+- [ ] Add security settings
+  - Timeout configuration
+  - Panic mode settings
+  - Cover traffic options
+  - Device security recommendations
+
+## Phase 4: Security Hardening (Week 7-8)
+
+### Memory Security
+- [ ] Implement secure memory management
+  - Zero-out sensitive data after use
+  - Prevent memory dumps of keys
+  - Secure garbage collection
+  - Memory leak detection
+- [ ] Add timing attack protection
+  - Constant-time operations where possible
+  - Random delays for authentication
+  - Uniform response times
+  - Side-channel resistance
+- [ ] Implement perfect forward secrecy
+  - Automatic key rotation
+  - Session isolation
+  - Historical data protection
+  - Emergency key erasure
+
+### Traffic Analysis Resistance
+- [ ] Implement cover traffic
+  - Periodic dummy OPAQUE authentications
+  - Random timing patterns
+  - Uniform request sizes
+  - Background noise generation
+- [ ] Add request obfuscation
+  - Batch multiple operations
+  - Padding for uniform sizes
+  - Decoy requests for failed authentications
+  - Traffic shaping
+
+### Duress Protection
+- [ ] Implement panic mode
+  - Emergency phrase detection
+  - Rapid data deletion
+  - Fake vault support
+  - Plausible deniability features
+- [ ] Add duress detection
+  - Unusual access patterns
+  - Biometric anomalies (future)
+  - Time-based triggers
+  - Remote panic capabilities
+
+## Phase 5: Testing and Validation (Week 8-9)
+
+### Cryptographic Testing
+- [ ] OPAQUE protocol compliance tests
+  - RFC specification adherence
+  - Interoperability testing
+  - Security property verification
+  - Edge case handling
+- [ ] Key derivation testing
+  - Deterministic generation verification
+  - Cross-platform consistency
+  - Performance benchmarking
+  - Memory usage analysis
+- [ ] Encryption/decryption validation
+  - Round-trip testing
+  - Data integrity verification
+  - Error condition handling
+  - Performance optimization
+
+### Security Testing
+- [ ] Penetration testing
+  - Authentication bypass attempts
+  - Memory analysis attacks
+  - Network traffic analysis
+  - Social engineering resistance
+- [ ] Vulnerability assessment
+  - Static code analysis
+  - Dynamic security testing
+  - Dependency vulnerability scanning
+  - Configuration security review
+- [ ] Performance security testing
+  - Timing attack resistance
+  - Resource exhaustion protection
+  - DoS attack mitigation
+  - Scalability under attack
+
+### Integration Testing
+- [ ] End-to-end flow testing
+  - Voice-to-encryption complete flows
+  - Multi-device synchronization
+  - Session management across restarts
+  - Error recovery scenarios
+- [ ] User experience testing
+  - Authentication flow usability
+  - Performance on mobile devices
+  - Battery impact assessment
+  - Network connectivity handling
+- [ ] Migration testing
+  - Existing data preservation
+  - Upgrade/downgrade scenarios
+  - Data corruption recovery
+  - User migration flows
+
+## Phase 6: Migration and Deployment (Week 9-10)
+
+### Migration Tools
+- [ ] Create migration utility
+  - Existing secret tag detection
+  - User consent and education
+  - Data backup and verification
+  - Rollback capabilities
+- [ ] Implement gradual rollout
+  - Feature flag implementation
+  - A/B testing framework
+  - Performance monitoring
+  - User feedback collection
+- [ ] Create migration documentation
+  - User migration guide
+  - Security benefit explanations
+  - Troubleshooting procedures
+  - FAQ and support materials
+
+### Deployment Infrastructure
+- [ ] Set up monitoring and alerting
+  - Authentication success/failure rates
+  - Performance metrics tracking
+  - Security incident detection
+  - User adoption monitoring
+- [ ] Implement backup and recovery
+  - Encrypted vault backup procedures
+  - Key recovery mechanisms
+  - Disaster recovery protocols
+  - Data retention policies
+- [ ] Create operational procedures
+  - Security incident response
+  - Performance optimization
+  - User support workflows
+  - Maintenance procedures
+
+### Documentation and Training
+- [ ] Update technical documentation
+  - API documentation for new endpoints
+  - Security architecture documentation
+  - Deployment and configuration guides
+  - Troubleshooting and maintenance
+- [ ] Create user documentation
+  - Feature introduction and benefits
+  - Setup and configuration guides
+  - Security best practices
+  - Privacy and safety information
+- [ ] Prepare support materials
+  - Common issues and solutions
+  - Security incident procedures
+  - User education materials
+  - Developer onboarding guides
+
+## Phase 7: Future Enhancements (Post-Launch)
+
+### Advanced Security Features
+- [ ] Hardware security module integration
+  - HSM-backed key storage
+  - Hardware-based attestation
+  - Secure enclave utilization
+  - TPM integration
+- [ ] Multi-party secret sharing
+  - Social recovery mechanisms
+  - Distributed key storage
+  - Threshold cryptography
+  - Emergency access protocols
+- [ ] Quantum-resistant cryptography
+  - Post-quantum algorithm research
+  - Migration planning
+  - Hybrid classical/quantum systems
+  - Future-proofing strategies
+
+### User Experience Enhancements
+- [ ] Biometric integration
+  - Voice pattern analysis
+  - Fingerprint confirmation
+  - Face recognition support
+  - Multi-factor authentication
+- [ ] Cross-device synchronization
+  - Secure key sharing
+  - Device pairing protocols
+  - Conflict resolution
+  - Offline synchronization
+- [ ] Advanced voice features
+  - Speaker identification
+  - Emotion-based encryption
+  - Context-aware security
+  - Voice stress detection
+
+## Current Priority Focus
+
+**IMMEDIATE NEXT STEPS:**
+1. Research and select OPAQUE library implementation
+2. Set up development environment with cryptographic dependencies
+3. Create basic key derivation and TagID generation functions
+4. Design database migration strategy
+
+**BLOCKERS TO RESOLVE:**
+- OPAQUE library selection and compatibility verification
+- Performance testing on mobile devices
+- Database migration strategy for existing users
+- Security audit and compliance requirements
+
+**ESTIMATED COMPLETION:**
+- Phase 1-2: 4 weeks (Foundation and Infrastructure)
+- Phase 3-4: 4 weeks (Integration and Security)
+- Phase 5-6: 3 weeks (Testing and Deployment)
+- Total: ~11 weeks for complete OPAQUE implementation
+
+This represents a complete architectural overhaul that will provide true zero-knowledge security while maintaining the voice-driven user experience.

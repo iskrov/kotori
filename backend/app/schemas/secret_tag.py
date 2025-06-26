@@ -12,15 +12,19 @@ class SecretTagBase(BaseModel):
 
 class SecretTagCreate(SecretTagBase):
     """Schema for creating a new secret tag."""
-    phrase_salt: List[int] = Field(..., description="32-byte salt as list of integers for Argon2 hashing")
-    phrase_hash: str = Field(..., min_length=1, max_length=255, description="Argon2 hash of the secret phrase")
+    phrase: str = Field(..., min_length=1, max_length=255, description="Raw secret phrase (will be hashed server-side)")
+    
+    # Internal fields used by the service layer (not part of the API)
+    phrase_salt: Optional[List[int]] = Field(None, description="32-byte salt as list of integers for Argon2 hashing")
+    phrase_hash: Optional[str] = Field(None, min_length=1, max_length=255, description="Argon2 hash of the secret phrase")
     
     @validator('phrase_salt')
     def validate_salt_length(cls, v):
-        if len(v) != 32:
-            raise ValueError('phrase_salt must be exactly 32 bytes')
-        if not all(0 <= byte <= 255 for byte in v):
-            raise ValueError('phrase_salt must contain valid byte values (0-255)')
+        if v is not None:
+            if len(v) != 32:
+                raise ValueError('phrase_salt must be exactly 32 bytes')
+            if not all(0 <= byte <= 255 for byte in v):
+                raise ValueError('phrase_salt must contain valid byte values (0-255)')
         return v
 
 

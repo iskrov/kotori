@@ -1,4 +1,3 @@
-import CryptoJS from 'crypto-js';
 import { SecretTag, SecretTagCreateRequest, SecretTagResponse, SecretTagListResponse } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from './api';
@@ -6,59 +5,23 @@ import { api } from './api';
 /**
  * Service for managing secret tags with server-side hash verification.
  * 
- * This approach stores salted hashes on the server for phrase verification
- * while keeping the actual phrases client-side only during activation.
+ * The server handles all cryptographic operations including phrase hashing
+ * with Argon2, ensuring consistent security across the application.
  */
 export class SecretTagHashService {
   private readonly API_BASE = '/api/secret-tags';
-  
-  /**
-   * Generate a cryptographically secure salt for Argon2 hashing
-   */
-  private generateSalt(): Uint8Array {
-    return crypto.getRandomValues(new Uint8Array(32));
-  }
-
-  /**
-   * Hash a secret phrase using Argon2 (simulated with PBKDF2 for now)
-   * TODO: Replace with actual Argon2 implementation when available in browsers
-   */
-  private async hashPhrase(phrase: string, salt: Uint8Array): Promise<string> {
-    // Normalize the phrase (lowercase, trim)
-    const normalizedPhrase = phrase.trim().toLowerCase();
-    
-    // Convert salt to WordArray for CryptoJS
-    const saltWordArray = CryptoJS.lib.WordArray.create(Array.from(salt));
-    
-    // Use PBKDF2 as a temporary substitute for Argon2
-    // In production, this should be replaced with actual Argon2
-    const hash = CryptoJS.PBKDF2(normalizedPhrase, saltWordArray, {
-      keySize: 256/32, // 256 bits = 32 bytes
-      iterations: 100000, // High iteration count for security
-      hasher: CryptoJS.algo.SHA256
-    });
-    
-    return hash.toString(CryptoJS.enc.Base64);
-  }
 
   /**
    * Create a new secret tag with server-side hash verification
    */
   async createSecretTag(tagName: string, secretPhrase: string, colorCode: string = '#007AFF'): Promise<SecretTagResponse> {
     try {
-      // Generate salt and hash the phrase
-      const salt = this.generateSalt();
-      const phraseHash = await this.hashPhrase(secretPhrase, salt);
-      
-      // Prepare request data
-      const requestData: SecretTagCreateRequest = {
+      // Prepare request data - server will handle hashing
+      const requestData = {
         tag_name: tagName,
-        phrase_salt: Array.from(salt), // Convert to array for JSON serialization
-        phrase_hash: phraseHash,
+        phrase: secretPhrase,  // Send raw phrase to server
         color_code: colorCode
       };
-      
-
 
       // Use the configured api instance instead of raw fetch to ensure correct baseURL
       const response = await api.post(this.API_BASE, requestData);
@@ -106,11 +69,7 @@ export class SecretTagHashService {
       // Test the phrase against each tag's hash
       for (const tag of tags) {
         try {
-          // Recreate the hash using the stored salt
-          const salt = new Uint8Array(tag.phrase_salt);
-          const computedHash = await this.hashPhrase(phrase, salt);
-          
-          // Verify with server (this could be optimized to verify all at once)
+          // Verify with server using the raw phrase
           const verificationResponse = await api.post(`${this.API_BASE}/verify-phrase`, {
             phrase: phrase,
             tag_id: tag.id
@@ -183,27 +142,6 @@ export class SecretTagHashService {
     } catch (error) {
       console.error('Error deleting secret tag:', error);
       throw error;
-    }
-  }
-
-
-
-  /**
-   * Client-side phrase verification (for immediate feedback)
-   * This is faster than server verification but less secure
-   */
-  async verifyPhraseClientSide(phrase: string, tag: SecretTagResponse): Promise<boolean> {
-    try {
-      const salt = new Uint8Array(tag.phrase_salt);
-      const computedHash = await this.hashPhrase(phrase, salt);
-      
-      // Note: We can't compare directly since we don't have the server hash
-      // This method would need the hash to be returned from the server
-      // For now, always use server-side verification
-      return false;
-    } catch (error) {
-      console.error('Error in client-side phrase verification:', error);
-      return false;
     }
   }
 }
