@@ -16,6 +16,7 @@ from app.routers import auth_router
 from app.routers import journals_router
 from app.routers import reminders_router
 from app.routers import users_router
+from app.routers.opaque_auth import router as opaque_auth_router
 
 from app.websockets import speech as speech_websocket_router
 
@@ -121,6 +122,7 @@ async def log_requests(request: Request, call_next):
 
 # Include routers
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(opaque_auth_router, tags=["OPAQUE Authentication"])
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(journals_router, prefix="/api/journals", tags=["Journals"])
 app.include_router(reminders_router, prefix="/api/reminders", tags=["Reminders"])
