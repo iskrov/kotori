@@ -5,12 +5,14 @@ This module provides FastAPI routes for OPAQUE zero-knowledge authentication.
 It handles registration and login flows while maintaining zero-knowledge properties.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
+from datetime import datetime
 import logging
 import base64
+from sqlalchemy.orm import Session
 
 from ..crypto.opaque_server import (
     OpaqueServer, 
@@ -23,6 +25,8 @@ from ..crypto.opaque_server import (
 from ..db.session import get_db
 from ..schemas.user import User as UserSchema
 from ..core.security import create_access_token
+from ..services.session_service import session_service, SessionTokenError
+from ..services.audit_service import audit_service
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -91,7 +95,9 @@ class OpaqueLoginFinishResponse(BaseModel):
     """Finish OPAQUE login response"""
     success: bool = Field(..., description="Login success status")
     access_token: Optional[str] = Field(None, description="JWT access token")
+    session_token: Optional[str] = Field(None, description="OPAQUE session token")
     token_type: str = Field(default="bearer", description="Token type")
+    expires_at: Optional[str] = Field(None, description="Session expiration time")
     message: str = Field(..., description="Status message")
 
 
@@ -126,7 +132,6 @@ async def get_or_create_user(user_id: str) -> UserSchema:
     try:
         # In a real implementation, this would interact with the database
         # For now, we'll create a simple user object
-        from datetime import datetime
         now = datetime.utcnow()
         return UserSchema(
             id=hash(user_id) % 1000000,  # Simple ID generation
@@ -226,7 +231,11 @@ async def start_opaque_registration(request: OpaqueRegistrationStartRequest):
 
 
 @router.post("/register/finish", response_model=OpaqueRegistrationFinishResponse)
-async def finish_opaque_registration(request: OpaqueRegistrationFinishRequest):
+async def finish_opaque_registration(
+    request: OpaqueRegistrationFinishRequest,
+    http_request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Finish OPAQUE registration flow
     
@@ -236,6 +245,14 @@ async def finish_opaque_registration(request: OpaqueRegistrationFinishRequest):
     try:
         # Validate user ID
         user_id = validate_user_id(request.user_id)
+        
+        # Extract client information for audit logging
+        ip_address = http_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        if not ip_address:
+            ip_address = http_request.headers.get("x-real-ip", "")
+        if not ip_address:
+            ip_address = getattr(http_request.client, "host", "")
+        user_agent = http_request.headers.get("user-agent", "")
         
         # Deserialize envelope
         envelope = deserialize_opaque_data(request.envelope)
@@ -248,11 +265,37 @@ async def finish_opaque_registration(request: OpaqueRegistrationFinishRequest):
             user = await get_or_create_user(user_id)
             logger.info(f"OPAQUE registration completed for user: {user_id}")
             
+            # Log successful registration event
+            audit_service.log_authentication_event(
+                db=db,
+                event_type=audit_service.EVENT_OPAQUE_REGISTRATION_FINISH,
+                user_id=user_id,
+                success=True,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                additional_data={
+                    "registration_method": "opaque",
+                    "envelope_size": len(envelope)
+                }
+            )
+            
             return OpaqueRegistrationFinishResponse(
                 success=True,
                 message="OPAQUE registration completed successfully"
             )
         else:
+            # Log failed registration event
+            audit_service.log_authentication_event(
+                db=db,
+                event_type=audit_service.EVENT_OPAQUE_REGISTRATION_FINISH,
+                user_id=user_id,
+                success=False,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                error_code="REGISTRATION_FAILED",
+                additional_data={"registration_method": "opaque"}
+            )
+            
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OPAQUE registration failed"
@@ -332,12 +375,16 @@ async def start_opaque_login(request: OpaqueLoginStartRequest):
 
 
 @router.post("/login/finish", response_model=OpaqueLoginFinishResponse)
-async def finish_opaque_login(request: OpaqueLoginFinishRequest):
+async def finish_opaque_login(
+    request: OpaqueLoginFinishRequest,
+    http_request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Finish OPAQUE login flow
     
-    Completes the OPAQUE login by verifying the client proof
-    and issuing an access token.
+    Completes the OPAQUE login by verifying the client proof,
+    creating a secure session, and issuing tokens.
     """
     try:
         # Validate user ID
@@ -358,11 +405,15 @@ async def finish_opaque_login(request: OpaqueLoginFinishRequest):
                 data={"sub": str(user.id), "email": user.email}
             )
             
+            # Create session token
+            session_token = session_service.create_session(user_id)
+            
             logger.info(f"OPAQUE login completed for user: {user_id}")
             
             return OpaqueLoginFinishResponse(
                 success=True,
                 access_token=access_token,
+                session_token=session_token,
                 token_type="bearer",
                 message="OPAQUE login completed successfully"
             )
@@ -370,6 +421,7 @@ async def finish_opaque_login(request: OpaqueLoginFinishRequest):
             return OpaqueLoginFinishResponse(
                 success=False,
                 access_token=None,
+                session_token=None,
                 token_type="bearer",
                 message="OPAQUE login failed - invalid credentials"
             )

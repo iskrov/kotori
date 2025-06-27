@@ -10,7 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import speech as speech_router_module
-from app.api.v1.endpoints import secret_tags as secret_tags_router_module
+from app.api.v1.endpoints import opaque as opaque_router_module
+from app.api.v1.endpoints import vault as vault_router_module
+from app.api.v1.endpoints import session as session_router_module
+from app.api.v1.endpoints import audit as audit_router_module
+from app.api.v1.endpoints import maintenance as maintenance_router_module
 from app.core.config import settings
 from app.routers import auth_router
 from app.routers import journals_router
@@ -121,13 +125,17 @@ async def log_requests(request: Request, call_next):
 
 
 # Include routers
+app.include_router(maintenance_router_module.router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(opaque_auth_router, tags=["OPAQUE Authentication"])
+app.include_router(opaque_router_module.router, prefix="/api/opaque", tags=["OPAQUE"])
+app.include_router(vault_router_module.router, prefix="/api/vault", tags=["Vault Storage"])
+app.include_router(audit_router_module.router, prefix="/api/audit", tags=["Security Audit"])
+app.include_router(session_router_module.router, prefix="/api/session", tags=["Session Management"])
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(journals_router, prefix="/api/journals", tags=["Journals"])
 app.include_router(reminders_router, prefix="/api/reminders", tags=["Reminders"])
 app.include_router(speech_router_module.router, prefix="/api/speech", tags=["Speech"])
-app.include_router(secret_tags_router_module.router, prefix="/api/secret-tags", tags=["Secret Tags"])
 
 app.include_router(speech_websocket_router.router, prefix="/ws", tags=["WebSockets"])
 

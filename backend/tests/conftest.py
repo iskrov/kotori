@@ -18,7 +18,7 @@ from app.models.base import Base
 from app.models.user import User
 from app.models.journal_entry import JournalEntry
 from app.models.tag import Tag, JournalEntryTag
-from app.models.secret_tag import SecretTag
+from app.models.secret_tag_opaque import SecretTag, WrappedKey, VaultBlob, OpaqueSession
 from app.models.reminder import Reminder
 
 # Use an in-memory SQLite database for testing
@@ -74,6 +74,13 @@ def test_user(db: Session) -> User:
     db.refresh(user)
     return user
 
+
+@pytest.fixture(scope="function")
+def db_session(db: Session) -> Session:
+    """Alias for db fixture for compatibility."""
+    return db
+
+
 @pytest.fixture(scope="function")
 def token_headers(test_user: User) -> dict[str, str]:
     """Create authentication headers for the test user."""
@@ -83,3 +90,8 @@ def token_headers(test_user: User) -> dict[str, str]:
         subject=str(test_user.id), expires_delta=timedelta(minutes=30)
     )
     return {"Authorization": f"Bearer {access_token}"}
+
+@pytest.fixture(scope="function")
+def db_session(db: Session) -> Session:
+    """Alias for db fixture for compatibility."""
+    return db

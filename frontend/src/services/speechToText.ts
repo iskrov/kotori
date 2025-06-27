@@ -6,7 +6,7 @@ import { api as axiosInstance } from './api';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { validateLanguageCode } from '../config/languageConfig';
-import { tagManager } from './tagManager';
+import { voicePhraseDetector } from './VoicePhraseDetector';
 
 // Enhanced types for multi-language transcription
 interface TranscriptionResult {
@@ -282,37 +282,27 @@ class SpeechToTextService {
       }
     };
 
-    // Perform secret tag detection if enabled and transcript is available
+    // Perform OPAQUE-based secret phrase detection if enabled and transcript is available
     if (enableSecretTagDetection && processedResult.transcript.trim()) {
       try {
-        logger.info(`[Secret Tag Detection] Starting detection for transcript: "${processedResult.transcript}"`);
+        logger.info(`[OPAQUE Voice Detection] Starting detection for transcript: "${processedResult.transcript}"`);
         
-        // Verify tag manager is initialized
-        await tagManager.initialize();
-        
-        // Get all secret tags to debug
-        const allTags = await tagManager.getSecretTags();
-        logger.info(`[Secret Tag Detection] Found ${allTags.length} secret tags in storage`);
-        
-        if (allTags.length > 0) {
-          logger.info(`[Secret Tag Detection] Secret tag names: ${allTags.map((t: any) => t.name).join(', ')}`);
-        }
-        
-        const tagDetection = await tagManager.checkForSecretTagPhrases(processedResult.transcript);
+        // Use new OPAQUE-based voice phrase detector
+        const tagDetection = await voicePhraseDetector.checkForSecretPhrase(processedResult.transcript);
         processedResult.secret_tag_detected = tagDetection;
         
-        logger.info(`[Secret Tag Detection] Detection result:`, tagDetection);
+        logger.info(`[OPAQUE Voice Detection] Detection result:`, tagDetection);
         
         if (tagDetection.found) {
-          logger.info(`Secret tag phrase detected: ${tagDetection.tagName} (${tagDetection.action})`);
+          logger.info(`OPAQUE secret phrase authenticated: ${tagDetection.tagName} (${tagDetection.action})`);
           
-          // Handle the detected secret tag action
-          await this._handleSecretTagDetection(tagDetection);
+          // Handle the detected secret tag action (session management happens in VoicePhraseDetector)
+          await this._handleOpaqueTagDetection(tagDetection);
         } else {
-          logger.info(`[Secret Tag Detection] No secret tag phrases detected in: "${processedResult.transcript}"`);
+          logger.info(`[OPAQUE Voice Detection] No secret phrases authenticated in: "${processedResult.transcript}"`);
         }
       } catch (error) {
-        logger.error('Error during secret tag detection:', error);
+        logger.error('Error during OPAQUE voice detection:', error);
         // Don't fail the transcription if secret tag detection fails
         processedResult.secret_tag_detected = { found: false };
       }
@@ -320,9 +310,9 @@ class SpeechToTextService {
       processedResult.secret_tag_detected = { found: false };
       
       if (enableSecretTagDetection) {
-        logger.info(`[Secret Tag Detection] Skipped - empty transcript`);
+        logger.info(`[OPAQUE Voice Detection] Skipped - empty transcript`);
       } else {
-        logger.info(`[Secret Tag Detection] Disabled`);
+        logger.info(`[OPAQUE Voice Detection] Disabled`);
       }
     }
 
@@ -339,31 +329,33 @@ class SpeechToTextService {
   }
 
   /**
-   * Handle secret tag detection results
+   * Handle OPAQUE tag detection results
    */
-  private async _handleSecretTagDetection(detection: any): Promise<void> {
+  private async _handleOpaqueTagDetection(detection: any): Promise<void> {
     try {
       if (detection.action === 'panic') {
-        // Handle panic mode
-        logger.warn('Panic mode detected - initiating secure deletion');
-        await tagManager.clearSecretCache();
+        // Handle panic mode - OPAQUE client handles memory cleanup
+        logger.warn('Panic mode detected via OPAQUE authentication');
+        // Panic mode cleanup is already handled in VoicePhraseDetector
         return;
       }
 
       if (detection.tagId) {
         if (detection.action === 'activate') {
-          await tagManager.activateSecretTag(detection.tagId);
-          logger.info(`Secret tag activated: ${detection.tagName}`);
+          logger.info(`OPAQUE secret tag session activated: ${detection.tagName}`);
+          // Session management is handled in VoicePhraseDetector
         } else if (detection.action === 'deactivate') {
-          await tagManager.deactivateSecretTag(detection.tagId);
-          logger.info(`Secret tag deactivated: ${detection.tagName}`);
+          logger.info(`OPAQUE secret tag session deactivated: ${detection.tagName}`);
+          // Session cleanup is handled in VoicePhraseDetector
         }
       }
     } catch (error) {
-      logger.error('Failed to handle secret tag detection:', error);
+      logger.error('Failed to handle OPAQUE tag detection:', error);
       // Don't throw - this shouldn't fail the transcription
     }
   }
+
+
 
   /**
    * Retry transcription with token refresh

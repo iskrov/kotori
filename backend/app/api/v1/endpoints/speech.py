@@ -206,11 +206,10 @@ async def activate_secret_tag_endpoint(
     
     try:
         # Validate that the secret tag belongs to the user
-        from app.models.secret_tag import SecretTag
+        from app.models import SecretTag
         secret_tag = db.query(SecretTag).filter(
-            SecretTag.id == request.tag_id,
-            SecretTag.user_id == current_user.id,
-            SecretTag.is_active == True
+            SecretTag.tag_id == request.tag_id.encode() if isinstance(request.tag_id, str) else request.tag_id,
+            SecretTag.user_id == str(current_user.id)
         ).first()
         
         if not secret_tag:

@@ -26,7 +26,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import { CalendarSkeleton, JournalCardSkeleton } from '../../components/SkeletonLoader';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
-import { tagManager } from '../../services/tagManager';
+// Legacy tagManager removed - OPAQUE system handles session management
 import { AppTheme } from '../../config/theme';
 
 type CalendarScreenNavigationProp = CompositeNavigationProp<

@@ -2,8 +2,6 @@ import React, { useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useAudioRecorderLogic } from '../hooks/useAudioRecorderLogic';
 import AudioRecorderUI from './AudioRecorderUI';
-import { tagManager } from '../services/tagManager';
-import { TagDetectionResult } from '../services/secretTagOnlineManager';
 import logger from '../utils/logger';
 import speechToTextService from '../services/speechToText';
 
@@ -71,27 +69,26 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const processSegment = useCallback(
     async (audioUri: string, language: string): Promise<{ text: string } | null> => {
       try {
-        const result = await speechToTextService.transcribeAudio(audioUri, { languageCodes: [language] });
+        const result = await speechToTextService.transcribeAudio(audioUri, { 
+          languageCodes: [language],
+          enableSecretTagDetection: true 
+        });
         if (!result) {
           cleanupAudioFile(audioUri);
           return null;
         }
-        const { transcript } = result;
-        const detectionResult: TagDetectionResult = await tagManager.checkForSecretTagPhrases(transcript);
-        if (detectionResult.found) {
-          logger.info(`Secret tag phrase detected: ${detectionResult.tagName} (${detectionResult.action})`);
-          // Handle secret tag activation/deactivation
-          if (detectionResult.action === 'activate' && detectionResult.tagId) {
-            await tagManager.activateSecretTag(detectionResult.tagId);
-          } else if (detectionResult.action === 'deactivate' && detectionResult.tagId) {
-            await tagManager.deactivateSecretTag(detectionResult.tagId);
-          }
+        const { transcript, secret_tag_detected } = result;
+        
+        // Check if secret tag was detected (handled by speechToText service)
+        if (secret_tag_detected?.found) {
+          logger.info(`OPAQUE secret tag detected: ${secret_tag_detected.tagName} (${secret_tag_detected.action})`);
           // Treat secret tag phrases as commands (don't add to transcript)
           logger.info('[processSegment] Transcript was a secret tag command. Halting processing.');
           cleanupAudioFile(audioUri);
           onCommandDetected?.();
           return null;
         }
+        
         analyzeTranscriptionQuality(result);
         cleanupAudioFile(audioUri);
         return { text: transcript };

@@ -32,6 +32,14 @@ interface JournalFormProps {
   isSaving: boolean;
   isAutoSaving: boolean;
   isLoading: boolean;
+  // Encryption support
+  encryptionMode?: {
+    isEnabled: boolean;
+    tagId?: string;
+    tagName?: string;
+    sessionActive?: boolean;
+  };
+  onEncryptionToggle?: (enabled: boolean) => void;
 }
 
 const JournalForm: React.FC<JournalFormProps> = ({
@@ -47,6 +55,8 @@ const JournalForm: React.FC<JournalFormProps> = ({
   isSaving,
   isAutoSaving,
   isLoading,
+  encryptionMode,
+  onEncryptionToggle,
 }) => {
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
@@ -140,9 +150,31 @@ const JournalForm: React.FC<JournalFormProps> = ({
       <View style={styles.form}>
         {/* Header with stats */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>New Journal Entry</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>New Journal Entry</Text>
+            {encryptionMode?.isEnabled && (
+              <View style={styles.encryptionIndicator}>
+                <Ionicons 
+                  name={encryptionMode.sessionActive ? "shield-checkmark" : "shield-outline"} 
+                  size={20} 
+                  color={encryptionMode.sessionActive ? theme.colors.success : theme.colors.warning} 
+                />
+                <Text style={[
+                  styles.encryptionText,
+                  { color: encryptionMode.sessionActive ? theme.colors.success : theme.colors.warning }
+                ]}>
+                  {encryptionMode.sessionActive ? 'Encrypted' : 'Session Required'}
+                </Text>
+              </View>
+            )}
+          </View>
           {getWritingStats() && (
             <Text style={styles.writingStats}>{getWritingStats()}</Text>
+          )}
+          {encryptionMode?.isEnabled && encryptionMode.tagName && (
+            <Text style={styles.encryptionDetails}>
+              Tag: {encryptionMode.tagName}
+            </Text>
           )}
         </View>
 
@@ -284,12 +316,38 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   header: {
     marginBottom: theme.spacing.xl,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
   headerTitle: {
     fontSize: theme.typography.fontSizes.xxl,
     fontWeight: 'bold',
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.bold,
-    marginBottom: theme.spacing.xs,
+    flex: 1,
+  },
+  encryptionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.card,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    ...theme.shadows.sm,
+  },
+  encryptionText: {
+    fontSize: theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    marginLeft: theme.spacing.xs,
+  },
+  encryptionDetails: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+    marginTop: theme.spacing.xs,
   },
   writingStats: {
     fontSize: theme.typography.fontSizes.sm,

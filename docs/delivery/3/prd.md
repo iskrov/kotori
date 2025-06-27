@@ -4,17 +4,18 @@
 
 ## Overview
 
-Integrate OPAQUE authentication with the voice journaling workflow, enabling seamless voice-activated secret tag authentication while maintaining the existing user experience. This PBI connects the cryptographic foundation to the user-facing voice recording functionality.
+Integrate OPAQUE authentication with the voice journaling workflow, enabling seamless voice-activated secret tag authentication while maintaining the existing user experience. This PBI connects the cryptographic foundation to the user-facing voice recording functionality with clean OPAQUE-only implementation.
 
 ## Problem Statement
 
-The current voice-activated secret tag system requires fetching metadata from the server and performing multiple verification calls, creating security vulnerabilities and poor user experience:
+The current voice-activated secret tag system requires complete replacement with OPAQUE-based authentication:
+- Legacy authentication creates security vulnerabilities and poor user experience
 - Multiple network requests reveal secret tag existence patterns
 - Client-side metadata storage creates forensic evidence
 - Authentication failures are distinguishable from successes
 - No support for multiple concurrent secret sessions
 
-The new OPAQUE integration must provide seamless voice activation while maintaining perfect deniability and zero-knowledge properties.
+The new OPAQUE integration must provide seamless voice activation while maintaining perfect deniability and zero-knowledge properties, with all legacy code removed.
 
 ## User Stories
 
@@ -26,6 +27,7 @@ As a frontend developer, I want to integrate OPAQUE authentication with the voic
 - As a user, I want the same voice experience as before so that OPAQUE upgrade is transparent to my workflow
 - As a security-conscious user, I want no evidence of secret functionality so that device inspection reveals nothing
 - As a user, I want multiple secret tags active simultaneously so that I can organize different types of private content
+- As a developer, I want clean codebase so that only OPAQUE authentication is used
 
 ## Technical Approach
 
@@ -70,7 +72,7 @@ As a frontend developer, I want to integrate OPAQUE authentication with the voic
    - OPAQUE-based tag creation wizard
    - Active session indicators
    - Manual session management controls
-   - Migration tools for existing V2 tags
+   - Clean interface without legacy authentication options
 
 2. **Recording Interface**
    - No visible changes to recording flow
@@ -92,7 +94,7 @@ As a frontend developer, I want to integrate OPAQUE authentication with the voic
 
 ## UX/UI Considerations
 
-- **Seamless Experience**: Users should not notice the OPAQUE upgrade
+- **Seamless Experience**: Users should experience clean, modern authentication
 - **Performance**: Authentication must complete within existing transcription time
 - **Visual Feedback**: Subtle indicators for active secret sessions
 - **Error Handling**: Clear feedback without revealing security information
@@ -107,10 +109,10 @@ As a frontend developer, I want to integrate OPAQUE authentication with the voic
    - [ ] Multiple secret sessions can be active simultaneously
 
 2. **User Interface**
-   - [ ] Secret tag creation uses OPAQUE registration flow
+   - [ ] Secret tag creation uses clean OPAQUE registration flow
    - [ ] Active session indicators show current secret tag status
    - [ ] Manual session management allows timeout extension and deactivation
-   - [ ] Migration wizard helps users upgrade from V2 to V3 tags
+   - [ ] No legacy authentication options visible in UI
 
 3. **Security Properties**
    - [ ] No client-side storage of secret tag metadata
@@ -127,7 +129,7 @@ As a frontend developer, I want to integrate OPAQUE authentication with the voic
 ## Dependencies
 
 - **PBI-1**: OPAQUE cryptographic foundation
-- **PBI-2**: Zero-knowledge server infrastructure
+- **PBI-2**: Clean OPAQUE server infrastructure
 - **Voice Processing**: Integration with existing speech-to-text service
 - **Entry Management**: Integration with journal entry creation/retrieval
 
@@ -135,7 +137,7 @@ As a frontend developer, I want to integrate OPAQUE authentication with the voic
 
 1. **Session Timeout**: What is the optimal timeout duration for secret sessions (5 minutes vs 10 minutes)?
 2. **Multiple Sessions**: How many concurrent secret sessions should be supported?
-3. **Migration UX**: What is the best user experience for migrating from V2 to V3 secret tags?
+3. **Clean Implementation**: How to ensure voice workflows work seamlessly with OPAQUE-only authentication?
 4. **Error Recovery**: How should the app handle OPAQUE authentication failures during poor network conditions?
 
 ## Related Tasks

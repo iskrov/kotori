@@ -15,6 +15,4 @@ This document lists all tasks associated with PBI 1.
 | 1-5 | [Implement AES-KW Key Wrapping](./1-5.md) | Done | Create key wrapping/unwrapping functions for vault data key protection |
 | 1-6 | [Create OPAQUE Client Integration](./1-6.md) | Done | Integrate OPAQUE library with frontend authentication flow |
 | 1-7 | [Create OPAQUE Server Integration](./1-7.md) | Done | Integrate OPAQUE library with backend authentication endpoints |
-| 1-8 | [Implement Cross-Platform Testing](./1-8.md) | Done | Create comprehensive test suite for cryptographic operations across platforms |
-| 1-9 | [Performance Optimization and Benchmarking](./1-9.md) | Proposed | Optimize Argon2id parameters and benchmark performance on mobile devices |
-| 1-10 | [Security Audit and Documentation](./1-10.md) | Proposed | Document security properties and prepare for external security audit | 
+| 1-8 | [Implement Cross-Platform Testing](./1-8.md) | Done | Create comprehensive test suite for cryptographic operations across platforms | 
