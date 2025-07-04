@@ -1,0 +1,374 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Backend Integration Tests
+  backend-integration:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_opaque_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov
+    
+    - name: Run backend integration tests
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_opaque_db
+        SECRET_KEY: test-secret-key-for-integration-tests
+        ALGORITHM: HS256
+        ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      run: |
+        cd backend
+        pytest tests/integration/ -v --cov=app --cov-report=xml --cov-report=html
+    
+    - name: Upload backend coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage.xml
+        flags: backend-integration
+        name: backend-integration-coverage
+
+  # Frontend Integration Tests
+  frontend-integration:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run frontend integration tests
+      run: |
+        cd frontend
+        npm run test:integration
+    
+    - name: Upload frontend coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: frontend-integration
+        name: frontend-integration-coverage
+
+  # End-to-End Integration Tests
+  e2e-integration:
+    runs-on: ubuntu-latest
+    needs: [backend-integration, frontend-integration]
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_opaque_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd backend && pip install -r requirements.txt
+        cd ../frontend && npm ci
+    
+    - name: Start backend server
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_opaque_db
+        SECRET_KEY: test-secret-key-for-integration-tests
+        ALGORITHM: HS256
+        ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      run: |
+        cd backend
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+        curl -f http://localhost:8000/health || exit 1
+    
+    - name: Run E2E integration tests
+      env:
+        BACKEND_URL: http://localhost:8000
+        TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_opaque_db
+      run: |
+        cd frontend
+        npm run test:e2e
+    
+    - name: Upload E2E test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-test-results
+        path: |
+          frontend/test-results/
+          frontend/coverage/
+    
+    - name: Upload E2E coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: e2e-integration
+        name: e2e-integration-coverage
+
+  # Cross-Platform Integration Tests
+  cross-platform-integration:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['16', '18', '20']
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Run cross-platform integration tests
+      run: |
+        cd frontend
+        npm run test:integration:cross-platform
+    
+    - name: Upload cross-platform results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: cross-platform-results-${{ matrix.os }}-node${{ matrix.node-version }}
+        path: frontend/test-results/
+
+  # Performance Integration Tests
+  performance-integration:
+    runs-on: ubuntu-latest
+    needs: [backend-integration, frontend-integration]
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_opaque_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd backend && pip install -r requirements.txt
+        cd ../frontend && npm ci
+    
+    - name: Start backend server
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_opaque_db
+        SECRET_KEY: test-secret-key-for-integration-tests
+      run: |
+        cd backend
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+    
+    - name: Run performance integration tests
+      env:
+        BACKEND_URL: http://localhost:8000
+        PERFORMANCE_TEST_MODE: true
+      run: |
+        cd frontend
+        npm run test:performance
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-results
+        path: |
+          frontend/performance-results/
+          frontend/lighthouse-results/
+
+  # Security Integration Tests
+  security-integration:
+    runs-on: ubuntu-latest
+    needs: [backend-integration, frontend-integration]
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_opaque_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd backend && pip install -r requirements.txt
+        cd ../frontend && npm ci
+    
+    - name: Start backend server
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_opaque_db
+        SECRET_KEY: test-secret-key-for-integration-tests
+      run: |
+        cd backend
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+    
+    - name: Run security integration tests
+      env:
+        BACKEND_URL: http://localhost:8000
+        SECURITY_TEST_MODE: true
+      run: |
+        cd frontend
+        npm run test:security
+    
+    - name: Upload security results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-results
+        path: frontend/security-results/
+
+  # Integration Test Summary
+  integration-summary:
+    runs-on: ubuntu-latest
+    needs: [backend-integration, frontend-integration, e2e-integration, cross-platform-integration, performance-integration, security-integration]
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Generate integration test summary
+      run: |
+        echo "# Integration Test Summary" > integration-summary.md
+        echo "" >> integration-summary.md
+        echo "## Test Results" >> integration-summary.md
+        echo "" >> integration-summary.md
+        echo "- Backend Integration: ${{ needs.backend-integration.result }}" >> integration-summary.md
+        echo "- Frontend Integration: ${{ needs.frontend-integration.result }}" >> integration-summary.md
+        echo "- E2E Integration: ${{ needs.e2e-integration.result }}" >> integration-summary.md
+        echo "- Cross-Platform Integration: ${{ needs.cross-platform-integration.result }}" >> integration-summary.md
+        echo "- Performance Integration: ${{ needs.performance-integration.result }}" >> integration-summary.md
+        echo "- Security Integration: ${{ needs.security-integration.result }}" >> integration-summary.md
+        echo "" >> integration-summary.md
+        echo "## Coverage Information" >> integration-summary.md
+        echo "" >> integration-summary.md
+        echo "Coverage reports have been uploaded to Codecov for detailed analysis." >> integration-summary.md
+        echo "" >> integration-summary.md
+        echo "## Artifacts" >> integration-summary.md
+        echo "" >> integration-summary.md
+        echo "- E2E test results and coverage reports" >> integration-summary.md
+        echo "- Cross-platform compatibility results" >> integration-summary.md
+        echo "- Performance benchmark results" >> integration-summary.md
+        echo "- Security test results" >> integration-summary.md
+        
+        cat integration-summary.md
+    
+    - name: Upload integration summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: integration-test-summary
+        path: integration-summary.md 
