@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  TouchableOpacity, 
-  Text, 
-  StyleSheet, 
-  ActivityIndicator, 
-  View 
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import logger from '../utils/logger';
 
@@ -34,8 +27,6 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
   const { 
     opaqueLogin, 
     opaqueRegister, 
-    login, 
-    register, 
     hasOpaqueSupport,
     isLoading: authLoading 
   } = useAuth();
@@ -69,30 +60,25 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
       return;
     }
 
+    if (!opaqueSupported) {
+      onError?.('OPAQUE authentication is not supported on this server');
+      return;
+    }
+
     try {
       setIsLoading(true);
       
-      if (opaqueSupported) {
-        logger.info(`Using OPAQUE ${mode} for enhanced security`);
-        
-        if (mode === 'login') {
-          await opaqueLogin(email, password);
-        } else {
-          await opaqueRegister(name!, email, password);
-        }
+      logger.info(`Using OPAQUE ${mode} for zero-knowledge authentication`);
+      
+      if (mode === 'login') {
+        await opaqueLogin(email, password);
       } else {
-        logger.info(`Using traditional ${mode} (OPAQUE not supported)`);
-        
-        if (mode === 'login') {
-          await login(email, password);
-        } else {
-          await register(name!, email, password);
-        }
+        await opaqueRegister(name!, email, password);
       }
       
       onSuccess?.();
     } catch (error: any) {
-      logger.error(`${mode} failed:`, error);
+      logger.error(`OPAQUE ${mode} failed:`, error);
       
       let errorMsg = `An error occurred during ${mode}. Please try again.`;
       
@@ -120,48 +106,41 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
     }
   };
 
-  const getButtonText = () => {
-    if (checkingSupport) return 'Checking Security...';
-    if (isLoading || authLoading) return mode === 'login' ? 'Signing In...' : 'Creating Account...';
-    
-    const authType = opaqueSupported ? 'Zero-Knowledge' : 'Standard';
-    return mode === 'login' 
-      ? `Sign In (${authType})` 
-      : `Create Account (${authType})`;
-  };
+  const isButtonDisabled = disabled || authLoading || isLoading || checkingSupport || !opaqueSupported;
 
-  const getIcon = () => {
-    if (checkingSupport || isLoading || authLoading) {
-      return <ActivityIndicator color="#fff" size="small" />;
-    }
-    
+  if (checkingSupport) {
     return (
-      <Ionicons 
-        name={opaqueSupported ? 'shield-checkmark' : 'log-in'} 
-        size={20} 
-        color="#fff" 
-      />
+      <View style={[styles.button, styles.checkingButton, style]}>
+        <ActivityIndicator size="small" color="#FFFFFF" />
+        <Text style={styles.buttonText}>Checking OPAQUE Support...</Text>
+      </View>
     );
-  };
+  }
+
+  if (!opaqueSupported) {
+    return (
+      <View style={[styles.button, styles.disabledButton, style]}>
+        <Text style={styles.buttonText}>OPAQUE Not Supported</Text>
+      </View>
+    );
+  }
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.button, 
-        opaqueSupported ? styles.opaqueButton : styles.standardButton,
-        disabled && styles.disabledButton,
+        styles.button,
+        isButtonDisabled ? styles.disabledButton : styles.enabledButton,
         style
       ]}
       onPress={handleAuth}
-      disabled={disabled || isLoading || authLoading || checkingSupport}
+      disabled={isButtonDisabled}
     >
-      <View style={styles.buttonContent}>
-        {getIcon()}
-        <Text style={styles.buttonText}>{getButtonText()}</Text>
-      </View>
-      
-      {opaqueSupported && !checkingSupport && (
-        <Text style={styles.securityBadge}>Enhanced Security</Text>
+      {isLoading || authLoading ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <Text style={styles.buttonText}>
+          {mode === 'login' ? 'OPAQUE Login' : 'OPAQUE Register'}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -169,51 +148,28 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 56,
-  },
-  opaqueButton: {
-    backgroundColor: '#2E7D32', // Green for enhanced security
-    shadowColor: '#2E7D32',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  standardButton: {
-    backgroundColor: '#1976D2', // Blue for standard auth
-    shadowColor: '#1976D2',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    minHeight: 48,
+  },
+  enabledButton: {
+    backgroundColor: '#007AFF',
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
+  checkingButton: {
+    backgroundColor: '#FFA500',
   },
   buttonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginLeft: 8,
-  },
-  securityBadge: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
-    opacity: 0.9,
   },
 });
 
