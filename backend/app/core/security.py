@@ -2,40 +2,30 @@ from datetime import datetime, UTC
 from datetime import timedelta
 from typing import Any
 
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi import status
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError
 from jose import jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..db.session import get_db
-from ..schemas.token import TokenPayload
 
-# OAuth2 scheme for token authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
-# Password hashing context
+# Password hashing context for user account management
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash"""
+    """Verify a password against a hash - for user account management only"""
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """Generate a password hash"""
+    """Generate a password hash - for user account management only"""
     return pwd_context.hash(password)
 
 
+# OPAQUE-compatible token creation for session management
 def create_access_token(
     subject: str | Any, expires_delta: timedelta | None = None
 ) -> str:
-    """Create a JWT access token"""
+    """Create a JWT access token for OPAQUE session compatibility"""
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
