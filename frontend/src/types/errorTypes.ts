@@ -67,6 +67,7 @@ export enum ErrorType {
   // Session errors
   SESSION_NOT_FOUND = 'session_not_found',
   SESSION_INVALID_STATE = 'session_invalid_state',
+  SESSION_EXPIRED = 'session_expired',
   SESSION_EXTENSION_FAILED = 'session_extension_failed',
   SESSION_DEACTIVATION_FAILED = 'session_deactivation_failed',
   SESSION_RECOVERY_FAILED = 'session_recovery_failed',

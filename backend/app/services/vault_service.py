@@ -7,7 +7,7 @@ All content is stored encrypted using AES-GCM with keys derived from OPAQUE auth
 
 import uuid
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, desc, asc
@@ -433,7 +433,7 @@ class VaultService:
             return VaultBlobDeleteResponse(
                 object_id=object_id,
                 vault_id=vault_id,
-                deleted_at=datetime.utcnow()
+                deleted_at=datetime.now(UTC)
             )
             
         except VaultAccessError:

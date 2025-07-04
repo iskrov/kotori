@@ -7,7 +7,7 @@ Comprehensive test suite for audit service, models, and API endpoints.
 import pytest
 import json
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 
@@ -95,7 +95,7 @@ class TestSecurityAuditService:
         log_entry.event_category = "test"
         log_entry.severity = "info"
         log_entry.user_id_hash = "user_hash"
-        log_entry.timestamp = datetime.utcnow()
+        log_entry.timestamp = datetime.now(UTC)
         log_entry.event_message = "test message"
         log_entry.success = True
         
@@ -417,7 +417,7 @@ class TestAuditModels:
             severity="info",
             event_message="Test message",
             user_id_hash="user_hash",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             success=True
         )
         
@@ -434,8 +434,8 @@ class TestAuditModels:
             metric_name="auth_attempts",
             metric_type="counter",
             time_window="1h",
-            window_start=datetime.utcnow(),
-            window_end=datetime.utcnow(),
+            window_start=datetime.now(UTC),
+            window_end=datetime.now(UTC),
             value=100
         )
         
@@ -452,8 +452,8 @@ class TestAuditModels:
             title="Brute Force Attack",
             description="Attack detected",
             detection_rule="failure_threshold",
-            first_seen=datetime.utcnow(),
-            last_seen=datetime.utcnow()
+            first_seen=datetime.now(UTC),
+            last_seen=datetime.now(UTC)
         )
         
         assert alert.alert_type == "brute_force"
@@ -516,7 +516,7 @@ class TestAuditIntegration:
         log_entry.event_category = "auth"
         log_entry.severity = "info"
         log_entry.user_id_hash = "user_hash"
-        log_entry.timestamp = datetime.utcnow()
+        log_entry.timestamp = datetime.now(UTC)
         log_entry.event_message = "test message"
         log_entry.success = True
         
@@ -551,7 +551,7 @@ class TestAuditPerformance:
         log_entry.event_category = "auth"
         log_entry.severity = "info"
         log_entry.user_id_hash = "user_hash"
-        log_entry.timestamp = datetime.utcnow()
+        log_entry.timestamp = datetime.now(UTC)
         log_entry.event_message = "test message"
         log_entry.success = True
         

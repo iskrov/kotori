@@ -8,7 +8,7 @@ Vibes is a voice-controlled journaling application that allows users to record v
 - **Journal Management**: Create, view, edit, and delete journal entries
 - **Tag System**: Organize entries with customizable tags
 - **Calendar View**: Browse entries by date
-- **Authentication**: Secure login with email/password or Google Sign-In
+- **🔐 OPAQUE Authentication**: Zero-knowledge authentication protocol - server never sees passwords
 - **Reminder System**: Set reminders to maintain journaling habits
 - **🔒 Zero-Knowledge Privacy**: Multi-level secret tags with end-to-end encryption where only you can access your private data
 
@@ -108,6 +108,49 @@ await api.post('/entries', {
 
 The zero-knowledge phrase-based secret tags architecture ensures that even if the server is compromised, user data remains completely secure and private with granular access control through voice-activated phrases.
 
+## 🔐 OPAQUE Zero-Knowledge Authentication
+
+Vibes implements the **OPAQUE protocol** for truly secure authentication where the server never sees user passwords.
+
+### Key OPAQUE Features:
+
+**✅ Password-Blind Authentication**
+- Server never receives or stores actual passwords
+- Uses cryptographic protocol to verify identity without password exposure
+- Resistant to server compromise and database breaches
+
+**✅ Enhanced Security Model**
+- Each secret tag protected by unique OPAQUE authentication
+- Voice phrase detection triggers OPAQUE authentication flow
+- Hardware-backed key storage for OPAQUE credentials
+
+**✅ Zero-Knowledge Guarantee**
+- Even with full server access, passwords cannot be recovered
+- No rainbow table or brute force attacks possible
+- Forward secrecy protects past sessions
+
+### Technical Implementation:
+
+```typescript
+// OPAQUE Registration Flow
+const registrationRequest = await opaqueClient.createRegistrationRequest(phrase);
+const registrationResponse = await api.post('/auth/opaque/register', {
+  request: registrationRequest,
+  tag_name: tagName
+});
+const record = await opaqueClient.finishRegistration(phrase, registrationResponse);
+
+// OPAQUE Authentication Flow  
+const authRequest = await opaqueClient.createAuthenticationRequest(phrase);
+const authResponse = await api.post('/auth/opaque/authenticate', {
+  request: authRequest,
+  tag_id: tagId
+});
+const sessionKey = await opaqueClient.finishAuthentication(phrase, authResponse);
+```
+
+The OPAQUE protocol ensures that even system administrators cannot access user data, providing military-grade security for personal journaling.
+
 ## Tech Stack
 
 ### Frontend (React Native + Expo)
@@ -124,7 +167,8 @@ The zero-knowledge phrase-based secret tags architecture ensures that even if th
 - PostgreSQL database
 - SQLAlchemy ORM
 - Alembic for migrations
-- JWT for authentication
+- **OPAQUE Protocol**: Zero-knowledge authentication system
+- JWT for session management
 - **Zero-Knowledge Architecture**: Server cannot decrypt user data
 - Google Cloud Speech-to-Text API
 
@@ -143,7 +187,7 @@ This project utilizes scripts to simplify the setup and running process.
 - Git
 - Node.js (v16+)
 - npm (usually comes with Node.js)
-- Python 3.10+ (Ensure `python3` points to a compatible version)
+- Python 3.11+ (Required for OPAQUE authentication system. Ensure `python3` points to a compatible version)
 - PostgreSQL Client (`psql` command available)
 - PostgreSQL Server (Installation instructions vary by OS)
 - `sudo` privileges (for installing system dependencies and managing the PostgreSQL service via scripts)

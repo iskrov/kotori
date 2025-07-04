@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from datetime import timedelta
 from typing import Any
 
@@ -37,9 +37,9 @@ def create_access_token(
 ) -> str:
     """Create a JWT access token"""
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
+        expire = datetime.now(UTC) + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
@@ -55,10 +55,10 @@ def create_refresh_token(
 ) -> str:
     """Create a JWT refresh token with a longer expiry."""
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
         # Default refresh token expiry (e.g., 7 days)
-        expire = datetime.utcnow() + timedelta(days=7)
+        expire = datetime.now(UTC) + timedelta(days=7)
 
     to_encode = {
         "exp": expire,

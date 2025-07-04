@@ -11,7 +11,7 @@ import uuid
 import base64
 import secrets
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Tuple, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -304,8 +304,8 @@ class EnhancedOpaqueService:
                         opaque_envelope=opaque_envelope,
                         tag_name=tag_name,
                         color_code=color_code,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC)
                     )
                     
                     # Create wrapped key record
@@ -316,8 +316,8 @@ class EnhancedOpaqueService:
                         wrapped_key=wrapped_data_key,
                         key_purpose="vault_data",
                         key_version=1,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC)
                     )
                     
                     # Save to database atomically
@@ -574,7 +574,7 @@ class EnhancedOpaqueService:
                     color_code = self._validate_color_code(color_code)
                     secret_tag.color_code = color_code
                 
-                secret_tag.updated_at = datetime.utcnow()
+                secret_tag.updated_at = datetime.now(UTC)
                 
                 self.db.commit()
                 
@@ -797,7 +797,7 @@ class EnhancedOpaqueService:
                 
                 # Create authentication session
                 session_id = self._generate_session_id()
-                expires_at = datetime.utcnow() + timedelta(minutes=self.SESSION_TIMEOUT_MINUTES)
+                expires_at = datetime.now(UTC) + timedelta(minutes=self.SESSION_TIMEOUT_MINUTES)
                 
                 # Decode client message
                 try:
@@ -857,9 +857,9 @@ class EnhancedOpaqueService:
                     tag_id=tag_id_bytes,
                     session_state='initialized',
                     session_data=json.dumps(session_data).encode(),
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
                     expires_at=expires_at,
-                    last_activity=datetime.utcnow()
+                    last_activity=datetime.now(UTC)
                 )
                 
                 self.db.add(opaque_session)
@@ -969,7 +969,7 @@ class EnhancedOpaqueService:
             
             with self._audit_context(correlation_id=correlation_id):
                 # Check session expiration
-                if datetime.utcnow() > session.expires_at:
+                if datetime.now(UTC) > session.expires_at:
                     # Clean up expired session
                     self.db.delete(session)
                     self.db.commit()
@@ -1077,12 +1077,12 @@ class EnhancedOpaqueService:
                         vault_id=vault_id,
                         expires_hours=self.TOKEN_LIFETIME_HOURS
                     )
-                    token_expires_at = datetime.utcnow() + timedelta(hours=self.TOKEN_LIFETIME_HOURS)
+                    token_expires_at = datetime.now(UTC) + timedelta(hours=self.TOKEN_LIFETIME_HOURS)
                 except Exception as e:
                     logger.warning(f"Failed to create enhanced session token: {e}")
                     # Fallback to simple token
                     session_token = self._generate_session_token(session.user_id, session.tag_id.hex())
-                    token_expires_at = datetime.utcnow() + timedelta(hours=self.TOKEN_LIFETIME_HOURS)
+                    token_expires_at = datetime.now(UTC) + timedelta(hours=self.TOKEN_LIFETIME_HOURS)
                 
                 # Clean up authentication session
                 self.db.delete(session)
@@ -1202,7 +1202,7 @@ class EnhancedOpaqueService:
             Number of sessions cleaned up
         """
         try:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(UTC)
             total_cleaned = 0
             
             while True:
@@ -1249,7 +1249,7 @@ class EnhancedOpaqueService:
             health_status = {
                 "service": "opaque_enhanced",
                 "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "dependencies": {}
             }
             
@@ -1290,7 +1290,7 @@ class EnhancedOpaqueService:
             # Get service statistics
             try:
                 active_sessions = self.db.query(OpaqueSession).filter(
-                    OpaqueSession.expires_at > datetime.utcnow()
+                    OpaqueSession.expires_at > datetime.now(UTC)
                 ).count()
                 
                 total_tags = self.db.query(SecretTag).count()
@@ -1310,7 +1310,7 @@ class EnhancedOpaqueService:
                 "service": "opaque_enhanced",
                 "status": "unhealthy",
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
 
     def _generate_session_id(self) -> str:

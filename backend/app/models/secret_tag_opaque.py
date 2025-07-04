@@ -5,7 +5,7 @@ OPAQUE Database Models for Zero-Knowledge Authentication
 from sqlalchemy import Column, Integer, String, LargeBinary, ForeignKey, DateTime, Index, Text, Boolean
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from .base import Base, TimestampMixin
 
@@ -85,9 +85,9 @@ class OpaqueSession(Base):
     tag_id = Column(LargeBinary(16), nullable=True, index=True)
     session_state = Column(String(20), nullable=False, default='initialized')
     session_data = Column(LargeBinary, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     expires_at = Column(DateTime, nullable=False)
-    last_activity = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_activity = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
     __table_args__ = (
         Index('idx_opaque_sessions_user_id', 'user_id'),
@@ -124,7 +124,7 @@ class SecurityAuditLog(Base):
     is_sensitive = Column(Boolean, nullable=False, default=False)  # Flag for sensitive events
     
     # Timing and metadata
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), index=True)
     processing_time_ms = Column(Integer, nullable=True)  # Request processing time
     
     # Status and outcome
@@ -164,7 +164,7 @@ class SecurityMetrics(Base):
     tags = Column(Text, nullable=True)  # JSON with metric tags
     
     # Metadata
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     
     __table_args__ = (
         Index('idx_metrics_name_window', 'metric_name', 'window_start'),
@@ -193,8 +193,8 @@ class SecurityAlert(Base):
     related_events = Column(Text, nullable=True)  # JSON array of related audit log IDs
     
     # Timing
-    first_seen = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-    last_seen = Column(DateTime, nullable=False, default=datetime.utcnow)
+    first_seen = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), index=True)
+    last_seen = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     resolved_at = Column(DateTime, nullable=True)
     
     # Response

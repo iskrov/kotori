@@ -274,7 +274,7 @@ describe('Error Handling Utilities', () => {
       const mockOperation = jest.fn().mockRejectedValue(new Error('Async error'));
       
       await expect(
-        withAsyncErrorHandling(mockOperation, mockContext)
+        withAsyncErrorHandling(() => mockOperation(), mockContext)
       ).rejects.toThrow();
       
       expect(mockOperation).toHaveBeenCalled();
@@ -283,7 +283,7 @@ describe('Error Handling Utilities', () => {
     it('should return result when async operation succeeds', async () => {
       const mockOperation = jest.fn().mockResolvedValue('async success');
       
-      const result = await withAsyncErrorHandling(mockOperation, mockContext);
+      const result = await withAsyncErrorHandling(() => mockOperation(), mockContext);
       
       expect(result).toBe('async success');
       expect(mockOperation).toHaveBeenCalled();

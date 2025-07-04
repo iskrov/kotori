@@ -11,7 +11,7 @@ import json
 import secrets
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Any, List, Union
 import logging
 from contextlib import contextmanager
@@ -262,7 +262,7 @@ class SecurityAuditService:
                 event_data=event_data_json,
                 event_message=message[:500],  # Limit message length
                 is_sensitive=is_sensitive,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(UTC),
                 processing_time_ms=processing_time_ms,
                 success=success,
                 error_code=error_code
@@ -433,7 +433,7 @@ class SecurityAuditService:
             bool: True if brute force attack is detected
         """
         try:
-            cutoff_time = datetime.utcnow() - timedelta(minutes=time_window_minutes)
+            cutoff_time = datetime.now(UTC) - timedelta(minutes=time_window_minutes)
             user_id_hash = self._hash_identifier(user_id) if self.HASH_USER_IDS else user_id
             
             # Count authentication failures in time window
@@ -566,7 +566,7 @@ class SecurityAuditService:
             int: Number of logs deleted
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=retention_days)
             
             # Count logs to be deleted
             total_count = db.query(SecurityAuditLog).filter(

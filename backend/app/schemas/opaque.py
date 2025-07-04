@@ -7,7 +7,7 @@ including registration, authentication, and session management.
 
 from datetime import datetime
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import base64
 
 
@@ -52,7 +52,7 @@ class OpaqueRegistrationRequest(BaseModel):
         pattern=r"^#[0-9A-Fa-f]{6}$"
     )
     
-    @validator('opaque_envelope', 'verifier_kv', 'salt')
+    @field_validator('opaque_envelope', 'verifier_kv', 'salt')
     def validate_base64(cls, v):
         """Validate that fields are proper base64 encoded data."""
         try:
@@ -63,7 +63,7 @@ class OpaqueRegistrationRequest(BaseModel):
         except Exception:
             raise ValueError("Invalid base64 encoding")
     
-    @validator('verifier_kv')
+    @field_validator('verifier_kv')
     def validate_verifier_length(cls, v):
         """Validate that verifier is 32 bytes when decoded."""
         try:
@@ -74,7 +74,7 @@ class OpaqueRegistrationRequest(BaseModel):
         except Exception:
             raise ValueError("Invalid verifier format")
     
-    @validator('salt')
+    @field_validator('salt')
     def validate_salt_length(cls, v):
         """Validate that salt is 16 bytes when decoded."""
         try:
@@ -146,7 +146,7 @@ class OpaqueAuthInitRequest(BaseModel):
         min_length=1
     )
     
-    @validator('tag_id')
+    @field_validator('tag_id')
     def validate_tag_id_hex(cls, v):
         """Validate that tag_id is valid hex encoding."""
         try:
@@ -157,7 +157,7 @@ class OpaqueAuthInitRequest(BaseModel):
         except ValueError:
             raise ValueError("Invalid hex encoding for tag_id")
     
-    @validator('client_message')
+    @field_validator('client_message')
     def validate_client_message_base64(cls, v):
         """Validate that client_message is proper base64."""
         try:
@@ -211,7 +211,7 @@ class OpaqueAuthFinalizeRequest(BaseModel):
         min_length=1
     )
     
-    @validator('client_finalize_message')
+    @field_validator('client_finalize_message')
     def validate_finalize_message_base64(cls, v):
         """Validate that finalize message is proper base64."""
         try:

@@ -8,7 +8,7 @@ token generation, validation, lifecycle management, and security features.
 import pytest
 import secrets
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, patch, MagicMock
 from sqlalchemy.orm import Session
 
@@ -87,7 +87,7 @@ class TestSessionCreation:
         
         # Mock the session object that would be created
         mock_session = Mock(spec=OpaqueSession)
-        mock_session.expires_at = datetime.utcnow() + timedelta(days=7)
+        mock_session.expires_at = datetime.now(UTC) + timedelta(days=7)
         mock_db.refresh.side_effect = lambda obj: setattr(obj, 'expires_at', mock_session.expires_at)
         
         token, session = service.create_session(
@@ -142,8 +142,8 @@ class TestSessionValidation:
         mock_session = Mock(spec=OpaqueSession)
         mock_session.user_id = "test_user"
         mock_session.session_state = "active"
-        mock_session.expires_at = datetime.utcnow() + timedelta(hours=1)
-        mock_session.last_activity = datetime.utcnow() - timedelta(minutes=5)
+        mock_session.expires_at = datetime.now(UTC) + timedelta(hours=1)
+        mock_session.last_activity = datetime.now(UTC) - timedelta(minutes=5)
         
         # Mock database query
         mock_query = Mock()
@@ -172,7 +172,7 @@ class TestSessionValidation:
         mock_session = Mock(spec=OpaqueSession)
         mock_session.user_id = "test_user"
         mock_session.session_state = "active"
-        mock_session.expires_at = datetime.utcnow() - timedelta(hours=1)  # Expired
+        mock_session.expires_at = datetime.now(UTC) - timedelta(hours=1)  # Expired
         
         # Mock database query
         mock_query = Mock()
@@ -217,7 +217,7 @@ class TestSessionLifecycle:
         # Mock session
         mock_session = Mock(spec=OpaqueSession)
         mock_session.user_id = "test_user"
-        original_expires = datetime.utcnow() + timedelta(hours=1)
+        original_expires = datetime.now(UTC) + timedelta(hours=1)
         mock_session.expires_at = original_expires
         
         mock_db.commit = Mock()
@@ -279,7 +279,7 @@ class TestSessionSecurity:
         # Mock many active sessions
         mock_sessions = [Mock(spec=OpaqueSession) for _ in range(6)]  # Over limit
         for i, session in enumerate(mock_sessions):
-            session.last_activity = datetime.utcnow() - timedelta(minutes=i)
+            session.last_activity = datetime.now(UTC) - timedelta(minutes=i)
         
         with patch.object(service, 'get_user_sessions', return_value=mock_sessions):
             with patch.object(service, '_invalidate_session') as mock_invalidate:

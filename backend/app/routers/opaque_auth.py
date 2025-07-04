@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta, UTC
 import logging
 import base64
 from sqlalchemy.orm import Session
@@ -132,7 +132,8 @@ async def get_or_create_user(user_id: str) -> UserSchema:
     try:
         # In a real implementation, this would interact with the database
         # For now, we'll create a simple user object
-        now = datetime.utcnow()
+        from datetime import UTC
+        now = datetime.now(UTC)
         return UserSchema(
             id=hash(user_id) % 1000000,  # Simple ID generation
             email=user_id,
@@ -402,11 +403,16 @@ async def finish_opaque_login(
             
             # Create access token
             access_token = create_access_token(
-                data={"sub": str(user.id), "email": user.email}
+                subject=str(user.id)
             )
             
             # Create session token
-            session_token = session_service.create_session(user_id)
+            session_token, session = session_service.create_session(
+                db=db,
+                user_id=user_id,
+                user_agent=http_request.headers.get("user-agent", ""),
+                ip_address=http_request.client.host if http_request.client else ""
+            )
             
             logger.info(f"OPAQUE login completed for user: {user_id}")
             

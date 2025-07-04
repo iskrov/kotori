@@ -1,172 +1,181 @@
-# PBI-4: Security Hardening and Traffic Analysis Resistance
+# PBI-4: OPAQUE System Stabilization and Issue Resolution
 
 [View in Backlog](../backlog.md#user-content-PBI-4)
 
 ## Overview
 
-Implement advanced security hardening features including traffic analysis resistance, duress protection, memory security, and cover traffic generation. This PBI ensures the OPAQUE system provides maximum security against sophisticated attacks and coercion scenarios.
+This PBI addresses the systematic resolution of all identified issues in the OPAQUE zero-knowledge security system to ensure production readiness, complete test coverage, and elimination of critical bugs. The work focuses on stabilizing the existing implementation rather than adding new features.
 
 ## Problem Statement
 
-Even with OPAQUE zero-knowledge authentication, the system remains vulnerable to advanced attacks:
-- Traffic analysis can reveal when secret authentication attempts occur
-- Memory attacks could recover sensitive keys from RAM
-- Timing attacks might leak information about authentication success/failure
-- Coercion scenarios require panic modes and plausible deniability features
-- Side-channel attacks could compromise cryptographic operations
+After comprehensive testing of the OPAQUE security system (PBIs 1-3), several categories of issues have been identified that prevent the system from being production-ready:
 
-This PBI implements comprehensive security hardening to protect against these advanced threat vectors.
+1. **Backend Legacy Dependencies**: Test files still reference deleted models causing test failures
+2. **Frontend Test Environment**: React Native OPAQUE module loading issues preventing comprehensive testing
+3. **Schema Validation**: Pydantic V1 deprecation warnings and validation errors
+4. **Error Handling**: Inconsistent error categorization affecting user experience
+5. **DateTime Usage**: Deprecated datetime functions causing warnings throughout the system
+6. **Configuration Issues**: Jest and module resolution configuration problems
+
+These issues, while not affecting core security functionality, prevent reliable testing, deployment, and maintenance of the system.
 
 ## User Stories
 
-**Primary User Story:**
-As a security engineer, I want to implement advanced security hardening features so that the system resists traffic analysis and provides duress protection.
+### Primary User Story
+**As a developer**, I want to systematically resolve all identified issues in the OPAQUE security system so that it is production-ready with full test coverage and no critical bugs.
 
-**Supporting User Stories:**
-- As a journalist, I want panic mode functionality so that I can quickly destroy all secret data under duress
-- As a security researcher, I want traffic analysis resistance so that network monitoring cannot reveal my secret usage patterns
-- As a privacy advocate, I want memory security so that forensic analysis cannot recover my encryption keys
-- As a user in hostile environments, I want fake vault support so that I can provide decoy data under coercion
+### Supporting User Stories
+- **As a QA engineer**, I want all tests to pass without errors so that I can validate system functionality reliably
+- **As a DevOps engineer**, I want the system to run without deprecation warnings so that deployments are clean and maintainable
+- **As a frontend developer**, I want the React Native OPAQUE integration to be properly testable so that I can validate client-side security features
+- **As a backend developer**, I want updated schemas and clean dependencies so that the API validation works correctly
+- **As a security engineer**, I want consistent error handling so that security information is never leaked to users
 
 ## Technical Approach
 
-### Traffic Analysis Resistance
+### Phase 1: Critical Backend Fixes (Priority 1)
+1. **Legacy Dependency Cleanup**
+   - Update all test files to use new OPAQUE models
+   - Remove references to deleted `secret_tag` modules
+   - Fix import statements and dependencies
 
-1. **Cover Traffic Generation**
-   ```typescript
-   class CoverTrafficManager {
-     private generateDummyAuthentications() {
-       // Periodic dummy OPAQUE authentication attempts
-       // Random timing patterns to obscure real usage
-       // Uniform request sizes and response patterns
-     }
-     
-     private batchOperations() {
-       // Batch multiple operations together
-       // Add padding to normalize request sizes
-       // Implement request queueing and timing
-     }
-   }
-   ```
+2. **Schema Migration to Pydantic V2**
+   - Update all `@validator` decorators to `@field_validator`
+   - Fix validation logic and error handling
+   - Update schema configuration settings
 
-2. **Request Obfuscation**
-   - Uniform timing for all authentication requests
-   - Constant-size request/response padding
-   - Decoy requests for failed authentications
-   - Background noise generation
+3. **DateTime Modernization**
+   - Replace all `datetime.utcnow()` with `datetime.now(datetime.UTC)`
+   - Update timezone handling throughout the system
+   - Fix deprecation warnings
 
-### Memory Security
+### Phase 2: Frontend Test Environment (Priority 1)
+1. **React Native Module Configuration**
+   - Configure Jest to properly handle `react-native-opaque` module
+   - Set up appropriate mocking for native dependencies
+   - Fix module resolution and path mapping
 
-1. **Secure Key Management**
-   ```typescript
-   class SecureMemoryManager {
-     private sensitiveData = new Map<string, SecureBuffer>();
-     
-     allocateSecure(size: number): SecureBuffer {
-       // Allocate memory with secure erasure
-       // Prevent memory dumps and swapping
-       // Automatic cleanup on timeout
-     }
-     
-     clearAll(): void {
-       // Zero-out all sensitive memory
-       // Force garbage collection
-       // Verify memory has been cleared
-     }
-   }
-   ```
+2. **Error Handling Fixes**
+   - Update error categorization logic to properly map error types
+   - Fix error category constants and mappings
+   - Ensure consistent error handling across components
 
-2. **Timing Attack Protection**
-   - Constant-time cryptographic operations
-   - Random delays for authentication responses
-   - Uniform processing time regardless of success/failure
+3. **Jest Configuration Optimization**
+   - Fix module name mapping warnings
+   - Update Jest configuration for React Native compatibility
+   - Optimize test performance and reliability
 
-### Duress Protection
+### Phase 3: Integration and Validation (Priority 2)
+1. **End-to-End Test Execution**
+   - Run complete E2E test suite without module loading issues
+   - Validate all OPAQUE workflow scenarios
+   - Ensure cross-platform compatibility
 
-1. **Panic Mode**
-   ```typescript
-   class PanicModeManager {
-     async activatePanicMode(): Promise<void> {
-       // Immediately clear all session keys
-       // Delete OPAQUE client state
-       // Clear application cache and storage
-       // Optional: Delete secret tag registrations
-     }
-     
-     detectDuressPatterns(): boolean {
-       // Unusual access patterns
-       // Biometric anomalies (future)
-       // Time-based triggers
-     }
-   }
-   ```
+2. **Performance Validation**
+   - Verify authentication timing targets (<500ms)
+   - Validate voice processing performance (<2s)
+   - Ensure memory usage stays within limits
 
-2. **Fake Vault Support**
-   - Register decoy secret tags with benign content
-   - Plausible deniability through fake data
-   - Multiple duress phrases for different scenarios
-
-### Side-Channel Resistance
-
-1. **Cryptographic Hardening**
-   - Constant-time implementations for all crypto operations
-   - Protection against power analysis attacks
-   - Resistance to cache timing attacks
-
-2. **Environmental Security**
-   - Screen recording detection and prevention
-   - Keylogger resistance for sensitive operations
-   - Anti-debugging and tamper detection
+3. **Security Validation**
+   - Confirm zero-knowledge properties maintained
+   - Validate error messages don't leak sensitive information
+   - Test session isolation and access controls
 
 ## UX/UI Considerations
 
-- **Transparent Operation**: Security features should be invisible to normal users
-- **Emergency Access**: Panic mode must be quickly accessible in crisis situations
-- **Configuration**: Advanced users should be able to configure security parameters
-- **Performance**: Security features must not noticeably impact app performance
-- **Accessibility**: Security features must work with accessibility tools
+- **Error Messages**: Ensure all error messages are user-friendly and don't expose technical details
+- **Performance**: Maintain responsive user experience during authentication flows
+- **Reliability**: Ensure consistent behavior across different platforms and scenarios
+- **Developer Experience**: Provide clear error messages and debugging information for developers
 
 ## Acceptance Criteria
 
-1. **Traffic Analysis Resistance**
-   - [ ] Cover traffic generates indistinguishable dummy authentication requests
-   - [ ] Request timing is uniform regardless of authentication success/failure
-   - [ ] Network monitoring cannot distinguish real from dummy operations
-   - [ ] Batch operations obscure individual authentication patterns
+### Must Have (Priority 1)
+1. **Backend Test Success**
+   - All backend tests pass without errors
+   - No import or dependency errors
+   - All deprecation warnings resolved
 
-2. **Memory Security**
-   - [ ] All sensitive keys automatically cleared within 1 second of session end
-   - [ ] Memory leak detection passes for all cryptographic operations
-   - [ ] Forensic memory analysis cannot recover encryption keys
-   - [ ] Secure memory allocation prevents key recovery from memory dumps
+2. **Frontend Test Environment**
+   - All frontend tests can run without module loading issues
+   - React Native OPAQUE integration properly testable
+   - Jest configuration warnings resolved
 
-3. **Duress Protection**
-   - [ ] Panic mode destroys all secret data within 2 seconds
-   - [ ] Fake vault support provides plausible deniability
-   - [ ] Multiple duress scenarios supported with different responses
-   - [ ] Emergency phrase detection works reliably under stress
+3. **Error Handling Consistency**
+   - Error categorization works correctly for all error types
+   - No security information leaked in error messages
+   - Consistent error handling across all components
 
-4. **Side-Channel Resistance**
-   - [ ] Timing attack resistance verified through statistical analysis
-   - [ ] Constant-time operations implemented for all crypto functions
-   - [ ] Power analysis resistance tested on mobile devices
-   - [ ] Cache timing attacks mitigated through implementation review
+4. **Schema Validation**
+   - All API endpoints accept and validate requests correctly
+   - No Pydantic deprecation warnings
+   - Proper error responses for invalid requests
+
+### Should Have (Priority 2)
+1. **Complete E2E Test Execution**
+   - All E2E tests pass successfully
+   - Performance targets met in test environment
+   - Cross-platform compatibility validated
+
+2. **Documentation Updates**
+   - Updated API documentation reflecting current schemas
+   - Developer setup guides updated for new dependencies
+   - Troubleshooting guides for common issues
+
+3. **Performance Optimization**
+   - Authentication flows meet timing targets consistently
+   - Memory usage optimized and monitored
+   - Database query performance validated
+
+### Could Have (Priority 3)
+1. **Enhanced Error Reporting**
+   - Structured error logging for debugging
+   - Error correlation IDs for support
+   - Automated error reporting and alerting
+
+2. **Test Coverage Improvements**
+   - Additional edge case testing
+   - Performance regression testing
+   - Security penetration testing scenarios
 
 ## Dependencies
 
-- **PBI-1**: OPAQUE cryptographic foundation
-- **PBI-2**: Zero-knowledge server infrastructure  
-- **PBI-3**: OPAQUE client integration
-- **Security Testing**: Specialized tools for side-channel analysis
-- **Performance Monitoring**: Tools to measure security feature impact
+### Internal Dependencies
+- **PBI-1**: OPAQUE Cryptographic Foundation (foundation for all security features)
+- **PBI-2**: Zero-Knowledge Server Infrastructure (backend implementation)
+- **PBI-3**: OPAQUE Client Integration (frontend implementation)
+
+### External Dependencies
+- **React Native OPAQUE Library**: Proper integration and testing setup
+- **Pydantic V2**: Schema validation framework migration
+- **Jest/React Native Testing**: Test environment configuration
+- **Database Schema**: Ensure compatibility with updated models
 
 ## Open Questions
 
-1. **Cover Traffic Frequency**: How often should dummy authentication requests be generated to provide effective cover?
-2. **Panic Mode Scope**: Should panic mode delete only session data or also registered secret tags on the server?
-3. **Performance Impact**: What is the acceptable performance overhead for security hardening features?
-4. **Fake Vault Content**: What type of decoy content provides the most plausible deniability?
+1. **Migration Strategy**: Should we create database migrations for any schema changes, or are they backward compatible?
+2. **Performance Impact**: Will the Pydantic V2 migration affect API response times?
+3. **Testing Strategy**: Should we run tests in CI/CD pipeline during the fix process, or wait until all fixes are complete?
+4. **Rollback Plan**: What's the rollback strategy if any fixes introduce new issues?
+5. **Version Compatibility**: Are there any version compatibility issues with React Native OPAQUE that need addressing?
 
 ## Related Tasks
 
-[View Task List](./tasks.md) 
+This PBI will be broken down into specific tasks following the three-phase approach:
+
+**Phase 1 Tasks (Critical Backend Fixes)**
+- Fix legacy model dependencies in test files
+- Migrate Pydantic schemas to V2
+- Update datetime usage throughout backend
+
+**Phase 2 Tasks (Frontend Test Environment)**
+- Configure React Native OPAQUE testing
+- Fix error categorization logic
+- Optimize Jest configuration
+
+**Phase 3 Tasks (Integration and Validation)**
+- Execute complete E2E test suite
+- Validate performance and security requirements
+- Update documentation and deployment guides
+
+Each task will include specific acceptance criteria, test plans, and validation steps to ensure systematic resolution of all identified issues. 

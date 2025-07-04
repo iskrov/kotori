@@ -99,7 +99,7 @@ def test_journal_service(db: Session, test_user):
     # Test update entry
     updated_data = {"title": "Updated Title", "content": "Updated content"}
     updated_entry = journal_service.update(
-        db, db_obj=entry, obj_in=updated_data
+        db, db_obj=retrieved_entry, obj_in=updated_data
     )
     assert updated_entry.title == "Updated Title"
     assert updated_entry.content == "Updated content"
@@ -121,7 +121,7 @@ def test_reminder_service(db: Session, test_user):
     reminder_data = ReminderCreate(
         title="Service Test Reminder",
         message="Testing reminder service",
-        time=time(9, 0, 0),
+        time=datetime.combine(date.today(), time(9, 0, 0)),
         frequency="daily",
         is_active=True,
     )
@@ -143,7 +143,7 @@ def test_reminder_service(db: Session, test_user):
 
     # Test update reminder
     updated_data = {"title": "Updated Reminder", "is_active": False}
-    updated_reminder = reminder_service.update(db, db_obj=reminder, obj_in=updated_data)
+    updated_reminder = reminder_service.update(db, db_obj=retrieved_reminder, obj_in=updated_data)
     assert updated_reminder.title == "Updated Reminder"
     assert updated_reminder.is_active is False
 

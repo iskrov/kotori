@@ -4,7 +4,7 @@ Session Management Schemas
 Pydantic models for OPAQUE session management API requests and responses.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
@@ -23,14 +23,15 @@ class SessionCreateRequest(BaseModel):
     tag_id: Optional[str] = Field(None, description="Secret tag ID for vault access")
     session_data: Optional[Dict[str, Any]] = Field(None, description="Additional session metadata")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "user_id": "user@example.com",
                 "tag_id": "tag123",
                 "session_data": {"client_type": "web", "version": "1.0"}
             }
         }
+    )
 
 
 class SessionCreateResponse(BaseModel):
@@ -40,8 +41,8 @@ class SessionCreateResponse(BaseModel):
     expires_at: Optional[datetime] = Field(None, description="Session expiration time")
     message: str = Field(..., description="Status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "session_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -49,24 +50,26 @@ class SessionCreateResponse(BaseModel):
                 "message": "Session created successfully"
             }
         }
+    )
 
 
 class SessionValidateRequest(BaseModel):
     """Request to validate a session"""
     session_token: str = Field(..., description="Session token to validate")
     
-    @validator('session_token')
+    @field_validator('session_token')
     def validate_session_token(cls, v):
         if not v or len(v.strip()) == 0:
             raise ValueError('Session token cannot be empty')
         return v.strip()
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "session_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
             }
         }
+    )
 
 
 class SessionValidateResponse(BaseModel):
@@ -77,8 +80,8 @@ class SessionValidateResponse(BaseModel):
     last_activity: Optional[datetime] = Field(None, description="Last activity timestamp")
     message: str = Field(..., description="Validation message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "valid": True,
                 "user_id": "user@example.com",
@@ -87,13 +90,14 @@ class SessionValidateResponse(BaseModel):
                 "message": "Session is valid"
             }
         }
+    )
 
 
 class SessionRefreshRequest(BaseModel):
     """Request to refresh a session"""
     session_token: str = Field(..., description="Session token to refresh")
     
-    @validator('session_token')
+    @field_validator('session_token')
     def validate_session_token(cls, v):
         if not v or len(v.strip()) == 0:
             raise ValueError('Session token cannot be empty')
@@ -106,21 +110,22 @@ class SessionRefreshResponse(BaseModel):
     expires_at: Optional[datetime] = Field(None, description="New session expiration time")
     message: str = Field(..., description="Refresh status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "expires_at": "2025-01-27T02:00:00Z",
                 "message": "Session refreshed successfully"
             }
         }
+    )
 
 
 class SessionInvalidateRequest(BaseModel):
     """Request to invalidate a session"""
     session_token: str = Field(..., description="Session token to invalidate")
     
-    @validator('session_token')
+    @field_validator('session_token')
     def validate_session_token(cls, v):
         if not v or len(v.strip()) == 0:
             raise ValueError('Session token cannot be empty')
@@ -132,13 +137,14 @@ class SessionInvalidateResponse(BaseModel):
     success: bool = Field(..., description="Whether session invalidation was successful")
     message: str = Field(..., description="Invalidation status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "message": "Session invalidated successfully"
             }
         }
+    )
 
 
 class SessionInfo(BaseModel):
@@ -151,8 +157,8 @@ class SessionInfo(BaseModel):
     expires_at: datetime = Field(..., description="Session expiration time")
     last_activity: datetime = Field(..., description="Last activity timestamp")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "session_id": "abc123def456...",
                 "user_id": "user@example.com",
@@ -163,6 +169,7 @@ class SessionInfo(BaseModel):
                 "last_activity": "2025-01-20T03:30:00Z"
             }
         }
+    )
 
 
 class SessionListRequest(BaseModel):
@@ -172,8 +179,8 @@ class SessionListRequest(BaseModel):
     limit: int = Field(50, ge=1, le=100, description="Maximum number of sessions to return")
     offset: int = Field(0, ge=0, description="Number of sessions to skip")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "user_id": "user@example.com",
                 "active_only": True,
@@ -181,6 +188,7 @@ class SessionListRequest(BaseModel):
                 "offset": 0
             }
         }
+    )
 
 
 class SessionListResponse(BaseModel):
@@ -189,8 +197,8 @@ class SessionListResponse(BaseModel):
     total_count: int = Field(..., description="Total number of sessions")
     has_more: bool = Field(..., description="Whether there are more sessions available")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "sessions": [
                     {
@@ -207,6 +215,7 @@ class SessionListResponse(BaseModel):
                 "has_more": False
             }
         }
+    )
 
 
 class SessionStatsResponse(BaseModel):
@@ -216,8 +225,8 @@ class SessionStatsResponse(BaseModel):
     expired_sessions: int = Field(..., description="Number of expired sessions")
     sessions_by_user: Dict[str, int] = Field(..., description="Session count by user")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "total_sessions": 150,
                 "active_sessions": 45,
@@ -228,6 +237,7 @@ class SessionStatsResponse(BaseModel):
                 }
             }
         }
+    )
 
 
 class SessionCleanupResponse(BaseModel):
@@ -236,14 +246,15 @@ class SessionCleanupResponse(BaseModel):
     cleaned_sessions: int = Field(..., description="Number of sessions cleaned up")
     message: str = Field(..., description="Cleanup status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "cleaned_sessions": 25,
                 "message": "Cleaned up 25 expired sessions"
             }
         }
+    )
 
 
 class SessionErrorResponse(BaseModel):
@@ -252,11 +263,12 @@ class SessionErrorResponse(BaseModel):
     message: str = Field(..., description="Error message")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "SessionValidationError",
                 "message": "Session token is invalid or expired",
                 "details": {"session_id": "abc123..."}
             }
-        } 
+        }
+    ) 

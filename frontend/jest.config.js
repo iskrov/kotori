@@ -39,16 +39,20 @@ module.exports = {
       statements: 80
     }
   },
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@assets/(.*)$': '<rootDir>/src/assets/$1',
     '^@components/(.*)$': '<rootDir>/src/components/$1',
     '^@services/(.*)$': '<rootDir>/src/services/$1',
     '^@utils/(.*)$': '<rootDir>/src/utils/$1',
-    '^@types/(.*)$': '<rootDir>/src/types/$1'
+    '^@types/(.*)$': '<rootDir>/src/types/$1',
+    // Mock problematic native modules
+    '^@serenity-kit/opaque$': '<rootDir>/__mocks__/@serenity-kit/opaque.js',
+    '^../secretTagManager$': '<rootDir>/__mocks__/secretTagManager.js',
+    '^../tagManager$': '<rootDir>/__mocks__/tagManager.js'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|@react-navigation|expo|@expo|react-native-vector-icons|@react-native-async-storage|expo-secure-store)/)'
+    'node_modules/(?!(react-native|@react-native|@react-navigation|expo|@expo|react-native-vector-icons|@react-native-async-storage|expo-secure-store|react-native-opaque|expo-file-system|expo-font|expo-constants|expo-web-browser|expo-modules-core)/)'
   ],
   testEnvironment: 'jsdom',
   testTimeout: 10000,

@@ -8,7 +8,7 @@ Content is stored encrypted and the server never has access to plaintext data.
 
 import uuid
 import time
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
@@ -273,6 +273,6 @@ async def health_check() -> dict:
     return {
         "service": "vault-storage",
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": "1.0.0"
     }

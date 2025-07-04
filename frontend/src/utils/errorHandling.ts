@@ -69,6 +69,7 @@ export function classifyErrorSeverity(errorType: ErrorType): ErrorSeverity {
     case ErrorType.SYSTEM_STORAGE_ERROR:
     case ErrorType.SYSTEM_PERMISSION_DENIED:
     case ErrorType.SESSION_NOT_FOUND:
+    case ErrorType.SESSION_EXPIRED:
     case ErrorType.SESSION_INVALID_STATE:
     case ErrorType.VOICE_TRANSCRIPTION_FAILED:
     case ErrorType.VOICE_MICROPHONE_ACCESS_DENIED:
@@ -101,25 +102,29 @@ export function classifyErrorSeverity(errorType: ErrorType): ErrorSeverity {
  * Determine error category from error type
  */
 export function getErrorCategory(errorType: ErrorType): ErrorCategory {
-  if (errorType.startsWith('AUTH_')) {
+  // ErrorType enum values are strings like 'auth_opaque_login_failed'
+  // We need to check the actual string values, not the enum keys
+  const errorValue = errorType.toString();
+  
+  if (errorValue.startsWith('auth_')) {
     return ErrorCategory.AUTHENTICATION;
   }
-  if (errorType.startsWith('NETWORK_')) {
+  if (errorValue.startsWith('network_')) {
     return ErrorCategory.NETWORK;
   }
-  if (errorType.startsWith('CRYPTO_')) {
+  if (errorValue.startsWith('crypto_')) {
     return ErrorCategory.CRYPTOGRAPHIC;
   }
-  if (errorType.startsWith('VALIDATION_')) {
+  if (errorValue.startsWith('validation_')) {
     return ErrorCategory.VALIDATION;
   }
-  if (errorType.startsWith('SYSTEM_')) {
+  if (errorValue.startsWith('system_')) {
     return ErrorCategory.SYSTEM;
   }
-  if (errorType.startsWith('SESSION_')) {
+  if (errorValue.startsWith('session_')) {
     return ErrorCategory.SESSION;
   }
-  if (errorType.startsWith('VOICE_')) {
+  if (errorValue.startsWith('voice_')) {
     return ErrorCategory.VOICE_PROCESSING;
   }
   return ErrorCategory.SYSTEM; // Default fallback
@@ -175,6 +180,7 @@ export function createRecoveryOptions(errorType: ErrorType): ErrorRecoveryOption
 function getUserAction(errorType: ErrorType): { label: string; action: () => void } | undefined {
   switch (errorType) {
     case ErrorType.AUTH_SESSION_EXPIRED:
+    case ErrorType.SESSION_EXPIRED:
     case ErrorType.AUTH_REAUTHENTICATION_REQUIRED:
       return {
         label: 'Sign In Again',

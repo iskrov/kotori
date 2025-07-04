@@ -11,7 +11,7 @@ This test suite covers the vault blob storage functionality including:
 import uuid
 import base64
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 
@@ -289,8 +289,8 @@ class TestVaultService:
         mock_blob.auth_tag = b"1234567890123456"
         mock_blob.content_type = "text/plain"
         mock_blob.content_size = 16
-        mock_blob.created_at = datetime.utcnow()
-        mock_blob.updated_at = datetime.utcnow()
+        mock_blob.created_at = datetime.now(UTC)
+        mock_blob.updated_at = datetime.now(UTC)
         
         vault_service.db.query.return_value.filter.return_value.first.return_value = mock_blob
         
@@ -337,16 +337,16 @@ class TestVaultService:
         mock_blob1.content_type = "text/plain"
         mock_blob1.content_size = 100
         mock_blob1.ciphertext = b"encrypted_content_1"
-        mock_blob1.created_at = datetime.utcnow()
-        mock_blob1.updated_at = datetime.utcnow()
+        mock_blob1.created_at = datetime.now(UTC)
+        mock_blob1.updated_at = datetime.now(UTC)
         
         mock_blob2 = Mock(spec=VaultBlob)
         mock_blob2.object_id = "blob-2"
         mock_blob2.content_type = "application/json"
         mock_blob2.content_size = 200
         mock_blob2.ciphertext = b"encrypted_content_2"
-        mock_blob2.created_at = datetime.utcnow()
-        mock_blob2.updated_at = datetime.utcnow()
+        mock_blob2.created_at = datetime.now(UTC)
+        mock_blob2.updated_at = datetime.now(UTC)
         
         # Mock query chain
         mock_query = Mock()
@@ -411,9 +411,9 @@ class TestVaultService:
         mock_basic_stats.total_blobs = 5
         mock_basic_stats.total_size = 1024
         mock_basic_stats.total_original_size = 800
-        mock_basic_stats.oldest_blob = datetime.utcnow() - timedelta(days=7)
-        mock_basic_stats.newest_blob = datetime.utcnow()
-        mock_basic_stats.last_activity = datetime.utcnow()
+        mock_basic_stats.oldest_blob = datetime.now(UTC) - timedelta(days=7)
+        mock_basic_stats.newest_blob = datetime.now(UTC)
+        mock_basic_stats.last_activity = datetime.now(UTC)
         
         # Mock content type stats
         mock_content_stats = [

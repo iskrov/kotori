@@ -19,6 +19,25 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
+// Mock expo-file-system
+jest.mock('expo-file-system', () => ({
+  documentDirectory: 'file:///mock/document/',
+  cacheDirectory: 'file:///mock/cache/',
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+  readAsStringAsync: jest.fn(() => Promise.resolve('mock file content')),
+  deleteAsync: jest.fn(() => Promise.resolve()),
+  makeDirectoryAsync: jest.fn(() => Promise.resolve()),
+  getInfoAsync: jest.fn(() => Promise.resolve({ exists: true, isDirectory: false })),
+}));
+
+// Mock @expo/vector-icons
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: 'Ionicons',
+  MaterialIcons: 'MaterialIcons',
+  FontAwesome: 'FontAwesome',
+  AntDesign: 'AntDesign',
+}));
+
 // Mock expo-auth-session
 jest.mock('expo-auth-session/providers/google', () => ({
   useAuthRequest: () => [
@@ -56,6 +75,30 @@ jest.mock('axios', () => ({
     put: jest.fn(() => Promise.resolve({ data: {} })),
     delete: jest.fn(() => Promise.resolve({ data: {} })),
   })),
+}));
+
+// Mock react-native-opaque for testing
+jest.mock('react-native-opaque', () => ({
+  ready: Promise.resolve(),
+  client: {
+    startRegistration: jest.fn(() => ({
+      clientRegistrationState: 'mock-client-state',
+      registrationRequest: 'mock-registration-request',
+    })),
+    finishRegistration: jest.fn(() => ({
+      registrationUpload: 'mock-upload',
+      exportKey: new Uint8Array([1, 2, 3, 4]),
+    })),
+    startLogin: jest.fn(() => ({
+      clientLoginState: 'mock-login-state',
+      credentialRequest: 'mock-credential-request',
+    })),
+    finishLogin: jest.fn(() => ({
+      credentialFinalization: 'mock-finalization',
+      sessionKey: new Uint8Array([1, 2, 3, 4]),
+      exportKey: new Uint8Array([5, 6, 7, 8]),
+    })),
+  },
 }));
 
 // Suppress React Native warnings in tests

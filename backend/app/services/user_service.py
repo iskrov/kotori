@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, UTC
 from typing import Any, List
 
 from sqlalchemy.orm import Session
@@ -36,8 +36,8 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             is_superuser=obj_in.is_superuser,
             is_active=True,
             profile_picture=obj_in.profile_picture,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         db.add(db_obj)
         db.commit()
@@ -57,7 +57,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             update_data["hashed_password"] = get_password_hash(update_data["password"])
             del update_data["password"]
 
-        update_data["updated_at"] = datetime.utcnow()
+        update_data["updated_at"] = datetime.now(UTC)
 
         for field in update_data:
             setattr(db_obj, field, update_data[field])
@@ -90,8 +90,8 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
                 hashed_password=get_password_hash("testpassword"),
                 is_active=True,
                 is_superuser=False,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
             db.add(test_user)
             db.commit()
@@ -198,7 +198,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
              return UserStats(total_entries=total_entries, current_streak=0, longest_streak=0, entries_this_week=0)
 
         # Use current UTC date as the reference for calculations
-        today_utc = datetime.utcnow().date()
+        today_utc = datetime.now(UTC).date()
         logger.debug(f"Today (UTC): {today_utc} for stat calculations.")
 
         current_streak = self._calculate_current_streak(unique_entry_days_utc, today_utc)

@@ -9,7 +9,7 @@ audit logging, session management, and vault storage.
 import pytest
 import uuid
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, patch, MagicMock
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -86,8 +86,8 @@ class TestEnhancedOpaqueService:
         """Sample OPAQUE registration request."""
         # Create properly sized base64 data that passes validation
         opaque_envelope = base64.b64encode(b"x" * 64).decode('ascii')  # 64 bytes -> valid base64
-        verifier_kv = base64.b64encode(b"v" * 96).decode('ascii')      # 96 bytes -> valid base64  
-        salt = base64.b64encode(b"s" * 32).decode('ascii')             # 32 bytes -> valid base64
+        verifier_kv = base64.b64encode(b"v" * 32).decode('ascii')      # 32 bytes -> valid base64 (matches schema)
+        salt = base64.b64encode(b"s" * 16).decode('ascii')             # 16 bytes -> valid base64 (matches schema)
         
         return OpaqueRegistrationRequest(
             opaque_envelope=opaque_envelope,
@@ -280,8 +280,8 @@ class TestEnhancedOpaqueService:
         mock_tag.tag_id = b"A" * 16
         mock_tag.tag_name = "Test Tag"
         mock_tag.color_code = "#FF0000"
-        mock_tag.created_at = datetime.utcnow()
-        mock_tag.updated_at = datetime.utcnow()
+        mock_tag.created_at = datetime.now(UTC)
+        mock_tag.updated_at = datetime.now(UTC)
         
         mock_wrapped_key = Mock()
         mock_wrapped_key.vault_id = "test-vault-id"
@@ -387,7 +387,7 @@ class TestEnhancedOpaqueService:
             assert isinstance(response, OpaqueAuthInitResponse)
             assert response.session_id is not None
             assert response.server_message is not None
-            assert response.expires_at > datetime.utcnow()
+            assert response.expires_at > datetime.now(UTC)
 
     def test_authenticate_init_brute_force_detected(self, opaque_service, mock_audit_service, sample_auth_init_request):
         """Test authentication init with brute force detection."""
@@ -417,7 +417,7 @@ class TestEnhancedOpaqueService:
         mock_session.user_id = "123"
         mock_session.tag_id = b"A" * 16
         mock_session.session_state = "initialized"
-        mock_session.expires_at = datetime.utcnow() + timedelta(minutes=5)
+        mock_session.expires_at = datetime.now(UTC) + timedelta(minutes=5)
         mock_session.session_data = b'{"correlation_id": "test-id"}'
         
         # Mock wrapped keys
@@ -458,7 +458,7 @@ class TestEnhancedOpaqueService:
     def test_authenticate_finalize_expired_session(self, opaque_service, mock_db, sample_auth_finalize_request):
         """Test authentication finalize with expired session."""
         mock_session = Mock()
-        mock_session.expires_at = datetime.utcnow() - timedelta(minutes=1)  # Expired
+        mock_session.expires_at = datetime.now(UTC) - timedelta(minutes=1)  # Expired
         mock_db.query.return_value.filter.return_value.first.return_value = mock_session
         mock_db.delete = Mock()
         mock_db.commit = Mock()

@@ -8,7 +8,7 @@ including upload, download, listing, and management of encrypted content.
 import base64
 from datetime import datetime
 from typing import Optional, Dict, List, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 
@@ -69,7 +69,7 @@ class VaultBlobUploadRequest(BaseModel):
         max_length=36
     )
     
-    @validator('ciphertext', 'iv', 'auth_tag')
+    @field_validator('ciphertext', 'iv', 'auth_tag')
     def validate_base64(cls, v):
         """Validate that fields are proper base64."""
         try:
@@ -80,7 +80,7 @@ class VaultBlobUploadRequest(BaseModel):
         except Exception:
             raise ValueError("Invalid base64 encoding")
     
-    @validator('iv')
+    @field_validator('iv')
     def validate_iv_length(cls, v):
         """Validate that IV is exactly 12 bytes when decoded."""
         try:
@@ -91,7 +91,7 @@ class VaultBlobUploadRequest(BaseModel):
         except Exception:
             raise ValueError("Invalid IV format")
     
-    @validator('auth_tag')
+    @field_validator('auth_tag')
     def validate_auth_tag_length(cls, v):
         """Validate that auth tag is exactly 16 bytes when decoded."""
         try:
@@ -102,7 +102,7 @@ class VaultBlobUploadRequest(BaseModel):
         except Exception:
             raise ValueError("Invalid auth tag format")
     
-    @validator('content_type')
+    @field_validator('content_type')
     def validate_content_type(cls, v):
         """Validate content type format."""
         if '/' not in v or len(v) > 100:
@@ -277,7 +277,7 @@ class VaultBlobListRequest(BaseModel):
         description="Order direction: 'asc' or 'desc'"
     )
     
-    @validator('order_by')
+    @field_validator('order_by')
     def validate_order_by(cls, v):
         """Validate order_by field."""
         allowed = ['created_at', 'updated_at', 'content_size', 'content_type']
@@ -285,7 +285,7 @@ class VaultBlobListRequest(BaseModel):
             raise ValueError(f"order_by must be one of: {allowed}")
         return v
     
-    @validator('order_direction')
+    @field_validator('order_direction')
     def validate_order_direction(cls, v):
         """Validate order direction."""
         if v.lower() not in ['asc', 'desc']:

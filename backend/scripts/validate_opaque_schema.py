@@ -15,7 +15,7 @@ import os
 import time
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import List, Dict, Any
 
 # Add the backend app to the path
@@ -277,15 +277,15 @@ class OpaqueSchemaValidator:
             try:
                 # Create test session
                 session_id = secrets.token_urlsafe(32)
-                expires_at = datetime.utcnow() + timedelta(hours=1)
+                expires_at = datetime.now(UTC) + timedelta(hours=1)
                 
                 opaque_session = OpaqueSession(
                     session_id=session_id,
                     user_id=self.test_user_id,
                     session_state="initialized",
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
                     expires_at=expires_at,
-                    last_activity=datetime.utcnow()
+                    last_activity=datetime.now(UTC)
                 )
                 session.add(opaque_session)
                 session.commit()

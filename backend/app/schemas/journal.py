@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # Base schema for Tag
@@ -19,8 +19,7 @@ class Tag(TagBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Base model for journal entries
@@ -35,16 +34,12 @@ class JournalEntryCreate(JournalEntryBase):
     audio_url: Optional[str] = None
     tags: Optional[List[str]] = []
     
-    # Secret tag support with client-side encryption
-    secret_tag_id: Optional[int] = None      # ID of secret tag for this entry
-    secret_tag_hash: Optional[str] = None    # Hash of secret tag for verification
-    encrypted_content: Optional[str] = None  # Base64 encoded encrypted content
-    encryption_iv: Optional[str] = None      # Base64 encoded initialization vector
-    encryption_salt: Optional[str] = None    # Base64 encoded salt for key derivation
-    encrypted_key: Optional[str] = None      # Entry key wrapped with master key
-    key_derivation_iterations: Optional[int] = None  # PBKDF2 iterations
-    encryption_algorithm: Optional[str] = None       # Encryption algorithm
-    encryption_wrap_iv: Optional[str] = None         # IV for key wrapping
+    # OPAQUE Secret Tag support with client-side encryption
+    secret_tag_id: Optional[bytes] = None       # Binary tag_id from OPAQUE model
+    encrypted_content: Optional[str] = None     # Base64 encoded encrypted content
+    wrapped_key: Optional[str] = None           # Entry key wrapped with tag-derived key
+    encryption_iv: Optional[str] = None         # Base64 encoded initialization vector
+    wrap_iv: Optional[str] = None               # IV for key wrapping
     
     # Timestamps
     created_at: Optional[datetime] = None
@@ -58,16 +53,12 @@ class JournalEntryUpdate(BaseModel):
     audio_url: Optional[str] = None
     tags: Optional[List[str]] = None
     
-    # Secret tag updates
-    secret_tag_id: Optional[int] = None
-    secret_tag_hash: Optional[str] = None
+    # OPAQUE Secret Tag updates
+    secret_tag_id: Optional[bytes] = None
     encrypted_content: Optional[str] = None
+    wrapped_key: Optional[str] = None
     encryption_iv: Optional[str] = None
-    encryption_salt: Optional[str] = None
-    encrypted_key: Optional[str] = None
-    key_derivation_iterations: Optional[int] = None
-    encryption_algorithm: Optional[str] = None
-    encryption_wrap_iv: Optional[str] = None
+    wrap_iv: Optional[str] = None
 
 
 # Properties shared by models stored in DB
@@ -78,19 +69,14 @@ class JournalEntryInDBBase(JournalEntryBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
-    # Secret tag fields
-    secret_tag_id: Optional[int] = None
-    secret_tag_hash: Optional[str] = None
+    # OPAQUE Secret Tag fields
+    secret_tag_id: Optional[bytes] = None
     encrypted_content: Optional[str] = None
+    wrapped_key: Optional[str] = None
     encryption_iv: Optional[str] = None
-    encryption_salt: Optional[str] = None
-    encrypted_key: Optional[str] = None
-    key_derivation_iterations: Optional[int] = None
-    encryption_algorithm: Optional[str] = None
-    encryption_wrap_iv: Optional[str] = None
+    wrap_iv: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Properties to return to client
@@ -111,8 +97,7 @@ class SecretTagJournalEntry(JournalEntryInDBBase):
     """
     tags: List[Tag] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Schema for bulk operations

@@ -26,6 +26,8 @@ from typing import Optional, List
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
+from pydantic import ConfigDict
 
 # Get the absolute path to the backend directory
 BACKEND_DIR = os.path.dirname(
@@ -97,8 +99,7 @@ class Settings(BaseSettings):
     ENCRYPTION_MASTER_SALT: str = get_required_env("ENCRYPTION_MASTER_SALT")
     HIDDEN_MODE_TIMEOUT_MINUTES: int = int(os.getenv("HIDDEN_MODE_TIMEOUT_MINUTES", "2"))
 
-    class Config:
-        case_sensitive = True
+    model_config = ConfigDict(case_sensitive=True)
 
     @property
     def CORS_ORIGINS(self) -> List[str]:

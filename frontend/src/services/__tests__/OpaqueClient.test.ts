@@ -45,6 +45,9 @@ describe('OpaqueClient', () => {
     // Reset client state
     client = OpaqueClient.getInstance();
     
+    // Reset the client's initialization state for testing
+    (client as any).isInitialized = false;
+    
     // Reset mock implementations
     mockOpaque.ready = Promise.resolve();
     mockOpaque.client.startRegistration.mockClear();
@@ -87,6 +90,8 @@ describe('OpaqueClient', () => {
 
     it('should handle WASM loading failure on Web', async () => {
       (Platform as any).OS = 'web';
+      
+      // Create a rejected promise that will cause initialization to fail
       mockOpaque.ready = Promise.reject(new Error('WASM failed to load'));
       
       await expect(client.initialize()).rejects.toThrow(OpaqueError);

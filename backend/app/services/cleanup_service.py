@@ -8,7 +8,7 @@ database optimization, and security hygiene operations.
 
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, List, Optional, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -145,7 +145,7 @@ class CleanupService:
             
             try:
                 # Calculate cutoff time for session retention
-                cutoff_time = datetime.utcnow() - timedelta(days=self.session_retention_days)
+                cutoff_time = datetime.now(UTC) - timedelta(days=self.session_retention_days)
                 
                 # Clean up OPAQUE sessions in batches
                 while True:
@@ -196,7 +196,7 @@ class CleanupService:
                 
                 # Update statistics
                 self._cleanup_stats['sessions_cleaned'] += stats['total_cleaned']
-                self._cleanup_stats['last_cleanup'] = datetime.utcnow()
+                self._cleanup_stats['last_cleanup'] = datetime.now(UTC)
                 
                 # Log successful cleanup
                 self._audit_service.log_security_event(
@@ -240,7 +240,7 @@ class CleanupService:
                 stats['orphaned_keys'] = orphaned_keys_cleaned
                 
                 # Find and clean up orphaned vault data
-                cutoff_time = datetime.utcnow() - timedelta(days=self.vault_orphan_days)
+                cutoff_time = datetime.now(UTC) - timedelta(days=self.vault_orphan_days)
                 
                 # This would be implemented based on vault service capabilities
                 # For now, we'll focus on database-level cleanup
@@ -290,7 +290,7 @@ class CleanupService:
             
             try:
                 # Clean up old audit logs
-                audit_cutoff = datetime.utcnow() - timedelta(days=self.audit_retention_days)
+                audit_cutoff = datetime.now(UTC) - timedelta(days=self.audit_retention_days)
                 audit_logs_cleaned = self._cleanup_audit_logs(audit_cutoff)
                 stats['audit_logs_cleaned'] = audit_logs_cleaned
                 
@@ -432,7 +432,7 @@ class CleanupService:
                 
                 # Update global statistics
                 self._cleanup_stats['total_cleanup_operations'] += 1
-                self._cleanup_stats['last_cleanup'] = datetime.utcnow()
+                self._cleanup_stats['last_cleanup'] = datetime.now(UTC)
                 
                 logger.info(f"Comprehensive cleanup completed in {comprehensive_stats['total_duration']:.2f}s")
                 return comprehensive_stats
@@ -454,7 +454,7 @@ class CleanupService:
             session_count = self.db.query(OpaqueSession).count()
             active_session_count = self.db.query(OpaqueSession).filter(
                 OpaqueSession.session_state == 'active',
-                OpaqueSession.expires_at > datetime.utcnow()
+                OpaqueSession.expires_at > datetime.now(UTC)
             ).count()
             
             secret_tag_count = self.db.query(SecretTag).count()
@@ -481,7 +481,7 @@ class CleanupService:
                     'audit_retention_days': self.audit_retention_days,
                     'vault_orphan_days': self.vault_orphan_days
                 },
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(UTC).isoformat()
             }
             
         except Exception as e:
@@ -499,7 +499,7 @@ class CleanupService:
             health_status = {
                 'service': 'cleanup_service',
                 'status': 'healthy',
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.now(UTC).isoformat(),
                 'dependencies': {},
                 'statistics': {}
             }
@@ -539,7 +539,7 @@ class CleanupService:
                 'service': 'cleanup_service',
                 'status': 'unhealthy',
                 'error': str(e),
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(UTC).isoformat()
             }
     
     def _cleanup_orphaned_wrapped_keys(self) -> int:

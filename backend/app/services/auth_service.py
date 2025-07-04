@@ -1,5 +1,4 @@
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from jose import JWTError
@@ -48,8 +47,8 @@ class AuthService:
                     full_name="Google User",
                     google_id="google123",
                     is_active=True,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
                 )
                 db.add(test_user)
                 db.commit()

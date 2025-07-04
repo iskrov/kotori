@@ -7,7 +7,7 @@ database optimization, and security hygiene operations.
 
 import pytest
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import Mock, patch, MagicMock
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -367,9 +367,9 @@ class TestCleanupServiceIntegration:
             user_id="test_user",
             tag_id=b"test_tag_id_123456",
             session_state="expired",
-            expires_at=datetime.utcnow() - timedelta(hours=1),
+            expires_at=datetime.now(UTC) - timedelta(hours=1),
             session_data=b"test_session_data",
-            last_activity=datetime.utcnow() - timedelta(hours=2)
+            last_activity=datetime.now(UTC) - timedelta(hours=2)
         )
         
         db_session.add(expired_session)

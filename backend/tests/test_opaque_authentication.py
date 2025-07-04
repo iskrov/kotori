@@ -11,7 +11,7 @@ This module tests the OPAQUE authentication flow including:
 import pytest
 import base64
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -128,7 +128,7 @@ class TestOpaqueAuthenticationEndpoints:
         service = create_opaque_service(db_session)
         
         # Create some test sessions
-        current_time = datetime.utcnow()
+        current_time = datetime.now(UTC)
         
         # Create an expired session
         expired_session = OpaqueSession(

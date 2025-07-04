@@ -4,7 +4,7 @@ Security Audit Logging Schemas
 Pydantic models for security audit logging API requests and responses.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
@@ -61,7 +61,7 @@ class AuditLogRequest(BaseModel):
             raise ValueError('Event message cannot be empty')
         return v.strip()
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "event_type": "opaque_login_finish",
@@ -73,7 +73,7 @@ class AuditLogRequest(BaseModel):
                 "success": True,
                 "processing_time_ms": 150
             }
-        }
+        })
 
 
 class AuditLogResponse(BaseModel):
@@ -83,7 +83,7 @@ class AuditLogResponse(BaseModel):
     correlation_id: Optional[str] = Field(None, description="Correlation ID for the event")
     message: str = Field(..., description="Status message")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "success": True,
@@ -91,7 +91,7 @@ class AuditLogResponse(BaseModel):
                 "correlation_id": "12345678-1234-1234-1234-123456789012",
                 "message": "Audit log entry created successfully"
             }
-        }
+        })
 
 
 class AuditLogEntry(BaseModel):
@@ -116,7 +116,7 @@ class AuditLogEntry(BaseModel):
     timestamp: datetime = Field(..., description="Event timestamp")
     is_sensitive: bool = Field(..., description="Whether event is sensitive")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "id": "87654321-4321-4321-4321-210987654321",
@@ -130,7 +130,7 @@ class AuditLogEntry(BaseModel):
                 "timestamp": "2025-01-20T03:30:00Z",
                 "is_sensitive": False
             }
-        }
+        })
 
 
 class AuditLogListRequest(BaseModel):
@@ -144,7 +144,7 @@ class AuditLogListRequest(BaseModel):
     limit: int = Field(100, ge=1, le=1000, description="Maximum number of results")
     offset: int = Field(0, ge=0, description="Number of results to skip")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "event_category": "auth",
@@ -153,7 +153,7 @@ class AuditLogListRequest(BaseModel):
                 "limit": 50,
                 "offset": 0
             }
-        }
+        })
 
 
 class AuditLogListResponse(BaseModel):
@@ -162,7 +162,7 @@ class AuditLogListResponse(BaseModel):
     total_count: int = Field(..., description="Total number of matching entries")
     has_more: bool = Field(..., description="Whether there are more entries available")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "logs": [
@@ -179,7 +179,7 @@ class AuditLogListResponse(BaseModel):
                 "total_count": 1,
                 "has_more": False
             }
-        }
+        })
 
 
 class SecurityMetricsRequest(BaseModel):
@@ -197,14 +197,14 @@ class SecurityMetricsRequest(BaseModel):
             raise ValueError(f'Time window must be one of: {valid_windows}')
         return v
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "metric_names": ["auth_failures", "brute_force_attempts"],
                 "time_window": "1h",
                 "start_time": "2025-01-20T02:00:00Z"
             }
-        }
+        })
 
 
 class SecurityMetric(BaseModel):
@@ -219,7 +219,7 @@ class SecurityMetric(BaseModel):
     window_start: datetime = Field(..., description="Window start time")
     window_end: datetime = Field(..., description="Window end time")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "metric_name": "auth_failures",
@@ -232,7 +232,7 @@ class SecurityMetric(BaseModel):
                 "window_start": "2025-01-20T02:00:00Z",
                 "window_end": "2025-01-20T03:00:00Z"
             }
-        }
+        })
 
 
 class SecurityMetricsResponse(BaseModel):
@@ -240,7 +240,7 @@ class SecurityMetricsResponse(BaseModel):
     metrics: List[SecurityMetric] = Field(..., description="List of security metrics")
     time_range: Dict[str, datetime] = Field(..., description="Time range for metrics")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "metrics": [
@@ -258,7 +258,7 @@ class SecurityMetricsResponse(BaseModel):
                     "end": "2025-01-20T03:00:00Z"
                 }
             }
-        }
+        })
 
 
 class SecurityAlertRequest(BaseModel):
@@ -274,7 +274,7 @@ class SecurityAlertRequest(BaseModel):
     related_events: Optional[List[str]] = Field(None, description="Related audit log entry IDs")
     confidence_score: int = Field(100, ge=0, le=100, description="Confidence score (0-100)")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "alert_type": "brute_force_attack",
@@ -284,7 +284,7 @@ class SecurityAlertRequest(BaseModel):
                 "detection_rule": "auth_failure_threshold",
                 "confidence_score": 95
             }
-        }
+        })
 
 
 class SecurityAlert(BaseModel):
@@ -305,7 +305,7 @@ class SecurityAlert(BaseModel):
     event_count: int = Field(..., description="Number of related events")
     confidence_score: int = Field(..., description="Confidence score")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "id": "alert-12345678-1234-1234-1234-123456789012",
@@ -320,7 +320,7 @@ class SecurityAlert(BaseModel):
                 "event_count": 8,
                 "confidence_score": 95
             }
-        }
+        })
 
 
 class SecurityAlertsResponse(BaseModel):
@@ -329,7 +329,7 @@ class SecurityAlertsResponse(BaseModel):
     total_count: int = Field(..., description="Total number of alerts")
     active_count: int = Field(..., description="Number of active alerts")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "alerts": [
@@ -347,7 +347,7 @@ class SecurityAlertsResponse(BaseModel):
                 "total_count": 1,
                 "active_count": 1
             }
-        }
+        })
 
 
 class AuditIntegrityRequest(BaseModel):
@@ -363,7 +363,7 @@ class AuditIntegrityRequest(BaseModel):
             raise ValueError('Cannot verify more than 100 log entries at once')
         return v
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "log_ids": [
@@ -371,7 +371,7 @@ class AuditIntegrityRequest(BaseModel):
                     "12345678-1234-1234-1234-123456789012"
                 ]
             }
-        }
+        })
 
 
 class AuditIntegrityResult(BaseModel):
@@ -380,14 +380,14 @@ class AuditIntegrityResult(BaseModel):
     is_valid: bool = Field(..., description="Whether the log entry is valid")
     error_message: Optional[str] = Field(None, description="Error message if validation failed")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "log_id": "87654321-4321-4321-4321-210987654321",
                 "is_valid": True,
                 "error_message": None
             }
-        }
+        })
 
 
 class AuditIntegrityResponse(BaseModel):
@@ -397,7 +397,7 @@ class AuditIntegrityResponse(BaseModel):
     valid_count: int = Field(..., description="Number of valid entries")
     invalid_count: int = Field(..., description="Number of invalid entries")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "results": [
@@ -411,7 +411,7 @@ class AuditIntegrityResponse(BaseModel):
                 "valid_count": 1,
                 "invalid_count": 0
             }
-        }
+        })
 
 
 class AuditErrorResponse(BaseModel):
@@ -420,11 +420,11 @@ class AuditErrorResponse(BaseModel):
     message: str = Field(..., description="Error message")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "error": "AuditServiceError",
                 "message": "Failed to create audit log entry",
                 "details": {"correlation_id": "12345678-1234-1234-1234-123456789012"}
             }
-        } 
+        } )

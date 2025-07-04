@@ -8,7 +8,7 @@ including session token generation, validation, lifecycle management, and securi
 import secrets
 import hashlib
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Any, Tuple
 import logging
 import json
@@ -153,7 +153,7 @@ class SessionService:
             fingerprint = self.create_session_fingerprint(user_agent, ip_address)
             
             # Calculate expiration times
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             expires_at = now + self.absolute_timeout
             
             # Prepare session data
@@ -228,7 +228,7 @@ class SessionService:
                 return None
             
             # Check expiration
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             if session.expires_at < now:
                 logger.info(f"Session expired for user {session.user_id}")
                 self._invalidate_session(db, session)
@@ -279,7 +279,7 @@ class SessionService:
         """
         try:
             # Extend expiration time
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             session.expires_at = now + self.absolute_timeout
             session.last_activity = now
             
@@ -379,7 +379,7 @@ class SessionService:
             int: Number of sessions cleaned up
         """
         try:
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             
             # Find expired sessions
             expired_sessions = db.query(OpaqueSession).filter(

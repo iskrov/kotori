@@ -9,7 +9,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Depends, status, Request, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import logging
 
 from app.dependencies import get_db, get_current_active_user_from_session, get_current_active_superuser
@@ -238,7 +238,7 @@ async def get_security_metrics(
     try:
         # Set default time range if not provided
         if not end_time:
-            end_time = datetime.utcnow()
+            end_time = datetime.now(UTC)
         if not start_time:
             # Parse time window
             if time_window == "1m":
@@ -337,8 +337,8 @@ async def list_security_alerts(
                 detection_rule="auth_failure_threshold",
                 user_id_hash="a1b2c3d4e5f6...",
                 correlation_id="corr-12345678-1234-1234-1234-123456789012",
-                first_seen=datetime.utcnow() - timedelta(minutes=15),
-                last_seen=datetime.utcnow() - timedelta(minutes=2),
+                first_seen=datetime.now(UTC) - timedelta(minutes=15),
+                last_seen=datetime.now(UTC) - timedelta(minutes=2),
                 event_count=8,
                 confidence_score=95
             )
@@ -465,7 +465,7 @@ async def detect_security_threats(
         return {
             "threats_detected": threats_detected,
             "total_threats": len(threats_detected),
-            "scan_time": datetime.utcnow().isoformat()
+            "scan_time": datetime.now(UTC).isoformat()
         }
         
     except Exception as e:
@@ -492,7 +492,7 @@ async def cleanup_audit_logs(
     try:
         if dry_run:
             # Calculate how many logs would be deleted
-            cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=retention_days)
             from app.models.secret_tag_opaque import SecurityAuditLog
             
             count = db.query(SecurityAuditLog).filter(

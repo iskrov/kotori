@@ -49,6 +49,7 @@ export const ERROR_MESSAGES: Record<ErrorType, string> = {
 
   // Session errors - Clear guidance without exposing session internals
   [ErrorType.SESSION_NOT_FOUND]: 'Session not found. Please sign in again.',
+  [ErrorType.SESSION_EXPIRED]: 'Your session has expired. Please sign in again.',
   [ErrorType.SESSION_INVALID_STATE]: 'Session error. Please sign in again.',
   [ErrorType.SESSION_EXTENSION_FAILED]: 'Unable to extend session. Please sign in again.',
   [ErrorType.SESSION_DEACTIVATION_FAILED]: 'Unable to end session. Please try again.',
@@ -221,6 +222,10 @@ export const RECOVERY_SUGGESTIONS: Record<ErrorType, string[]> = {
   [ErrorType.SESSION_NOT_FOUND]: [
     'Sign in again to create a new session',
     'Check your internet connection'
+  ],
+  [ErrorType.SESSION_EXPIRED]: [
+    'Sign in again to continue',
+    'Enable "Remember me" for longer sessions'
   ],
   [ErrorType.SESSION_INVALID_STATE]: [
     'Sign in again to reset your session',
