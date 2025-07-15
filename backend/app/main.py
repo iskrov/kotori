@@ -15,14 +15,18 @@ from app.api.v1.endpoints import vault as vault_router_module
 from app.api.v1.endpoints import session as session_router_module
 from app.api.v1.endpoints import audit as audit_router_module
 from app.api.v1.endpoints import maintenance as maintenance_router_module
+from app.api.v1 import monitoring as monitoring_router_module
 from app.core.config import settings
 from app.routers import auth_router
 from app.routers import journals_router
 from app.routers import reminders_router
 from app.routers import users_router
-from app.routers.opaque_auth import router as opaque_auth_router
+from app.routers.user_opaque_auth import router as user_opaque_auth_router
 
 from app.websockets import speech as speech_websocket_router
+
+# Security middleware imports
+from app.middleware.security_middleware import SecurityMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -67,6 +71,10 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={"detail": "An unexpected error occurred. Please try again later."},
     )
 
+
+# Security middleware configuration (must be first)
+app.add_middleware(SecurityMiddleware)
+logger.info("Security middleware configured with comprehensive protection")
 
 # CORS middleware configuration
 if settings.ENVIRONMENT == "development":
@@ -126,8 +134,9 @@ async def log_requests(request: Request, call_next):
 
 # Include routers
 app.include_router(maintenance_router_module.router, prefix="/api/v1")
+app.include_router(monitoring_router_module.router, prefix="/api/v1", tags=["Monitoring"])
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(opaque_auth_router, tags=["OPAQUE Authentication"])
+app.include_router(user_opaque_auth_router, prefix="/api/auth/opaque", tags=["User OPAQUE Authentication"])
 app.include_router(opaque_router_module.router, prefix="/api/opaque", tags=["OPAQUE"])
 app.include_router(vault_router_module.router, prefix="/api/vault", tags=["Vault Storage"])
 app.include_router(audit_router_module.router, prefix="/api/audit", tags=["Security Audit"])

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 
 
 class SessionState(str, Enum):
@@ -19,16 +20,16 @@ class SessionState(str, Enum):
 
 class SessionCreateRequest(BaseModel):
     """Request to create a new session"""
-    user_id: str = Field(..., description="User identifier")
+    user_id: UUID = Field(..., description="User identifier")
     tag_id: Optional[str] = Field(None, description="Secret tag ID for vault access")
     session_data: Optional[Dict[str, Any]] = Field(None, description="Additional session metadata")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "user_id": "user@example.com",
+                "user_id": "12345678-1234-5678-9012-123456789012",
                 "tag_id": "tag123",
-                "session_data": {"client_type": "web", "version": "1.0"}
+                "session_data": {"client_info": "mobile_app"}
             }
         }
     )
@@ -75,7 +76,7 @@ class SessionValidateRequest(BaseModel):
 class SessionValidateResponse(BaseModel):
     """Response for session validation"""
     valid: bool = Field(..., description="Whether the session is valid")
-    user_id: Optional[str] = Field(None, description="User ID if session is valid")
+    user_id: Optional[UUID] = Field(None, description="User ID if session is valid")
     expires_at: Optional[datetime] = Field(None, description="Session expiration time")
     last_activity: Optional[datetime] = Field(None, description="Last activity timestamp")
     message: str = Field(..., description="Validation message")
@@ -84,9 +85,9 @@ class SessionValidateResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "valid": True,
-                "user_id": "user@example.com",
-                "expires_at": "2025-01-27T02:00:00Z",
-                "last_activity": "2025-01-20T03:30:00Z",
+                "user_id": "12345678-1234-5678-9012-123456789012",
+                "expires_at": "2024-01-01T12:00:00Z",
+                "last_activity": "2024-01-01T11:30:00Z",
                 "message": "Session is valid"
             }
         }
@@ -107,6 +108,7 @@ class SessionRefreshRequest(BaseModel):
 class SessionRefreshResponse(BaseModel):
     """Response for session refresh"""
     success: bool = Field(..., description="Whether session refresh was successful")
+    new_session_token: Optional[str] = Field(None, description="New JWT session token")
     expires_at: Optional[datetime] = Field(None, description="New session expiration time")
     message: str = Field(..., description="Refresh status message")
     
@@ -114,8 +116,9 @@ class SessionRefreshResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "success": True,
+                "new_session_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "expires_at": "2025-01-27T02:00:00Z",
-                "message": "Session refreshed successfully"
+                "message": "Session token refreshed successfully"
             }
         }
     )
@@ -150,7 +153,7 @@ class SessionInvalidateResponse(BaseModel):
 class SessionInfo(BaseModel):
     """Information about a session"""
     session_id: str = Field(..., description="Session identifier (hashed)")
-    user_id: str = Field(..., description="User identifier")
+    user_id: UUID = Field(..., description="User identifier")
     tag_id: Optional[str] = Field(None, description="Secret tag ID")
     state: SessionState = Field(..., description="Session state")
     created_at: datetime = Field(..., description="Session creation time")
@@ -160,13 +163,13 @@ class SessionInfo(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "session_id": "abc123def456...",
-                "user_id": "user@example.com",
+                "session_id": "hashed_session_id",
+                "user_id": "12345678-1234-5678-9012-123456789012",
                 "tag_id": "tag123",
                 "state": "active",
-                "created_at": "2025-01-20T02:00:00Z",
-                "expires_at": "2025-01-27T02:00:00Z",
-                "last_activity": "2025-01-20T03:30:00Z"
+                "created_at": "2024-01-01T10:00:00Z",
+                "expires_at": "2024-01-01T22:00:00Z",
+                "last_activity": "2024-01-01T11:30:00Z"
             }
         }
     )
@@ -174,7 +177,7 @@ class SessionInfo(BaseModel):
 
 class SessionListRequest(BaseModel):
     """Request to list user sessions"""
-    user_id: Optional[str] = Field(None, description="User ID to filter sessions")
+    user_id: Optional[UUID] = Field(None, description="User ID to filter sessions")
     active_only: bool = Field(True, description="Whether to return only active sessions")
     limit: int = Field(50, ge=1, le=100, description="Maximum number of sessions to return")
     offset: int = Field(0, ge=0, description="Number of sessions to skip")
@@ -182,7 +185,7 @@ class SessionListRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "user_id": "user@example.com",
+                "user_id": "12345678-1234-5678-9012-123456789012",
                 "active_only": True,
                 "limit": 10,
                 "offset": 0
@@ -229,11 +232,11 @@ class SessionStatsResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "total_sessions": 150,
-                "active_sessions": 45,
-                "expired_sessions": 105,
+                "active_sessions": 75,
+                "expired_sessions": 75,
                 "sessions_by_user": {
-                    "user1@example.com": 3,
-                    "user2@example.com": 2
+                    "12345678-1234-5678-9012-123456789012": 5,
+                    "87654321-4321-8765-2109-876543210987": 3
                 }
             }
         }

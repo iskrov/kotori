@@ -1,7 +1,27 @@
+/**
+ * OPAQUE Authentication Service
+ * 
+ * This service handles OPAQUE-based authentication providing zero-knowledge password proof.
+ * It works in conjunction with the backend's OPAQUE server implementation.
+ */
+
 import * as opaque from '@serenity-kit/opaque';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from './api';
 import logger from '../utils/logger';
+
+// Initialize OPAQUE library
+let opaqueReady = false;
+
+async function ensureOpaqueReady() {
+  if (!opaqueReady) {
+    if (opaque.ready) {
+      await opaque.ready;
+    }
+    opaqueReady = true;
+    logger.info('OPAQUE library initialized');
+  }
+}
 
 // OPAQUE client types and interfaces
 export interface OpaqueRegistrationState {
@@ -24,14 +44,33 @@ export interface OpaqueLoginResponse {
 }
 
 export interface OpaqueSessionResult {
-  sessionKey: Uint8Array;
-  exportKey: Uint8Array;
+  sessionKey: string;
+  exportKey: string;
+  finishLoginRequest: string;
+}
+
+export interface OpaqueLoginResult {
+  success: boolean;
+  user: {
+    id: string;
+    email: string;
+    full_name: string;
+    is_active: boolean;
+    is_superuser: boolean;
+    created_at: string | null;
+    updated_at: string | null;
+  };
+  token: string;
+  sessionKey: string;
+  exportKey: string;
 }
 
 // Storage keys for OPAQUE data
 const STORAGE_KEYS = {
   REGISTRATION_RECORD: 'opaque_registration_record',
   USER_IDENTIFIER: 'opaque_user_identifier',
+  DEVICE_FINGERPRINT: 'opaque_device_fingerprint',
+  SESSION_DATA: 'opaque_session_data',
 } as const;
 
 /**
@@ -53,22 +92,29 @@ export class OpaqueAuthService {
   /**
    * Start OPAQUE registration process
    * @param password User's password
-   * @param userIdentifier Unique user identifier (email)
-   * @returns Registration request to send to server
+   * @param userIdentifier User identifier (email)
+   * @returns Registration request and client state
    */
   public async startRegistration(password: string, userIdentifier: string): Promise<{
     registrationRequest: string;
     clientRegistrationState: string;
   }> {
     try {
+      await ensureOpaqueReady();
       logger.info('Starting OPAQUE registration', { userIdentifier });
-      
-      const { clientRegistrationState, registrationRequest } = 
-        opaque.client.startRegistration({ password });
+
+      // Start registration with OPAQUE client
+      const { clientRegistrationState, registrationRequest } = opaque.client.startRegistration({
+        password,
+      });
+
+      if (!clientRegistrationState || !registrationRequest) {
+        throw new Error('Failed to generate OPAQUE registration request');
+      }
 
       // Store the client state temporarily for finishing registration
       await AsyncStorage.setItem(
-        `opaque_reg_state_${userIdentifier}`, 
+        `opaque_registration_state_${userIdentifier}`, 
         JSON.stringify({
           clientRegistrationState,
           password,
@@ -76,9 +122,13 @@ export class OpaqueAuthService {
         })
       );
 
-      logger.info('OPAQUE registration started successfully');
+      logger.info('OPAQUE registration started successfully', { 
+        registrationRequestLength: registrationRequest.length,
+        clientRegistrationStateLength: clientRegistrationState.length 
+      });
+
       return {
-        registrationRequest,
+        registrationRequest,  // Send raw Base64URL to backend
         clientRegistrationState
       };
     } catch (error) {
@@ -91,17 +141,18 @@ export class OpaqueAuthService {
    * Complete OPAQUE registration process
    * @param userIdentifier User identifier
    * @param registrationResponse Server's registration response
-   * @returns Registration record for storage
+   * @returns Registration record
    */
   public async finishRegistration(
     userIdentifier: string,
     registrationResponse: string
   ): Promise<string> {
     try {
+      await ensureOpaqueReady();
       logger.info('Finishing OPAQUE registration', { userIdentifier });
 
       // Retrieve stored registration state
-      const storedState = await AsyncStorage.getItem(`opaque_reg_state_${userIdentifier}`);
+      const storedState = await AsyncStorage.getItem(`opaque_registration_state_${userIdentifier}`);
       if (!storedState) {
         throw new Error('Registration state not found');
       }
@@ -112,54 +163,64 @@ export class OpaqueAuthService {
       const { registrationRecord } = opaque.client.finishRegistration({
         clientRegistrationState,
         registrationResponse,
-        password
+        password,
       });
 
-      // Store registration record and user identifier
-      await AsyncStorage.setItem(STORAGE_KEYS.REGISTRATION_RECORD, registrationRecord);
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_IDENTIFIER, userIdentifier);
+      if (!registrationRecord) {
+        throw new Error('Failed to finish registration');
+      }
 
-      // Clean up temporary state
-      await AsyncStorage.removeItem(`opaque_reg_state_${userIdentifier}`);
+      // Clean up stored state
+      await AsyncStorage.removeItem(`opaque_registration_state_${userIdentifier}`);
 
-      logger.info('OPAQUE registration completed successfully');
-      return registrationRecord;
+      logger.info('OPAQUE registration finished successfully', { userIdentifier });
+
+      return registrationRecord;  // Return raw Base64URL to backend
     } catch (error) {
-      logger.error('OPAQUE registration finish failed', error);
-      throw new Error('Failed to complete OPAQUE registration');
+      logger.error('Failed to finish OPAQUE registration', { userIdentifier, error });
+      throw new Error(`OPAQUE registration finish failed: ${error}`);
     }
   }
 
   /**
-   * Start OPAQUE login process
+   * Start OPAQUE login process with user credentials
    * @param password User's password
    * @param userIdentifier User identifier (email)
-   * @returns Login request to send to server
+   * @returns Login request and client state
    */
   public async startLogin(password: string, userIdentifier: string): Promise<{
     loginRequest: string;
     clientLoginState: string;
   }> {
     try {
+      await ensureOpaqueReady();
       logger.info('Starting OPAQUE login', { userIdentifier });
 
-      const { clientLoginState, loginRequest } = 
-        opaque.client.startLogin({ password });
+      // Start login with OPAQUE client
+      const result = opaque.client.startLogin({ password });
+
+      if (!result || !result.clientLoginState || !result.startLoginRequest) {
+        throw new Error('Failed to generate OPAQUE login request');
+      }
 
       // Store the client state temporarily for finishing login
       await AsyncStorage.setItem(
         `opaque_login_state_${userIdentifier}`, 
         JSON.stringify({
-          clientLoginState,
+          clientLoginState: result.clientLoginState,
           password,
           userIdentifier
         })
       );
 
-      logger.info('OPAQUE login started successfully');
+      logger.info('OPAQUE login started successfully', { 
+        startLoginRequestLength: result.startLoginRequest.length,
+        clientLoginStateLength: result.clientLoginState.length 
+      });
+      
       return {
-        loginRequest,
-        clientLoginState
+        loginRequest: result.startLoginRequest,  // Send raw Base64URL to backend
+        clientLoginState: result.clientLoginState
       };
     } catch (error) {
       logger.error('OPAQUE login start failed', error);
@@ -178,6 +239,7 @@ export class OpaqueAuthService {
     loginResponse: string
   ): Promise<OpaqueSessionResult> {
     try {
+      await ensureOpaqueReady();
       logger.info('Finishing OPAQUE login', { userIdentifier });
 
       // Retrieve stored login state
@@ -188,27 +250,47 @@ export class OpaqueAuthService {
 
       const { clientLoginState, password } = JSON.parse(storedState);
 
+      // Add detailed logging for debugging
+      logger.info('Retrieved stored login state', { 
+        userIdentifier,
+        clientLoginStateLength: clientLoginState?.length,
+        loginResponseLength: loginResponse?.length,
+        passwordLength: password?.length
+      });
+
       // Complete login
       const loginResult = opaque.client.finishLogin({
         clientLoginState,
         loginResponse,
-        password
+        password,
+      });
+
+      logger.info('OPAQUE finishLogin result', { 
+        userIdentifier,
+        success: loginResult !== null,
+        resultType: typeof loginResult,
+        resultKeys: loginResult ? Object.keys(loginResult) : null
       });
 
       if (!loginResult) {
-        throw new Error('OPAQUE login failed - invalid credentials');
+        throw new Error('Failed to finish login');
       }
 
-      const { sessionKey, exportKey } = loginResult;
+      const { finishLoginRequest, sessionKey, exportKey } = loginResult;
 
-      // Clean up temporary state
+      // Clean up stored state
       await AsyncStorage.removeItem(`opaque_login_state_${userIdentifier}`);
 
-      logger.info('OPAQUE login completed successfully');
-      return { sessionKey, exportKey };
+      logger.info('OPAQUE login finished successfully', { userIdentifier });
+
+      return { 
+        sessionKey, 
+        exportKey, 
+        finishLoginRequest
+      };
     } catch (error) {
-      logger.error('OPAQUE login finish failed', error);
-      throw new Error('Failed to complete OPAQUE login');
+      logger.error('Failed to finish OPAQUE login', { userIdentifier, error });
+      throw new Error(`OPAQUE login finish failed: ${error}`);
     }
   }
 
@@ -254,30 +336,47 @@ export class OpaqueAuthService {
    * Login user with OPAQUE protocol
    * @param email User's email address
    * @param password User's password
-   * @returns Session and export keys for key derivation
+   * @returns Complete login result with JWT token and session keys
    */
-  public async login(email: string, password: string): Promise<OpaqueSessionResult> {
+  public async login(email: string, password: string): Promise<OpaqueLoginResult> {
     try {
-      logger.info('Starting OPAQUE login flow', { email });
+      logger.info('Starting OPAQUE login', { email });
 
-      // Step 1: Start login
-      const { loginRequest } = await this.startLogin(password, email);
-
-      // Step 2: Send login request to server
-      const response = await api.post('/api/auth/opaque/login/start', {
+      // Start login process
+      const startResult = await this.startLogin(password, email);
+      const loginResponse = await api.post('/api/auth/opaque/login/start', {
         userIdentifier: email,
-        loginRequest
+        loginRequest: startResult.loginRequest,
       });
 
-      const { loginResponse } = response.data;
+      if (!loginResponse.data?.loginResponse) {
+        throw new Error('Invalid login response from server');
+      }
 
-      // Step 3: Finish login and get session keys
-      const sessionResult = await this.finishLogin(email, loginResponse);
+      // Finish login process
+      const sessionResult = await this.finishLogin(email, loginResponse.data.loginResponse);
+      
+      // Send finish login request to server
+      const finishResponse = await api.post('/api/auth/opaque/login/finish', {
+        userIdentifier: email,
+        finishLoginRequest: sessionResult.finishLoginRequest,
+      });
 
-      logger.info('OPAQUE login flow completed successfully');
-      return sessionResult;
+      if (!finishResponse.data?.token) {
+        throw new Error('Invalid finish login response from server');
+      }
+
+      logger.info('OPAQUE login completed successfully', { email });
+
+      return {
+        success: true,
+        user: finishResponse.data.user,
+        token: finishResponse.data.token,
+        sessionKey: sessionResult.sessionKey,
+        exportKey: sessionResult.exportKey,
+      };
     } catch (error) {
-      logger.error('OPAQUE login flow failed', error);
+      logger.error('OPAQUE login failed', { email, error });
       throw error;
     }
   }

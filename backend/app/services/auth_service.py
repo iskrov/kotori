@@ -1,3 +1,5 @@
+import logging
+
 from datetime import datetime, timedelta, UTC
 from typing import Any
 
@@ -10,6 +12,8 @@ from ..core.security import create_access_token
 from ..core.security import verify_password
 from ..models.user import User
 from .user_service import user_service
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -71,7 +75,7 @@ class AuthService:
                 # Invalid token type or missing user ID
                 return None
 
-            user = user_service.get(db, id=int(user_id))
+            user = user_service.get(db, id=user_id)  # Remove int() conversion
             if not user or not user.is_active:
                 # User not found or inactive
                 return None

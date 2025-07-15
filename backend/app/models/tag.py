@@ -3,29 +3,36 @@ from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy.orm import relationship
+import uuid
 
-from .base import Base
+from .base import Base, UUID
 from .base import TimestampMixin
 
 
 class Tag(Base, TimestampMixin):
     __tablename__ = "tags"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String, nullable=False, unique=True)
     color = Column(String, nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
 
     # Relationships
     entries = relationship("JournalEntryTag", back_populates="tag")
+    user = relationship("User", back_populates="tags")
 
 
 class JournalEntryTag(Base):
     __tablename__ = "journal_entry_tags"
 
-    id = Column(Integer, primary_key=True, index=True)
-    entry_id = Column(Integer, ForeignKey("journal_entries.id"), nullable=False)
-    tag_id = Column(Integer, ForeignKey("tags.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    entry_id = Column(UUID(as_uuid=True), ForeignKey("journal_entries.id"), nullable=False)
+    tag_id = Column(UUID(as_uuid=True), ForeignKey("tags.id"), nullable=False)
 
     # Relationships
     entry = relationship("JournalEntry", back_populates="tags")
     tag = relationship("Tag", back_populates="entries")
+
+    __table_args__ = (
+        {"extend_existing": True},
+    )

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppTheme } from '../contexts/ThemeContext';
+import { AppTheme } from '../config/theme';
 import logger from '../utils/logger';
 
 interface OpaqueAuthButtonProps {
@@ -8,6 +10,7 @@ interface OpaqueAuthButtonProps {
   email: string;
   password: string;
   name?: string;
+  confirmPassword?: string;
   onSuccess?: () => void;
   onError?: (error: string) => void;
   disabled?: boolean;
@@ -19,6 +22,7 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
   email,
   password,
   name,
+  confirmPassword,
   onSuccess,
   onError,
   disabled = false,
@@ -31,6 +35,9 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
     isLoading: authLoading 
   } = useAuth();
   
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [opaqueSupported, setOpaqueSupported] = useState<boolean | null>(null);
   const [checkingSupport, setCheckingSupport] = useState(true);
@@ -42,9 +49,9 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
         setCheckingSupport(true);
         const supported = await hasOpaqueSupport();
         setOpaqueSupported(supported);
-        logger.info('OPAQUE support check completed', { supported });
+        logger.info('Authentication service check completed', { supported });
       } catch (error) {
-        logger.error('Failed to check OPAQUE support', error);
+        logger.error('Failed to check authentication service', error);
         setOpaqueSupported(false);
       } finally {
         setCheckingSupport(false);
@@ -55,20 +62,69 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
   }, [hasOpaqueSupport]);
 
   const handleAuth = async () => {
-    if (!email || !password || (mode === 'register' && !name)) {
-      onError?.('Please fill in all required fields');
+    // Email validation regex - comprehensive pattern
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    // Validate required fields with specific messages
+    if (mode === 'register' && !name?.trim()) {
+      onError?.('Please enter your name');
+      return;
+    }
+    if (!email?.trim()) {
+      onError?.('Please enter your email address');
+      return;
+    }
+    
+    // Only apply strict email validation for registration
+    if (mode === 'register') {
+      const trimmedEmail = email.trim();
+      if (!emailRegex.test(trimmedEmail)) {
+        onError?.('Please enter a valid email address (e.g., user@example.com)');
+        return;
+      }
+      
+      // Additional email validation checks for registration
+      if (trimmedEmail.length > 254) {
+        onError?.('Email address is too long');
+        return;
+      }
+      if (trimmedEmail.includes('..')) {
+        onError?.('Email address cannot contain consecutive dots');
+        return;
+      }
+    }
+    if (!password) {
+      onError?.('Please enter a password');
+      return;
+    }
+    if (mode === 'register' && password.length < 8) {
+      onError?.('Password must be at least 8 characters long');
+      return;
+    }
+    if (mode === 'register') {
+      if (password.length > 128) {
+        onError?.('Password is too long (maximum 128 characters)');
+        return;
+      }
+      if (!confirmPassword) {
+        onError?.('Please confirm your password');
+        return;
+      }
+    }
+    if (mode === 'register' && password !== confirmPassword) {
+      onError?.('Passwords do not match');
       return;
     }
 
     if (!opaqueSupported) {
-      onError?.('OPAQUE authentication is not supported on this server');
+      onError?.('Authentication service is currently unavailable');
       return;
     }
 
     try {
       setIsLoading(true);
       
-      logger.info(`Using OPAQUE ${mode} for zero-knowledge authentication`);
+      logger.info(`Starting secure ${mode} process`);
       
       if (mode === 'login') {
         await opaqueLogin(email, password);
@@ -78,7 +134,7 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
       
       onSuccess?.();
     } catch (error: any) {
-      logger.error(`OPAQUE ${mode} failed:`, error);
+      logger.error(`Secure ${mode} failed:`, error);
       
       let errorMsg = `An error occurred during ${mode}. Please try again.`;
       
@@ -90,6 +146,8 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
         } else if (error.errors && Array.isArray(error.errors)) {
           errorMsg = error.errors.join('\n');
         }
+      } else if (error.status === 400 && error.message === 'User already exists') {
+        errorMsg = 'An account with this email already exists. Please try signing in instead.';
       } else if (error.status === 409) {
         errorMsg = 'An account with this email already exists.';
       } else if (error.status === 500 && error.message.includes('Database connection error')) {
@@ -111,8 +169,8 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
   if (checkingSupport) {
     return (
       <View style={[styles.button, styles.checkingButton, style]}>
-        <ActivityIndicator size="small" color="#FFFFFF" />
-        <Text style={styles.buttonText}>Checking OPAQUE Support...</Text>
+        <ActivityIndicator size="small" color={theme.colors.white} />
+        <Text style={styles.buttonText}>Checking Server...</Text>
       </View>
     );
   }
@@ -120,7 +178,7 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
   if (!opaqueSupported) {
     return (
       <View style={[styles.button, styles.disabledButton, style]}>
-        <Text style={styles.buttonText}>OPAQUE Not Supported</Text>
+        <Text style={[styles.buttonText, styles.disabledText]}>Server Unavailable</Text>
       </View>
     );
   }
@@ -136,40 +194,46 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
       disabled={isButtonDisabled}
     >
       {isLoading || authLoading ? (
-        <ActivityIndicator size="small" color="#FFFFFF" />
+        <ActivityIndicator size="small" color={theme.colors.white} />
       ) : (
         <Text style={styles.buttonText}>
-          {mode === 'login' ? 'OPAQUE Login' : 'OPAQUE Register'}
+          {mode === 'login' ? 'Sign In' : 'Create Account'}
         </Text>
       )}
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    minHeight: 48,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+    minHeight: 56,
   },
   enabledButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
+    ...theme.shadows.sm,
   },
   disabledButton: {
-    backgroundColor: '#CCCCCC',
+    backgroundColor: theme.colors.disabled,
   },
   checkingButton: {
-    backgroundColor: '#FFA500',
+    backgroundColor: theme.colors.warning,
+    ...theme.shadows.sm,
   },
   buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    color: theme.colors.white,
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: '600',
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    marginLeft: theme.spacing.sm,
+  },
+  disabledText: {
+    color: theme.colors.textDisabled,
   },
 });
 

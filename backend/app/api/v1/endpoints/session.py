@@ -5,6 +5,7 @@ This module provides FastAPI routes for OPAQUE session management operations.
 """
 
 import asyncio
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, status, Request
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -195,14 +196,14 @@ async def refresh_session(
     db: Session = Depends(get_db)
 ):
     """
-    Refresh a session
+    Refresh a JWT session token
     
-    Extends the expiration time of an active session.
+    Generates a new JWT token for the session, blacklisting the old token.
     """
     start_time = asyncio.get_event_loop().time()
     
     try:
-        # First validate the session
+        # Extract client information
         user_agent = http_request.headers.get("user-agent", "")
         ip_address = http_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
         if not ip_address:
@@ -210,37 +211,30 @@ async def refresh_session(
         if not ip_address:
             ip_address = getattr(http_request.client, "host", "")
         
-        session = session_service.validate_session_token(
+        # Refresh the JWT session token
+        new_token = session_service.refresh_session_token(
             db=db,
-            token=request.session_token,
+            session_token=request.session_token,
             user_agent=user_agent,
             ip_address=ip_address
         )
-        
-        if not session:
-            # Timing attack protection
-            elapsed = (asyncio.get_event_loop().time() - start_time) * 1000
-            if elapsed < session_service.MIN_RESPONSE_TIME_MS:
-                await asyncio.sleep((session_service.MIN_RESPONSE_TIME_MS - elapsed) / 1000)
-            
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid session token"
-            )
-        
-        # Refresh the session
-        refreshed_session = session_service.refresh_session(db, session)
         
         # Timing attack protection
         elapsed = (asyncio.get_event_loop().time() - start_time) * 1000
         if elapsed < session_service.MIN_RESPONSE_TIME_MS:
             await asyncio.sleep((session_service.MIN_RESPONSE_TIME_MS - elapsed) / 1000)
         
-        return SessionRefreshResponse(
-            success=True,
-            expires_at=refreshed_session.expires_at,
-            message="Session refreshed successfully"
-        )
+        if new_token:
+            return SessionRefreshResponse(
+                success=True,
+                new_session_token=new_token,
+                message="Session token refreshed successfully"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid session token"
+            )
         
     except SessionTokenError as e:
         logger.error(f"Session refresh error: {str(e)}")
@@ -482,6 +476,39 @@ async def get_current_session(
         )
 
 
+@router.get("/token/info")
+async def get_token_info(
+    session_token: str,
+    current_user: User = Depends(get_current_active_user_from_session)
+):
+    """
+    Get information about a JWT session token
+    
+    Returns token information for debugging and monitoring.
+    """
+    try:
+        token_info = session_service.get_session_info(session_token)
+        
+        if not token_info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid token"
+            )
+        
+        return {
+            "token_info": token_info,
+            "service": "session_service",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting token info: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+
 @router.get("/health")
 async def session_health_check():
     """
@@ -499,6 +526,7 @@ async def session_health_check():
             "session_invalidation": True,
             "session_cleanup": True,
             "timing_protection": True,
-            "fingerprinting": True
+            "fingerprinting": True,
+            "jwt_tokens": True
         }
     } 

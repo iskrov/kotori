@@ -1,0 +1,14 @@
+{
+  "name": "vibes-backend",
+  "version": "1.0.0",
+  "description": "Backend Node.js dependencies for Vibes",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@serenity-kit/opaque": "^0.9.0"
+  },
+  "author": "",
+  "license": "ISC"
+}

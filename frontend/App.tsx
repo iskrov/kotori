@@ -66,14 +66,27 @@ const AppContent = () => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    if (__DEV__) {
-      logger.info('Running in development mode', {
-        platform: Platform.OS,
-        version: Platform.Version,
-        constants: Constants.expoConfig?.extra
-      });
-    }
-    setIsInitialized(true);
+    const initializeApp = async () => {
+      try {
+        if (__DEV__) {
+          logger.info('Running in development mode', {
+            platform: Platform.OS,
+            version: Platform.Version,
+            constants: Constants.expoConfig?.extra
+          });
+        }
+        
+        logger.info('App initialization completed');
+        
+        setIsInitialized(true);
+      } catch (error) {
+        logger.error('Failed to initialize app:', error);
+        // Still set initialized to true to avoid infinite loading
+        setIsInitialized(true);
+      }
+    };
+
+    initializeApp();
   }, []);
 
   // Map theme.colors.statusBar to StatusBarStyle

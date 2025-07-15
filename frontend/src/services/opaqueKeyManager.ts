@@ -26,7 +26,12 @@ export class OpaqueKeyManager {
     this.exportKey = sessionResult.exportKey;
     this.derivedKeys.clear();
     
-    logger.info('OPAQUE key manager initialized');
+    logger.info('OPAQUE key manager initialized', {
+      sessionKeyType: typeof this.sessionKey,
+      sessionKeyConstructor: this.sessionKey?.constructor?.name,
+      exportKeyType: typeof this.exportKey,
+      exportKeyConstructor: this.exportKey?.constructor?.name
+    });
   }
 
   /**
@@ -164,18 +169,26 @@ export class OpaqueKeyManager {
   public clear(): void {
     // Securely zero out keys if possible
     if (this.sessionKey) {
-      this.sessionKey.fill(0);
+      // Check if it's a Uint8Array before calling fill
+      if (this.sessionKey instanceof Uint8Array) {
+        this.sessionKey.fill(0);
+      }
       this.sessionKey = null;
     }
     
     if (this.exportKey) {
-      this.exportKey.fill(0);
+      // Check if it's a Uint8Array before calling fill
+      if (this.exportKey instanceof Uint8Array) {
+        this.exportKey.fill(0);
+      }
       this.exportKey = null;
     }
 
     // Clear derived keys
     for (const key of this.derivedKeys.values()) {
-      key.fill(0);
+      if (key instanceof Uint8Array) {
+        key.fill(0);
+      }
     }
     this.derivedKeys.clear();
 

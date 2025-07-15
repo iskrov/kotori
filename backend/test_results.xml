@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="10" failures="0" skipped="0" tests="10" time="2.405" timestamp="2025-07-09T07:15:09.445524" hostname="AI"><testcase classname="tests.e2e.test_authentication_flow.TestOpaqueAuthenticationFlow" name="test_complete_opaque_authentication_flow" time="1.811"><error message="failed on setup with &quot;NameError: name 'create_engine' is not defined&quot;">tests/e2e/test_authentication_flow.py:89: in setup_method
+    self.engine = create_engine(TEST_DATABASE_URL)
+E   NameError: name 'create_engine' is not defined</error><error message="failed on teardown with &quot;AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'&quot;">tests/e2e/test_authentication_flow.py:191: in _cleanup_test_data
+    self.db.query(OpaqueSession).filter(
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'
+
+During handling of the above exception, another exception occurred:
+tests/e2e/test_authentication_flow.py:118: in teardown_method
+    self._cleanup_test_data()
+tests/e2e/test_authentication_flow.py:207: in _cleanup_test_data
+    self.db.rollback()
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'</error></testcase><testcase classname="tests.e2e.test_authentication_flow.TestOpaqueAuthenticationFlow" name="test_authentication_with_wrong_phrase" time="0.001"><error message="failed on setup with &quot;NameError: name 'create_engine' is not defined&quot;">tests/e2e/test_authentication_flow.py:89: in setup_method
+    self.engine = create_engine(TEST_DATABASE_URL)
+E   NameError: name 'create_engine' is not defined</error><error message="failed on teardown with &quot;AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'&quot;">tests/e2e/test_authentication_flow.py:191: in _cleanup_test_data
+    self.db.query(OpaqueSession).filter(
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'
+
+During handling of the above exception, another exception occurred:
+tests/e2e/test_authentication_flow.py:118: in teardown_method
+    self._cleanup_test_data()
+tests/e2e/test_authentication_flow.py:207: in _cleanup_test_data
+    self.db.rollback()
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'</error></testcase><testcase classname="tests.e2e.test_authentication_flow.TestOpaqueAuthenticationFlow" name="test_authentication_with_nonexistent_tag" time="0.001"><error message="failed on setup with &quot;NameError: name 'create_engine' is not defined&quot;">tests/e2e/test_authentication_flow.py:89: in setup_method
+    self.engine = create_engine(TEST_DATABASE_URL)
+E   NameError: name 'create_engine' is not defined</error><error message="failed on teardown with &quot;AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'&quot;">tests/e2e/test_authentication_flow.py:191: in _cleanup_test_data
+    self.db.query(OpaqueSession).filter(
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'
+
+During handling of the above exception, another exception occurred:
+tests/e2e/test_authentication_flow.py:118: in teardown_method
+    self._cleanup_test_data()
+tests/e2e/test_authentication_flow.py:207: in _cleanup_test_data
+    self.db.rollback()
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'</error></testcase><testcase classname="tests.e2e.test_authentication_flow.TestOpaqueAuthenticationFlow" name="test_authentication_timing_consistency" time="0.001"><error message="failed on setup with &quot;NameError: name 'create_engine' is not defined&quot;">tests/e2e/test_authentication_flow.py:89: in setup_method
+    self.engine = create_engine(TEST_DATABASE_URL)
+E   NameError: name 'create_engine' is not defined</error><error message="failed on teardown with &quot;AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'&quot;">tests/e2e/test_authentication_flow.py:191: in _cleanup_test_data
+    self.db.query(OpaqueSession).filter(
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'
+
+During handling of the above exception, another exception occurred:
+tests/e2e/test_authentication_flow.py:118: in teardown_method
+    self._cleanup_test_data()
+tests/e2e/test_authentication_flow.py:207: in _cleanup_test_data
+    self.db.rollback()
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'</error></testcase><testcase classname="tests.e2e.test_authentication_flow.TestOpaqueAuthenticationFlow" name="test_authentication_session_management" time="0.001"><error message="failed on setup with &quot;NameError: name 'create_engine' is not defined&quot;">tests/e2e/test_authentication_flow.py:89: in setup_method
+    self.engine = create_engine(TEST_DATABASE_URL)
+E   NameError: name 'create_engine' is not defined</error><error message="failed on teardown with &quot;AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'&quot;">tests/e2e/test_authentication_flow.py:191: in _cleanup_test_data
+    self.db.query(OpaqueSession).filter(
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'
+
+During handling of the above exception, another exception occurred:
+tests/e2e/test_authentication_flow.py:118: in teardown_method
+    self._cleanup_test_data()
+tests/e2e/test_authentication_flow.py:207: in _cleanup_test_data
+    self.db.rollback()
+E   AttributeError: 'TestOpaqueAuthenticationFlow' object has no attribute 'db'</error></testcase></testsuite></testsuites>

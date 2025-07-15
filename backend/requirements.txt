@@ -1,63 +1,52 @@
-alembic==1.11.1
-annotated-types==0.7.0
-anyio==4.9.0
-argon2-cffi==23.1.0
-bcrypt==4.3.0
-cachetools==5.5.2
-certifi==2025.1.31
-cffi==1.17.1
-charset-normalizer==3.4.1
-click==8.1.8
-cryptography==44.0.2
-dnspython==2.7.0
-ecdsa==0.19.1
-email-validator==2.0.0
-exceptiongroup==1.2.2
-fastapi==0.100.0
-google-api-core>=2.11.0
-google-auth>=2.17.3
-google-cloud-speech>=2.21.0
-googleapis-common-protos>=1.60.0
-greenlet==3.1.1
-grpcio==1.71.0
-grpcio-status==1.62.3
-h11==0.14.0
-httpcore==0.17.3
-httptools==0.6.4
-httpx==0.24.1
-idna==3.10
-iniconfig==2.1.0
-Mako==1.3.9
-MarkupSafe==3.0.2
-packaging==24.2
-passlib==1.7.4
-pluggy==1.5.0
-proto-plus>=1.22.3
-protobuf>=4.21.1
-psycopg2-binary==2.9.6
-pyasn1==0.6.1
-pyasn1_modules==0.4.1
-pycparser==2.22
-pydantic==2.1.1
-pydantic-settings==2.0.2
-pydantic_core==2.4.0
-pytest==7.4.0
-pytest-asyncio==0.23.8
-python-dotenv==1.0.0
-python-jose==3.3.0
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+sqlalchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+python-jose[cryptography]==3.3.0
 python-multipart==0.0.6
-PyYAML==6.0.2
-requests==2.31.0
-rsa==4.9
-ruff==0.11.5
-six==1.17.0
-sniffio==1.3.1
-SQLAlchemy==2.0.19
-starlette==0.27.0
-tomli==2.2.1
-typing_extensions==4.12.2
-urllib3==1.26.20
-uvicorn==0.23.2
-uvloop==0.21.0
-watchfiles==1.0.5
-websockets==15.0.1
+python-dotenv==1.0.0
+pydantic-settings==2.1.0
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+argon2-cffi==23.1.0
+cryptography==41.0.7
+pynacl==1.5.0
+opaque-ke==0.1.0
+libopaque==1.0.0
+redis==5.0.1
+passlib==1.7.4
+
+# New dependencies for enhanced phrase processing (Task 7-4)
+# Text normalization and Unicode processing
+unicodedata2==15.1.0
+unidecode==1.3.8
+
+# Performance monitoring and system metrics
+psutil==5.9.6
+prometheus-client==0.19.0
+
+# Redis client for distributed rate limiting
+redis==5.0.1
+
+# Additional testing dependencies
+pytest-redis==3.0.2
+pytest-benchmark==4.0.0
+fakeredis==2.20.1
+
+# Development and debugging
+memory-profiler==0.61.0
+line-profiler==4.1.1
+
+# Security dependencies for Task 7-7 (Production-ready error handling and security measures)
+bleach==6.1.0  # HTML sanitization for XSS protection
+python-dateutil==2.8.2  # Date validation
+phonenumbers==8.13.26  # Phone number validation
+email-validator==2.1.0  # Email validation
+cachetools==5.3.2  # Caching utilities for rate limiting
+python-magic==0.4.27  # File type detection
+validators==0.22.0  # Additional validation utilities
+bcrypt==4.1.2  # Secure password hashing
+bcrypt==4.1.2  # Secure password hashing

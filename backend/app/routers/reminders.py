@@ -1,17 +1,21 @@
-from typing import Any
+"""
+Reminder routes for the Vibes application.
 
-from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import HTTPException
+This module provides endpoints for reminder management including creating,
+retrieving, updating, and deleting reminders.
+"""
+
+from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi import status
 from sqlalchemy.orm import Session
+from typing import List
 
-from ..core.security import get_current_user
-from ..db.session import get_db
+from ..dependencies import get_db, get_current_user
 from ..models.user import User
-from ..schemas.reminder import Reminder
-from ..schemas.reminder import ReminderCreate
-from ..schemas.reminder import ReminderUpdate
+from ..schemas.reminder import ReminderCreate, ReminderUpdate, Reminder
 from ..services.reminder_service import reminder_service
 
 router = APIRouter()
@@ -28,7 +32,7 @@ def read_reminders(
     """
     Retrieve reminders for the current user.
     """
-    return reminder_service.get_multi_by_user(
+    return reminder_service.get_by_user(
         db=db, user_id=current_user.id, skip=skip, limit=limit
     )
 
@@ -41,18 +45,17 @@ def create_reminder(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Create new reminder for the current user.
+    Create new reminder.
     """
-    return reminder_service.create_with_user(
-        db=db, obj_in=reminder_in, user_id=current_user.id
-    )
+    reminder_in.user_id = current_user.id
+    return reminder_service.create(db=db, obj_in=reminder_in)
 
 
 @router.get("/{id}", response_model=Reminder)
 def read_reminder(
     *,
     db: Session = Depends(get_db),
-    id: int,
+    id: UUID,
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
@@ -74,7 +77,7 @@ def read_reminder(
 def update_reminder(
     *,
     db: Session = Depends(get_db),
-    id: int,
+    id: UUID,
     reminder_in: ReminderUpdate,
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -97,7 +100,7 @@ def update_reminder(
 def delete_reminder(
     *,
     db: Session = Depends(get_db),
-    id: int,
+    id: UUID,
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """

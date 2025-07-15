@@ -17,12 +17,16 @@ from jose import JWTError, jwt
 
 from app.dependencies import get_db
 from app.models.user import User
-from app.services.speech_service import SpeechService, speech_service
+from app.services.speech_service import SpeechService, create_speech_service
 from app.core.config import settings
 from app.services.user_service import user_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+def get_speech_service(db: Session = Depends(get_db)) -> SpeechService:
+    """Dependency to get SpeechService instance with database integration."""
+    return create_speech_service(db)
 
 async def manual_get_user_from_header(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> User:
     if authorization is None:
@@ -84,7 +88,7 @@ async def transcribe_audio_endpoint(
     file: UploadFile = File(...),
     authorization: str | None = Header(None),
     db: Session = Depends(get_db),
-    speech_service_instance: SpeechService = Depends(lambda: speech_service),
+    speech_service_instance: SpeechService = Depends(get_speech_service),
 ):
     """
     Receives an audio file and optional language codes, transcribes it using the SpeechService,
@@ -165,11 +169,11 @@ async def transcribe_audio_endpoint(
             f"Detected language: {transcription_data.get('detected_language_code')}"
         )
 
-        # Return response (transcript only - secret tag detection happens client-side)
+        # Return response with server-side secret phrase detection
         return {
             "transcript": transcription_data.get("transcript", ""),
             "detected_language_code": transcription_data.get("detected_language_code"),
-            "secret_tag_detected": transcription_data.get("secret_tag_detected")  # Will be None for now
+            "code_phrase_detected": transcription_data.get("code_phrase_detected")  # Secret tag name or None
         }
 
     except RuntimeError as e:

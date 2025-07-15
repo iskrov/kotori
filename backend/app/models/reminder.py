@@ -1,4 +1,5 @@
 import enum
+import uuid
 
 from sqlalchemy import Boolean
 from sqlalchemy import Column
@@ -9,7 +10,7 @@ from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy.orm import relationship
 
-from .base import Base
+from .base import Base, UUID
 from .base import TimestampMixin
 
 
@@ -25,22 +26,16 @@ class ReminderFrequency(str, enum.Enum):
 class Reminder(Base, TimestampMixin):
     __tablename__ = "reminders"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     title = Column(String, nullable=False)
     message = Column(String, nullable=False)
     frequency = Column(Enum(ReminderFrequency), nullable=False)
-    time = Column(
-        DateTime(timezone=True), nullable=False
-    )  # Time of day for the reminder
+    time = Column(DateTime(timezone=True), nullable=False)
     is_active = Column(Boolean, default=True)
+    custom_days = Column(String, nullable=True)  # For custom frequency
 
-    # For custom frequency
-    custom_days = Column(
-        String, nullable=True
-    )  # CSV of days (1-7) for custom schedules
-
-    # Foreign keys
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # Foreign key to User
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
 
     # Relationships
     user = relationship("User", back_populates="reminders")

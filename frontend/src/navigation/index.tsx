@@ -13,7 +13,7 @@ import MainNavigator from './MainNavigator';
 const Stack = createStackNavigator<RootStackParamList>();
 
 const Navigation = () => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, isInitialLoading, user } = useAuth();
   
   // Log navigation state for debugging
   // console.log('[Navigation/index] Rendering - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading); // Removed diagnostic log
@@ -21,15 +21,16 @@ const Navigation = () => {
     // Keep logger.info for general state overview
     logger.info('Navigation state:', { 
       isLoading,
+      isInitialLoading,
       isAuthenticated,
       userExists: !!user,
       platform: Platform.OS,
       isDev: __DEV__
     });
-  }, [isLoading, isAuthenticated, user]);
+  }, [isLoading, isInitialLoading, isAuthenticated, user]);
 
-  // While authentication state is loading, show loading indicator
-  if (isLoading) {
+  // Only show loading indicator for initial auth check, not for auth operations
+  if (isInitialLoading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#7D4CDB" />

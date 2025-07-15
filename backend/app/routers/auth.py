@@ -1,28 +1,32 @@
+"""
+Authentication routes for the Vibes application.
+
+This module provides endpoints for user authentication, registration, and session management.
+It includes support for both traditional email/password authentication and OPAQUE protocol
+for secure password authentication.
+"""
+
 import logging
 import traceback
 from datetime import timedelta
-from typing import Any
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi import Body
-from fastapi import Depends
-from fastapi import HTTPException
-from fastapi import Request
-from fastapi import status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from ..core import security
 from ..core.config import settings
-from ..core.security import get_current_user
-from ..db.session import get_db
+from ..dependencies import get_db, get_current_user
 from ..schemas.token import GoogleAuthRequest
 from ..schemas.token import RefreshTokenRequest
 from ..schemas.token import Token
 from ..schemas.user import User as UserSchema
 from ..schemas.user import UserCreate
 from ..services import auth_service
-from ..services import user_service
+from ..services.user_service import user_service
+from ..core.security import create_access_token, verify_password, audit_authentication_event
 
 # Configure logging
 logger = logging.getLogger(__name__)

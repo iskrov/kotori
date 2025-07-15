@@ -4,13 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import { User } from '../types';
 import logger from '../utils/logger';
-import { opaqueAuth, OpaqueSessionResult } from '../services/opaqueAuth';
+import { opaqueAuth, OpaqueSessionResult, OpaqueLoginResult } from '../services/opaqueAuth';
 import { opaqueKeyManager } from '../services/opaqueKeyManager';
 
 // OPAQUE-only Authentication Context
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  isInitialLoading: boolean;
   user: User | null;
   logout: () => Promise<void>;
   updateUser: (updatedUserData: Partial<User>) => Promise<void>;
@@ -29,6 +30,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   
   // Check for existing OPAQUE session on startup
@@ -82,6 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } finally {
         setIsLoading(false);
+        setIsInitialLoading(false);
       }
     };
 
@@ -158,28 +161,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       logger.info(`OPAQUE login attempt for ${email}`);
       setIsLoading(true);
       
-      // Perform OPAQUE authentication
-      const sessionResult: OpaqueSessionResult = await opaqueAuth.login(email, password);
+      // Perform OPAQUE authentication - this now returns the login response with JWT token
+      const loginResponse: OpaqueLoginResult = await opaqueAuth.login(email, password);
       
-      // Initialize key manager with derived keys
-      opaqueKeyManager.initialize(sessionResult);
+      // Initialize key manager with OPAQUE session keys
+      // Note: We don't need the finishLoginRequest here as it's already been used
+      opaqueKeyManager.initialize({
+        sessionKey: loginResponse.sessionKey,
+        exportKey: loginResponse.exportKey,
+        finishLoginRequest: '' // Not needed for key manager initialization
+      });
       
-      // Use session key for API authentication
-      const sessionKeyBase64 = btoa(String.fromCharCode(...sessionResult.sessionKey));
+      // Use JWT token for API authentication
+      api.defaults.headers.common.Authorization = `Bearer ${loginResponse.token}`;
       
-      // Set authorization header with session key
-      api.defaults.headers.common.Authorization = `Bearer ${sessionKeyBase64}`;
+      logger.info('OPAQUE login successful', { userId: loginResponse.user.id });
       
-      // Get user data from server (using session key for auth)
-      const userResponse = await api.get('/api/auth/me');
+      // Ensure user data has proper date fields (convert null to empty string if needed)
+      const userData = {
+        ...loginResponse.user,
+        created_at: loginResponse.user.created_at || new Date().toISOString(),
+        updated_at: loginResponse.user.updated_at || new Date().toISOString()
+      };
       
-      logger.info('OPAQUE login successful', { userId: userResponse.data.id });
+      // Store JWT token and user data
+      await AsyncStorage.setItem('access_token', loginResponse.token);
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
       
-      // Store session key as access token
-      await AsyncStorage.setItem('access_token', sessionKeyBase64);
-      await AsyncStorage.setItem('user', JSON.stringify(userResponse.data));
-      
-      setUser(userResponse.data);
+      setUser(userData);
       setIsAuthenticated(true);
     } catch (error: any) {
       logger.error('OPAQUE login failed:', { 
@@ -202,13 +211,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       logger.info(`OPAQUE registration attempt for ${email}`);
       setIsLoading(true);
       
-      // Perform OPAQUE registration
+      // Perform OPAQUE registration only - don't auto-login
       await opaqueAuth.register(name, email, password);
       
-      // After successful registration, perform login to get session keys
-      await opaqueLogin(email, password);
-      
-      logger.info('OPAQUE registration and login successful');
+      logger.info('OPAQUE registration successful');
     } catch (error: any) {
       logger.error('OPAQUE registration failed:', { 
         email,
@@ -226,8 +232,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const hasOpaqueSupport = async (): Promise<boolean> => {
     try {
       // Check if server supports OPAQUE endpoints
-      const response = await api.get('/api/auth/opaque/support');
-      return response.data.supported === true;
+      const response = await api.get('/api/auth/opaque/status');
+      return response.data.opaque_enabled === true;
     } catch (error) {
       logger.warn('OPAQUE support check failed, assuming not supported', error);
       return false;
@@ -237,6 +243,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value = {
     isAuthenticated,
     isLoading,
+    isInitialLoading,
     user,
     logout,
     updateUser,

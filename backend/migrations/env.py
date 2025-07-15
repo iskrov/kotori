@@ -14,6 +14,31 @@ from app.core.config import settings
 from app.models.base import Base
 
 # Import all models for Alembic to detect
+from app.models.user import User
+from app.models.journal_entry import JournalEntry
+from app.models.tag import Tag
+from app.models.reminder import Reminder
+from app.models.secret_tag_opaque import (
+    SecretTag,
+    WrappedKey,
+    VaultBlob,
+    OpaqueSession,
+    SecurityAuditLog,
+    SecurityMetrics,
+    SecurityAlert,
+)
+from app.models.monitoring import (
+    SystemHealth,
+    ServiceHealth,
+    Alert,
+    AlertRule,
+    AlertChannel,
+    AlertEscalation,
+    MonitoringConfiguration,
+    MonitoringMetric,
+    MonitoringDashboard,
+)
+from app.models.tag import JournalEntryTag
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -20,8 +20,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { opaqueTagManager } from '../services/OpaqueTagManager';
-import { sessionStorageManager } from '../services/SessionStorageManager';
 import OpaqueTagIndicator from './OpaqueTagIndicator';
 import logger from '../utils/logger';
 import { OpaqueSecretTag } from '../types/opaqueTypes';
@@ -166,26 +164,36 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
       let tagId: string;
       let createdTag: OpaqueSecretTag | undefined;
 
-      // Create OPAQUE-based secret tag (only option now)
-      const deviceFingerprint = sessionStorageManager.getDeviceFingerprint();
-      if (!deviceFingerprint) {
-        throw new Error('Device fingerprinting required for OPAQUE tags');
-      }
-
-      const response = await opaqueTagManager.createOpaqueTag({
-        tag_name: tagName.trim(),
-        activation_phrase: activationPhrase.trim(),
-        color_code: selectedColor,
-        device_fingerprint: deviceFingerprint.hash,
-        security_level: securityLevel
+      // Create server-side secret tag (PBI-7 approach)
+      // This creates the tag on the server using OPAQUE registration
+      const response = await fetch('/api/opaque/secret-tags/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          tag_name: tagName.trim(),
+          phrase: activationPhrase.trim(),
+          color_code: selectedColor
+        })
       });
 
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to create OPAQUE tag');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to create secret tag');
       }
 
-      tagId = response.tag.id;
-      createdTag = response.tag;
+      const secretTag = await response.json();
+      tagId = secretTag.id;
+      
+      // Convert to OpaqueSecretTag format for display
+      createdTag = {
+        ...secretTag,
+        auth_method: 'opaque' as const,
+        security_level: securityLevel,
+        authentication_count: 0
+      };
       
       // Set success state with created tag info
       setJustCreated({
@@ -221,8 +229,6 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
     activationPhrase, 
     confirmationPhrase,
     selectedColor, 
-    useOpaqueAuth,
-    enableOpaqueAuth,
     securityLevel,
     validateTagName, 
     validatePhrase, 
@@ -276,10 +282,8 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
 
           <View style={styles.successInstructions}>
             <Text style={styles.successInstructionText}>
-              {justCreated.isOpaque 
-                ? 'Your tag is protected with OPAQUE zero-knowledge authentication. You can now use this phrase during voice recording to automatically create encrypted entries.'
-                : 'You can now use this phrase during voice recording to automatically tag your entries.'
-              }
+              Your tag is protected with OPAQUE zero-knowledge authentication. 
+              Include your activation phrase in journal entries to automatically access encrypted content.
             </Text>
           </View>
 
@@ -290,7 +294,7 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
               </View>
               <Text style={styles.securityNoticeText}>
                 <Text style={styles.securityNoticeTextBold}>Important:</Text> This phrase cannot be recovered if forgotten. 
-                Your entries will be permanently inaccessible without it.
+                Your encrypted entries will be permanently inaccessible without it.
               </Text>
             </View>
           )}
@@ -316,14 +320,14 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
         
         <Text style={styles.description}>
           Secret tags provide independent privacy levels for your journal entries.
-          Each tag has its own encryption key and activation phrase.
+          Include your activation phrase in journal entries to automatically access encrypted content.
         </Text>
 
         {/* Security Level Selection */}
         <View style={styles.securityLevelContainer}>
           <Text style={styles.securityLevelTitle}>Security Level</Text>
           <Text style={styles.securityLevelDescription}>
-            All tags now use OPAQUE zero-knowledge authentication with device binding
+            All tags use OPAQUE zero-knowledge authentication with server-side phrase detection
           </Text>
           <View style={styles.securityLevelOptions}>
             <TouchableOpacity
@@ -349,27 +353,24 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
             <TouchableOpacity
               style={[
                 styles.securityLevelOption,
-                      securityLevel === 'enhanced' && styles.securityLevelOptionSelected
-                    ]}
-                    onPress={() => setSecurityLevel('enhanced')}
-                  >
-                    <Ionicons 
-                      name="shield-checkmark" 
-                      size={20} 
-                      color={securityLevel === 'enhanced' ? '#00C851' : '#8E8E93'} 
-                    />
-                    <Text style={[
-                      styles.securityLevelOptionText,
-                      securityLevel === 'enhanced' && styles.securityLevelOptionTextSelected
-                    ]}>
-                      Enhanced
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+                securityLevel === 'enhanced' && styles.securityLevelOptionSelected
+              ]}
+              onPress={() => setSecurityLevel('enhanced')}
+            >
+              <Ionicons 
+                name="shield-checkmark" 
+                size={20} 
+                color={securityLevel === 'enhanced' ? '#00C851' : '#8E8E93'} 
+              />
+              <Text style={[
+                styles.securityLevelOptionText,
+                securityLevel === 'enhanced' && styles.securityLevelOptionTextSelected
+              ]}>
+                Enhanced
+              </Text>
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
 
         {/* Critical Warning Section */}
         <View style={styles.warningContainer}>
@@ -384,21 +385,17 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
           </View>
           
           <Text style={styles.warningText}>
-            {useOpaqueAuth && enableOpaqueAuth
-              ? 'This tag uses OPAQUE zero-knowledge authentication. Neither we nor anyone else can see or recover your secret tags or entries.'
-              : 'This app uses zero-knowledge encryption. We (the developers) cannot see or recover your secret tags or entries.'
-            }
+            This tag uses OPAQUE zero-knowledge authentication with server-side phrase detection.
+            Neither we nor anyone else can see or recover your secret tags or entries.
           </Text>
           
           <Text style={styles.warningTextBold}>
             If you forget your activation phrase, all entries with this tag will be permanently lost. There is no recovery method.
           </Text>
           
-          {useOpaqueAuth && enableOpaqueAuth && (
-            <Text style={styles.warningTextBold}>
-              OPAQUE tags are also bound to this device. You'll need to re-authenticate on new devices.
-            </Text>
-          )}
+          <Text style={styles.warningTextBold}>
+            To access encrypted entries, type your exact activation phrase in a journal entry.
+          </Text>
           
           <View style={styles.warningTips}>
             <Text style={styles.warningTipTitle}>Tips for remembering phrases:</Text>
@@ -801,6 +798,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: theme.spacing.sm,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  securityLevelDescription: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.md,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   securityLevelOptions: {
     flexDirection: 'row',

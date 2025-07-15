@@ -17,9 +17,13 @@ class UUID(TypeDecorator):
     impl = String
     cache_ok = True
 
+    def __init__(self, as_uuid=False):
+        self.as_uuid = as_uuid
+        super().__init__()
+
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
-            return dialect.type_descriptor(PostgreSQLUUID(as_uuid=True))
+            return dialect.type_descriptor(PostgreSQLUUID(as_uuid=self.as_uuid))
         else:
             return dialect.type_descriptor(String(36))
 
@@ -37,7 +41,7 @@ class UUID(TypeDecorator):
         elif dialect.name == 'postgresql':
             return value
         else:
-            return uuid.UUID(value)
+            return uuid.UUID(value) if self.as_uuid else value
 
 
 class TimestampMixin:

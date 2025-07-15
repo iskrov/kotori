@@ -1,0 +1,137 @@
+# Test Requirements for Vibes Backend Test Suite
+# This file contains all dependencies needed for comprehensive testing
+
+# Core Testing Framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-html>=3.2.0
+pytest-json-report>=1.5.0
+pytest-xdist>=3.3.0
+pytest-timeout>=2.1.0
+pytest-benchmark>=4.0.0
+
+# Database Testing
+pytest-postgresql>=5.0.0
+pytest-alembic>=0.10.0
+sqlalchemy-utils>=0.41.0
+psycopg2-binary>=2.9.0
+
+# HTTP Testing
+httpx>=0.24.0
+requests>=2.31.0
+responses>=0.23.0
+
+# Security Testing
+cryptography>=41.0.0
+passlib>=1.7.4
+python-jose>=3.3.0
+python-multipart>=0.0.6
+
+# Performance Testing
+psutil>=5.9.0
+memory-profiler>=0.60.0
+py-spy>=0.3.14
+
+# Mocking and Fixtures
+factory-boy>=3.3.0
+faker>=19.0.0
+freezegun>=1.2.2
+responses>=0.23.0
+httpretty>=1.1.4
+
+# Data Validation
+pydantic>=2.0.0
+marshmallow>=3.20.0
+cerberus>=1.3.4
+
+# Async Testing
+asynctest>=0.13.0
+aioresponses>=0.7.4
+async-timeout>=4.0.0
+
+# Load Testing
+locust>=2.16.0
+pytest-benchmark>=4.0.0
+
+# Code Quality
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
+pylint>=2.17.0
+isort>=5.12.0
+
+# Test Data Generation
+mimesis>=10.0.0
+hypothesis>=6.82.0
+
+# Monitoring and Metrics
+prometheus-client>=0.17.0
+structlog>=23.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+click>=8.1.0
+colorama>=0.4.6
+tabulate>=0.9.0
+tqdm>=4.65.0
+
+# JSON and XML Processing
+jsonschema>=4.18.0
+xmltodict>=0.13.0
+
+# Time and Date Testing
+python-dateutil>=2.8.2
+pytz>=2023.3
+
+# File and Path Testing
+pathlib2>=2.3.7
+tempfile>=1.4
+
+# Network Testing
+requests-mock>=1.11.0
+urllib3>=2.0.0
+
+# Image Processing (for vault tests)
+Pillow>=10.0.0
+
+# Encryption Testing
+pycryptodome>=3.18.0
+
+# Development and Debug
+pdb-attach>=3.2.0
+ipython>=8.14.0
+ipdb>=0.13.13
+
+# Test Reporting
+allure-pytest>=2.13.0
+pytest-instafail>=0.5.0
+pytest-sugar>=0.9.7
+
+# Environment Management
+python-decouple>=3.8
+environs>=9.5.0
+
+# Process Management
+supervisor>=4.2.5
+
+# API Testing
+tavern>=2.0.0
+
+# Documentation Testing
+sphinx>=7.1.0
+sphinx-rtd-theme>=1.3.0
+
+# Container Testing
+testcontainers>=3.7.0
+
+# Continuous Integration
+pytest-github-actions-annotate-failures>=0.2.0
+pytest-clarity>=1.0.1
+
+# Additional Testing Utilities
+retry>=0.9.2
+tenacity>=8.2.0
+timeout-decorator>=0.5.0
+parameterized>=0.9.0 

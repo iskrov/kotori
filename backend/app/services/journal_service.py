@@ -1,5 +1,6 @@
 from datetime import date, datetime
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
+from uuid import UUID
 import logging
 
 from sqlalchemy.orm import Session
@@ -11,7 +12,7 @@ from ..models.tag import JournalEntryTag
 from ..models.tag import Tag as TagModel
 from ..schemas.journal import JournalEntry, JournalEntryCreate, JournalEntryUpdate
 from ..schemas.journal import Tag as TagSchema
-from ..schemas.journal import TagCreate
+from ..schemas.journal import TagCreate, SecretPhraseAuthResponse
 from .base import BaseService
 from .session_service import session_service
 
@@ -65,7 +66,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         self,
         db: Session,
         *,
-        user_id: int,
+        user_id: UUID,
         skip: int = 0,
         limit: int = 100,
         start_date: date | None = None,
@@ -137,7 +138,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         
         return response_entries
 
-    def create_tag(self, db: Session, *, tag_in: TagCreate, user_id: int) -> TagModel:
+    def create_tag(self, db: Session, *, tag_in: TagCreate, user_id: UUID) -> TagModel:
         """Create a new tag."""
         # Tags are not user-specific in this model, but we check for existence.
         tag_obj = db.query(TagModel).filter(TagModel.name == tag_in.name).first()
@@ -151,7 +152,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return tag_obj
 
     def update_tag(
-        self, db: Session, *, tag_id: int, tag_in: TagSchema, user_id: int
+        self, db: Session, *, tag_id: UUID, tag_in: TagSchema, user_id: UUID
     ) -> TagModel:
         """Update a tag."""
         tag_obj = db.query(TagModel).get(tag_id)
@@ -167,7 +168,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         db.refresh(tag_obj)
         return tag_obj
 
-    def delete_tag(self, db: Session, *, tag_id: int, user_id: int) -> TagModel:
+    def delete_tag(self, db: Session, *, tag_id: UUID, user_id: UUID) -> TagModel:
         """Delete a tag and all its associations."""
         tag_obj = db.query(TagModel).get(tag_id)
         if not tag_obj:
@@ -184,7 +185,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return tag_obj
 
     def create_with_user(
-        self, db: Session, *, obj_in: JournalEntryCreate, user_id: int
+        self, db: Session, *, obj_in: JournalEntryCreate, user_id: UUID
     ) -> JournalEntry:  # Change return type to JournalEntry schema
         """
         Create a new journal entry with user_id and process tags.
@@ -306,14 +307,14 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Commit all new associations
         db.commit()
 
-    def get_tags_by_user(self, db: Session, *, user_id: int) -> list[TagModel]:
+    def get_tags_by_user(self, db: Session, *, user_id: UUID) -> list[TagModel]:
         """
         Get all tags (tags are global, not user-specific)
         """
         # Return all tags since they are global in this system
         return db.query(TagModel).all()
 
-    def get_recent_tags_by_user(self, db: Session, *, user_id: int, limit: int = 5) -> list[dict]:
+    def get_recent_tags_by_user(self, db: Session, *, user_id: UUID, limit: int = 5) -> list[dict]:
         """
         Get recently used tags for a user, ordered by last usage date.
         Returns tag info with usage statistics.
@@ -355,6 +356,131 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
             })
         
         return recent_tags
+
+    async def create_with_phrase_detection(
+        self,
+        db: Session,
+        *,
+        obj_in: JournalEntryCreate,
+        user_id: UUID,
+        detect_phrases: bool = True,
+        ip_address: Optional[str] = None,
+        session_id: Optional[str] = None
+    ) -> Union[JournalEntry, "SecretPhraseAuthResponse"]:
+        """
+        Create a new journal entry with optional phrase detection.
+        
+        This method integrates with the entry processor to provide:
+        - Real-time secret phrase detection
+        - OPAQUE authentication for detected phrases
+        - Encrypted storage for secret content
+        - Backward compatibility with regular entries
+        
+        Args:
+            db: Database session
+            obj_in: Journal entry creation request
+            user_id: ID of the user creating the entry
+            detect_phrases: Whether to enable phrase detection
+            ip_address: Optional IP address for rate limiting
+            session_id: Optional session ID for tracking
+            
+        Returns:
+            Either a regular JournalEntry or SecretPhraseAuthResponse
+            
+        Raises:
+            EntryProcessingError: If processing fails
+            ValueError: If input validation fails
+        """
+        # Import here to avoid circular imports
+        from .entry_processor import create_entry_processor
+        
+        # Validate input
+        if not obj_in.content and not obj_in.encrypted_content:
+            raise ValueError("Entry must contain either content or encrypted_content")
+        
+        # Create entry processor
+        entry_processor = create_entry_processor(db)
+        
+        # Process entry submission
+        try:
+            result = await entry_processor.process_entry_submission(
+                entry_request=obj_in,
+                user_id=user_id,
+                detect_phrases=detect_phrases,
+                ip_address=ip_address,
+                session_id=session_id
+            )
+            
+            logger.info(f"Entry processing completed for user {user_id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Entry processing failed for user {user_id}: {e}")
+            # Fall back to regular entry creation if phrase detection fails
+            if detect_phrases:
+                logger.warning("Falling back to regular entry creation due to processing error")
+                return self.create_with_user(db=db, obj_in=obj_in, user_id=user_id)
+            else:
+                raise
+    
+    def get_secret_entries_for_tag(
+        self,
+        db: Session,
+        *,
+        secret_tag_id: bytes,
+        user_id: UUID,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[JournalEntry]:
+        """
+        Get encrypted journal entries for a specific secret tag.
+        
+        Args:
+            db: Database session
+            secret_tag_id: Binary tag ID for the secret tag
+            user_id: ID of the user (for security validation)
+            skip: Number of entries to skip (pagination)
+            limit: Maximum number of entries to return
+            
+        Returns:
+            List of journal entries with encrypted content
+        """
+        query = (
+            db.query(JournalEntryModel)
+            .filter(
+                JournalEntryModel.user_id == user_id,
+                JournalEntryModel.secret_tag_id == secret_tag_id
+            )
+            .options(joinedload(JournalEntryModel.tags).joinedload(JournalEntryTag.tag))
+            .order_by(JournalEntryModel.entry_date.desc())
+        )
+        
+        db_entries = query.offset(skip).limit(limit).all()
+        
+        # Convert to schema format
+        response_entries = []
+        for db_entry in db_entries:
+            # Extract ORM tags from the association
+            orm_tags = [assoc.tag for assoc in db_entry.tags]
+            schema_tags = [TagSchema.from_orm(tag_orm_obj) for tag_orm_obj in orm_tags]
+            
+            # Return encrypted content as-is for client-side decryption
+            content = db_entry.encrypted_content.hex() if db_entry.encrypted_content else ""
+            
+            response_entry = JournalEntry(
+                id=db_entry.id,
+                title=db_entry.title,
+                content=content,  # Encrypted content as hex string
+                entry_date=db_entry.entry_date,
+                audio_url=db_entry.audio_url,
+                user_id=db_entry.user_id,
+                created_at=db_entry.created_at,
+                updated_at=db_entry.updated_at,
+                tags=schema_tags
+            )
+            response_entries.append(response_entry)
+        
+        return response_entries
 
     # Legacy static methods removed - use instance methods instead
 

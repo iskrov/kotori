@@ -155,7 +155,7 @@ class EnhancedOpaqueService:
         
         return color_code
     
-    def _check_user_tag_limit(self, user_id: int) -> None:
+    def _check_user_tag_limit(self, user_id: str) -> None:
         """
         Check if user has reached the maximum number of tags.
         
@@ -199,7 +199,7 @@ class EnhancedOpaqueService:
     
     def register_secret_tag(
         self,
-        user_id: int,
+        user_id: str,
         request: OpaqueRegistrationRequest,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None
@@ -444,7 +444,7 @@ class EnhancedOpaqueService:
         # Use BLAKE2s to generate deterministic 16-byte tag_id
         return blake2s_hash(opaque_envelope, length=16)
     
-    def get_user_secret_tags(self, user_id: int) -> List[SecretTagInfo]:
+    def get_user_secret_tags(self, user_id: str) -> List[SecretTagInfo]:
         """
         Get all secret tags for a user with enhanced metadata.
         
@@ -501,7 +501,7 @@ class EnhancedOpaqueService:
             logger.error(f"Error retrieving secret tags for user {user_id}: {e}")
             raise OpaqueServiceError(f"Failed to retrieve secret tags: {str(e)}")
     
-    def validate_tag_exists(self, user_id: int, tag_id: str) -> bool:
+    def validate_tag_exists(self, user_id: str, tag_id: str) -> bool:
         """
         Validate that a secret tag exists for the given user.
         
@@ -528,7 +528,7 @@ class EnhancedOpaqueService:
     
     def update_secret_tag(
         self,
-        user_id: int,
+        user_id: str,
         tag_id: str,
         tag_name: Optional[str] = None,
         color_code: Optional[str] = None,
@@ -607,7 +607,7 @@ class EnhancedOpaqueService:
     
     def delete_secret_tag(
         self,
-        user_id: int,
+        user_id: str,
         tag_id: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None
@@ -710,7 +710,7 @@ class EnhancedOpaqueService:
 
     def authenticate_init(
         self,
-        user_id: int,
+        user_id: str,
         request: OpaqueAuthInitRequest,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None
@@ -1137,7 +1137,7 @@ class EnhancedOpaqueService:
 
     def get_vault_access_info(
         self,
-        user_id: int,
+        user_id: str,
         tag_id: str,
         session_token: str
     ) -> Dict[str, Any]:
@@ -1340,5 +1340,23 @@ def create_opaque_service(db: Session) -> EnhancedOpaqueService:
         
     Returns:
         Configured EnhancedOpaqueService instance
+    """
+    return EnhancedOpaqueService(db)
+
+
+# Create a singleton instance for backward compatibility
+# Note: This will be replaced with proper dependency injection in production
+opaque_service = None
+
+
+def get_opaque_service(db: Session) -> EnhancedOpaqueService:
+    """
+    Get or create an OPAQUE service instance.
+    
+    Args:
+        db: Database session
+        
+    Returns:
+        EnhancedOpaqueService instance
     """
     return EnhancedOpaqueService(db) 

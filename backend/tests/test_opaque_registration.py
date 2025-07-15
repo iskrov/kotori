@@ -9,6 +9,7 @@ import base64
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+import uuid
 
 from app.main import app
 from app.dependencies import get_db, get_current_user
@@ -45,7 +46,7 @@ class TestOpaqueRegistration:
             pass
         
         def mock_get_current_user():
-            return User(id=1, email="test@example.com", is_active=True)
+            return User(id=str(uuid.uuid4()), email="test@example.com", is_active=True)
         
         app.dependency_overrides[get_db] = mock_get_db
         app.dependency_overrides[get_current_user] = mock_get_current_user

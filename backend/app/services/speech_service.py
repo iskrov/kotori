@@ -13,9 +13,11 @@ from google.cloud.speech_v2.types import cloud_speech # Use V2 types
 # from google.cloud.speech import StreamingRecognitionConfig
 # from google.cloud.speech import StreamingRecognizeRequest
 from google.oauth2 import service_account
+from sqlalchemy.orm import Session
 
 from ..core.config import settings
 from .encryption_service import encryption_service
+from .phrase_processor import SecretPhraseProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +40,13 @@ class SpeechService:
     DEFAULT_RECOGNIZER_ID = "_"
     CHIRP_2_MODEL = "chirp_2"  # Restored for us-central1 compatibility
 
-    def __init__(self):
+    def __init__(self, db: Optional[Session] = None):
         self.client_options = None
         self.async_client = None
         self.sync_client = None
+        self.db = db
+        self.phrase_processor = SecretPhraseProcessor(db) if db else None
+        
         try:
             self.client_options = self._get_client_options()
             # Initialize clients only if client_options are valid
@@ -173,15 +178,9 @@ class SpeechService:
                 transcription_result["detected_language_code"] = detected_lang_from_response
                 logger.info(f"Detected language: {detected_lang_from_response}")
 
-            # Check for code phrases if we have a user context
+            # Note: Code phrase detection requires user context
+            # Use transcribe_audio_with_user_context() for secret phrase detection
             transcription_result["code_phrase_detected"] = None
-            transcript_text = transcription_result.get("transcript", "").strip()
-            if transcript_text:
-                # This will be enhanced to take user_id and check user-specific phrases
-                code_phrase_type = self._check_code_phrases(transcript_text)
-                if code_phrase_type:
-                    transcription_result["code_phrase_detected"] = code_phrase_type
-                    logger.info(f"Code phrase detected: {code_phrase_type}")
 
             return transcription_result
 
@@ -196,41 +195,44 @@ class SpeechService:
 
     def _check_code_phrases(self, transcript: str, user_id: Optional[int] = None) -> Optional[str]:
         """
-        Check if the transcript contains any code phrases.
-        Returns the type of code phrase detected: 'unlock', 'decoy', 'panic', or None.
+        Check if the transcript contains any secret phrases for the user.
+        Returns the secret tag name if a phrase is detected, None otherwise.
         
-        TODO: This needs to be enhanced to:
-        1. Accept user_id parameter
-        2. Fetch user's stored phrase hashes from database
-        3. Check against user-specific phrases instead of hardcoded ones
+        This method integrates with the database to:
+        1. Fetch user's stored secret tags from database
+        2. Check against user-specific phrases using OPAQUE authentication
+        3. Return the secret tag name if authentication succeeds
         """
-        # Normalize transcript for comparison
-        normalized_transcript = transcript.strip().lower().translate(
-            str.maketrans('', '', '.,!?;:')
-        )
-        
-        # TODO: Replace these hardcoded phrases with user-specific database lookups
-        # For now, using placeholder phrases for testing
-        test_phrases = {
-            'unlock': ['show hidden entries', 'unlock secret mode', 'reveal private'],
-            'decoy': ['show decoy profile', 'switch to decoy'],
-            'panic': ['emergency destroy', 'delete everything now']
-        }
-        
-        for phrase_type, phrases in test_phrases.items():
-            for phrase in phrases:
-                normalized_phrase = phrase.strip().lower().translate(
-                    str.maketrans('', '', '.,!?;:')
-                )
-                if normalized_phrase == normalized_transcript:
-                    return phrase_type
-        
-        return None
+        if not transcript or not user_id:
+            return None
+            
+        if not self.phrase_processor:
+            logger.warning("Phrase processor not initialized - database integration not available")
+            return None
+            
+        try:
+            # Use the phrase processor to check for secret phrases
+            # This will handle normalization, database lookup, and OPAQUE authentication
+            success, secret_tag, encrypted_entries, encryption_key = self.phrase_processor.process_entry_for_secret_phrases(
+                content=transcript,
+                user_id=user_id
+            )
+            
+            if success and secret_tag:
+                logger.info(f"Secret phrase detected for user {user_id}: tag '{secret_tag.tag_name}'")
+                return secret_tag.tag_name
+            else:
+                logger.debug(f"No secret phrase detected in transcript for user {user_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error checking secret phrases for user {user_id}: {e}")
+            return None
 
     async def transcribe_audio_with_user_context(
         self, 
         audio_content: bytes, 
-        user_id: int,
+        user_id: str,
         language_codes: Optional[List[str]] = None
     ) -> dict:
         """
@@ -340,6 +342,23 @@ class SpeechService:
 
                 if is_final:
                     logger.info(f"[{user_id}] Received final transcript segment: '{transcript[:50]}...'")
+                    
+                    # Check for secret phrases in final transcripts
+                    if self.phrase_processor:
+                        try:
+                            # Convert user_id to int for database lookup
+                            user_id_int = int(user_id) if user_id.isdigit() else None
+                            if user_id_int:
+                                secret_tag_name = self._check_code_phrases(transcript, user_id_int)
+                                if secret_tag_name:
+                                    await manager.send_personal_message({
+                                        "type": "secret_phrase_detected",
+                                        "tag_name": secret_tag_name,
+                                        "transcript": transcript,
+                                    }, user_id)
+                                    logger.info(f"[{user_id}] Secret phrase detected in streaming: {secret_tag_name}")
+                        except Exception as e:
+                            logger.error(f"[{user_id}] Error checking secret phrases in streaming: {e}")
 
 
     async def process_audio_stream(
@@ -398,5 +417,18 @@ class SpeechService:
              logger.info(f"Google streaming recognize task finished or terminated for user {user_id}")
 
 
-# Singleton instance
+# Factory function to create SpeechService with database session
+def create_speech_service(db: Optional[Session] = None) -> SpeechService:
+    """
+    Create a SpeechService instance with optional database integration.
+    
+    Args:
+        db: Optional database session for secret phrase integration
+        
+    Returns:
+        SpeechService instance with database integration if provided
+    """
+    return SpeechService(db)
+
+# Default instance without database integration (for backward compatibility)
 speech_service = SpeechService()

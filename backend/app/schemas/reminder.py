@@ -1,54 +1,52 @@
 from datetime import datetime
-from enum import Enum
+from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-
-# Reminder frequency enum
-class ReminderFrequency(str, Enum):
-    DAILY = "daily"
-    WEEKDAYS = "weekdays"
-    WEEKENDS = "weekends"
-    WEEKLY = "weekly"
-    MONTHLY = "monthly"
-    CUSTOM = "custom"
+from ..models.reminder import ReminderFrequency
 
 
-# Base model for reminders
+# Shared properties
 class ReminderBase(BaseModel):
     title: str
     message: str
     frequency: ReminderFrequency
     time: datetime
     is_active: bool = True
-    custom_days: str | None = None  # CSV of days (1-7) for custom schedules
+    custom_days: Optional[str] = None
 
 
-# Properties to receive via API on creation
+# Properties to receive on creation
 class ReminderCreate(ReminderBase):
-    pass
+    user_id: Optional[UUID] = None
 
 
-# Properties to receive via API on update
-class ReminderUpdate(ReminderBase):
-    pass
+# Properties to receive on update
+class ReminderUpdate(BaseModel):
+    title: Optional[str] = None
+    message: Optional[str] = None
+    frequency: Optional[ReminderFrequency] = None
+    time: Optional[datetime] = None
+    is_active: Optional[bool] = None
+    custom_days: Optional[str] = None
 
 
 # Properties shared by models stored in DB
 class ReminderInDBBase(ReminderBase):
-    id: int
-    user_id: int
+    id: UUID
+    user_id: UUID
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# Additional properties to return via API
+# Properties to return to client
 class Reminder(ReminderInDBBase):
     pass
 
 
-# Additional properties stored in DB
+# Properties stored in DB
 class ReminderInDB(ReminderInDBBase):
     pass

@@ -590,4 +590,8 @@ async def cleanup_expired_sessions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cleanup sessions"
-        ) 
+        )
+
+
+# Note: Secret tag creation is primarily handled through phrase detection during journal entry submission
+# This aligns with PBI-7's server-side approach where tags are created automatically when phrases are detected 

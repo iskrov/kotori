@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Union
 import logging
 
 from app.api.dependencies import get_current_user, get_db
@@ -11,9 +11,12 @@ from app.schemas.journal import (
     JournalEntryUpdate,
     HiddenJournalEntry,
     JournalEntryBulkResponse,
-    JournalEntrySearchResponse
+    JournalEntrySearchResponse,
+    SecretPhraseAuthResponse,
+    JournalEntryCreateResponse
 )
-from app.services.journal_service import JournalService
+from app.services.journal_service import journal_service
+from app.services.entry_processor import EntryProcessingError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,7 +37,7 @@ async def create_journal_entry(
     """
     try:
         # Validate hidden entry requirements
-        if entry.is_hidden:
+        if hasattr(entry, 'is_hidden') and entry.is_hidden:
             if not entry.encrypted_content or not entry.encryption_iv:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -51,17 +54,78 @@ async def create_journal_entry(
                 detail="Regular entries must include content"
             )
         
-        db_entry = JournalService.create_journal_entry(
+        db_entry = journal_service.create_with_user(
             db=db, 
-            entry=entry, 
+            obj_in=entry, 
             user_id=current_user.id
         )
         
-        logger.info(f"Created {'hidden' if entry.is_hidden else 'regular'} journal entry for user {current_user.id}")
+        logger.info(f"Created journal entry for user {current_user.id}")
         return db_entry
         
     except Exception as e:
         logger.error(f"Failed to create journal entry: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create journal entry"
+        )
+
+
+@router.post("/with-phrase-detection", response_model=JournalEntryCreateResponse)
+async def create_journal_entry_with_phrase_detection(
+    entry: JournalEntryCreate,
+    request: Request,
+    detect_phrases: bool = Query(True, description="Enable secret phrase detection"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a new journal entry with optional secret phrase detection.
+    
+    This endpoint provides:
+    - Real-time secret phrase detection during entry creation
+    - Automatic OPAQUE authentication for detected phrases
+    - Encrypted storage for entries with authenticated secret phrases
+    - Regular storage for entries without secret phrases
+    
+    Args:
+        entry: Journal entry creation request
+        detect_phrases: Whether to enable phrase detection (default: True)
+        
+    Returns:
+        Either a regular JournalEntry or SecretPhraseAuthResponse with encrypted entries
+    """
+    try:
+        # Get client IP address for rate limiting
+        client_ip = getattr(request.client, 'host', None) if request.client else None
+        
+        # Create entry with phrase detection
+        result = await journal_service.create_with_phrase_detection(
+            db=db,
+            obj_in=entry,
+            user_id=current_user.id,
+            detect_phrases=detect_phrases,
+            ip_address=client_ip,
+            session_id=None  # Could be extracted from request headers if needed
+        )
+        
+        logger.info(f"Entry created with phrase detection for user {current_user.id}")
+        return result
+        
+    except EntryProcessingError as e:
+        logger.error(f"Entry processing failed for user {current_user.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Entry processing failed: {e.message}"
+        )
+    except ValueError as e:
+        logger.error(f"Invalid entry data: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error creating entry: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create journal entry"

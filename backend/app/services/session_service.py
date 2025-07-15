@@ -2,7 +2,7 @@
 Session Management Service for OPAQUE Authentication
 
 This module provides secure session management for OPAQUE zero-knowledge authentication,
-including session token generation, validation, lifecycle management, and security features.
+including JWT-based session token generation, validation, lifecycle management, and security features.
 """
 
 import secrets
@@ -17,9 +17,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 
-from app.models.secret_tag_opaque import OpaqueSession
-from app.models.user import User
-from app.core.config import settings
+from ..models.secret_tag_opaque import OpaqueSession
+from ..models.user import User
+from ..core.config import settings
+from .jwt_service import jwt_service, JWTValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -139,15 +140,14 @@ class SessionService:
             session_data: Additional session data
             
         Returns:
-            Tuple[str, OpaqueSession]: (session_token, session_object)
+            Tuple[str, OpaqueSession]: (jwt_session_token, session_object)
         """
         try:
             # Check concurrent session limit
             self._enforce_session_limits(db, user_id)
             
-            # Generate session token
-            session_token = self.generate_session_token()
-            session_id = self.hash_session_token(session_token)
+            # Generate session ID for database storage
+            session_id = secrets.token_hex(32)  # 64 character hex string
             
             # Create session fingerprint
             fingerprint = self.create_session_fingerprint(user_agent, ip_address)
@@ -182,8 +182,20 @@ class SessionService:
             db.commit()
             db.refresh(session)
             
-            logger.info(f"Created session for user {user_id}, expires at {expires_at}")
-            return session_token, session
+            # Generate JWT session token
+            jwt_token = jwt_service.generate_session_token(
+                user_id=user_id,
+                session_id=session_id,
+                tag_id=tag_id,
+                fingerprint=fingerprint,
+                additional_claims={
+                    "session_expires_at": int(expires_at.timestamp()),
+                    "created_at": int(now.timestamp())
+                }
+            )
+            
+            logger.info(f"Created JWT session for user {user_id}, expires at {expires_at}")
+            return jwt_token, session
             
         except SQLAlchemyError as e:
             db.rollback()
@@ -202,11 +214,11 @@ class SessionService:
         ip_address: str = ""
     ) -> Optional[OpaqueSession]:
         """
-        Validate session token and return session if valid
+        Validate JWT session token and return session if valid
         
         Args:
             db: Database session
-            token: Session token to validate
+            token: JWT session token to validate
             user_agent: Client user agent for fingerprint validation
             ip_address: Client IP address for fingerprint validation
             
@@ -214,20 +226,42 @@ class SessionService:
             Optional[OpaqueSession]: Session object if valid, None otherwise
         """
         try:
-            # Hash token for lookup
-            session_id = self.hash_session_token(token)
+            # Create fingerprint for validation
+            current_fingerprint = self.create_session_fingerprint(user_agent, ip_address)
+            
+            # Validate JWT token
+            try:
+                claims = jwt_service.validate_token(
+                    token=token,
+                    expected_token_type=jwt_service.TOKEN_TYPE_SESSION,
+                    require_fingerprint=False,  # We'll validate fingerprint separately
+                    fingerprint=current_fingerprint
+                )
+            except JWTValidationError as e:
+                logger.debug(f"JWT validation failed: {str(e)}")
+                return None
+            
+            # Extract session information from JWT claims
+            session_id = claims.get("session_id")
+            user_id = claims.get("sub")
+            token_fingerprint = claims.get("fingerprint")
+            
+            if not session_id or not user_id:
+                logger.debug("JWT token missing required claims")
+                return None
             
             # Find session in database
             session = db.query(OpaqueSession).filter(
                 OpaqueSession.session_id == session_id,
+                OpaqueSession.user_id == user_id,
                 OpaqueSession.session_state == 'active'
             ).first()
             
             if not session:
-                logger.debug(f"Session not found for token hash: {session_id[:16]}...")
+                logger.debug(f"Session not found for session_id: {session_id[:16]}...")
                 return None
             
-            # Check expiration
+            # Check database expiration (double-check beyond JWT expiration)
             now = datetime.now(UTC)
             if session.expires_at < now:
                 logger.info(f"Session expired for user {session.user_id}")
@@ -241,17 +275,22 @@ class SessionService:
                 self._invalidate_session(db, session)
                 return None
             
-            # Validate session fingerprint (optional security check)
+            # Validate session fingerprint (enhanced security check)
             if not self._validate_session_fingerprint(session, user_agent, ip_address):
                 logger.warning(f"Session fingerprint mismatch for user {session.user_id}")
                 # Note: In production, you might want to invalidate the session here
                 # For now, we'll log the warning but allow the session
             
+            # Additional fingerprint validation from JWT token
+            if token_fingerprint and token_fingerprint != current_fingerprint:
+                logger.warning(f"JWT fingerprint mismatch for user {session.user_id}")
+                # This is a potential security issue - consider invalidating session
+            
             # Update last activity
             session.last_activity = now
             db.commit()
             
-            logger.debug(f"Validated session for user {session.user_id}")
+            logger.debug(f"Validated JWT session for user {session.user_id}")
             return session
             
         except SQLAlchemyError as e:
@@ -300,18 +339,42 @@ class SessionService:
         session_token: str
     ) -> bool:
         """
-        Invalidate a session by token
+        Invalidate a session by JWT token
         
         Args:
             db: Database session
-            session_token: Token of session to invalidate
+            session_token: JWT token of session to invalidate
             
         Returns:
             bool: True if session was invalidated, False if not found
         """
         try:
-            session_id = self.hash_session_token(session_token)
+            # Blacklist the JWT token
+            jwt_service.blacklist_token(session_token)
             
+            # Extract session ID from JWT token to invalidate database session
+            try:
+                claims = jwt_service.validate_token(
+                    token=session_token,
+                    expected_token_type=jwt_service.TOKEN_TYPE_SESSION
+                )
+                session_id = claims.get("session_id")
+            except JWTValidationError:
+                # Token is invalid, but we can try to decode it without verification
+                # to get the session ID for cleanup
+                from jose import jwt
+                try:
+                    claims = jwt.decode(session_token, key="", options={"verify_signature": False})
+                    session_id = claims.get("session_id")
+                except Exception:
+                    logger.warning("Could not extract session_id from invalid JWT token")
+                    return False
+            
+            if not session_id:
+                logger.debug("No session_id found in JWT token")
+                return False
+            
+            # Find and invalidate session in database
             session = db.query(OpaqueSession).filter(
                 OpaqueSession.session_id == session_id
             ).first()
@@ -370,7 +433,7 @@ class SessionService:
     
     def cleanup_expired_sessions(self, db: Session) -> int:
         """
-        Clean up expired sessions from database
+        Clean up expired sessions from database and JWT blacklist
         
         Args:
             db: Database session
@@ -392,13 +455,88 @@ class SessionService:
                 count += 1
             
             db.commit()
-            logger.info(f"Cleaned up {count} expired sessions")
+            
+            # Also cleanup expired JWT tokens
+            jwt_cleanup_count = jwt_service.cleanup_expired_tokens()
+            
+            logger.info(f"Cleaned up {count} expired sessions and {jwt_cleanup_count} JWT tokens")
             return count
             
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"Database error cleaning up sessions: {str(e)}")
             raise SessionTokenError(f"Failed to cleanup sessions: {str(e)}")
+    
+    def refresh_session_token(
+        self,
+        db: Session,
+        session_token: str,
+        user_agent: str = "",
+        ip_address: str = ""
+    ) -> Optional[str]:
+        """
+        Refresh a JWT session token without full re-authentication
+        
+        Args:
+            db: Database session
+            session_token: Current JWT session token
+            user_agent: Client user agent
+            ip_address: Client IP address
+            
+        Returns:
+            Optional[str]: New JWT session token if successful, None if failed
+        """
+        try:
+            # Validate current token
+            session = self.validate_session_token(db, session_token, user_agent, ip_address)
+            
+            if not session:
+                logger.debug("Cannot refresh invalid session token")
+                return None
+            
+            # Blacklist the old token
+            jwt_service.blacklist_token(session_token)
+            
+            # Generate new JWT token with same session data
+            current_fingerprint = self.create_session_fingerprint(user_agent, ip_address)
+            
+            new_jwt_token = jwt_service.generate_session_token(
+                user_id=session.user_id,
+                session_id=session.session_id,
+                tag_id=session.tag_id,
+                fingerprint=current_fingerprint,
+                additional_claims={
+                    "session_expires_at": int(session.expires_at.timestamp()),
+                    "refreshed_at": int(datetime.now(UTC).timestamp())
+                }
+            )
+            
+            # Update session activity
+            session.last_activity = datetime.now(UTC)
+            db.commit()
+            
+            logger.info(f"Refreshed JWT session token for user {session.user_id}")
+            return new_jwt_token
+            
+        except Exception as e:
+            logger.error(f"Error refreshing session token: {str(e)}")
+            return None
+    
+    def get_session_info(self, session_token: str) -> Optional[Dict[str, Any]]:
+        """
+        Get information about a session token without full validation
+        
+        Args:
+            session_token: JWT session token to inspect
+            
+        Returns:
+            Optional[Dict[str, Any]]: Session information or None if invalid
+        """
+        try:
+            return jwt_service.get_token_info(session_token)
+        except Exception as e:
+            logger.error(f"Error getting session info: {str(e)}")
+            return None
     
     def get_user_sessions(
         self,

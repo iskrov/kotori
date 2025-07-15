@@ -5,7 +5,6 @@ import {
   TextInput, 
   TouchableOpacity, 
   StyleSheet, 
-  Image, 
   ActivityIndicator,
   Alert
 } from 'react-native';
@@ -17,6 +16,8 @@ import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
 import { useAuth } from '../../contexts/AuthContext';
+import { useAppTheme } from '../../contexts/ThemeContext';
+import { AppTheme } from '../../config/theme';
 import SafeScrollView from '../../components/SafeScrollView';
 import logger from '../../utils/logger';
 import LogViewer from '../../utils/LogViewer';
@@ -29,7 +30,9 @@ type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const LoginScreen = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const { login, googleLogin, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
+  const { theme } = useAppTheme();
+  const styles = getStyles(theme);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,71 +51,8 @@ const LoginScreen = () => {
     }
   }, [email, password]);
   
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setErrorMessage('Please fill in all required fields');
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      setErrorMessage(null);
-      
-      // Log credentials before calling the API - REMOVED PASSWORD LOGGING
-      // console.log(`Attempting login with Email: [${email}], Password: [${password}]`); 
-      logger.debug(`Attempting login with Email: [${email}]`); // Log email only
-      
-      await login(email, password);
-      // The AuthContext will handle navigation to the main app
-    } catch (error: any) {
-      logger.error('Login screen error:', error);
-      let errorMsg = 'An error occurred during login. Please try again.';
-      
-      if (error.status === 401) {
-        errorMsg = 'Invalid email or password. Please try again.';
-      } else if (error.status === 422) {
-        // Validation error
-        if (error.message && typeof error.message === 'string') {
-          errorMsg = error.message;
-        } else if (error.errors && Array.isArray(error.errors)) {
-          errorMsg = error.errors.join('\n');
-        }
-      } else if (error.status === 500 && error.message.includes('Database connection error')) {
-        errorMsg = 'Cannot connect to the database. Please make sure the database service is running.';
-      } else if (error.status === 0) {
-        errorMsg = 'Unable to connect to the server. Please check your connection and try again.';
-      } else if (error.message) {
-        errorMsg = error.message;
-      }
-      
-      setErrorMessage(errorMsg);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   const handleGoogleLogin = async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage(null);
-      await googleLogin();
-      // The AuthContext will handle the response and navigation
-    } catch (error: any) {
-      logger.error('Google Login Screen Error:', error);
-      let errorMsg = 'Failed to login with Google. Please try again.';
-      
-      if (error.status === 0) {
-        errorMsg = 'Unable to connect to the server. Please check your connection and try again.';
-      } else if (error.status === 500 && error.message.includes('Database connection error')) {
-        errorMsg = 'Cannot connect to the database. Please make sure the database service is running.';
-      } else if (error.message) {
-        errorMsg = error.message;
-      }
-      
-      setErrorMessage(errorMsg);
-    } finally {
-      setIsLoading(false);
-    }
+    setErrorMessage('Google login is not available with OPAQUE zero-knowledge authentication. Please use email/password registration and login.');
   };
   
   const navigateToRegister = () => {
@@ -124,282 +64,343 @@ const LoginScreen = () => {
   };
   
   return (
-    <SafeScrollView 
-      style={styles.container}
-      contentContainerStyle={styles.scrollContainer}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={true}
-    >
-      <View style={styles.logoContainer}>
-        <Text style={styles.appName}>Vibes</Text>
-        <Text style={styles.tagline}>Voice Journaling</Text>
-      </View>
-      
-      <View style={styles.formContainer}>
-        {errorMessage && (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={20} color="#d32f2f" />
-            <Text style={styles.errorText}>{errorMessage}</Text>
+    <View style={styles.container}>
+      <SafeScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Welcome Card */}
+        <View style={styles.welcomeCard}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logoCircle}>
+              <Ionicons name="mic" size={32} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.appName}>Welcome Back</Text>
+            <Text style={styles.tagline}>Sign in to continue your journey</Text>
           </View>
-        )}
-        
-        <View style={styles.inputContainer}>
-          <Ionicons name="mail-outline" size={22} color="#666" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor="#999"
-          />
         </View>
-        
-        <View style={styles.inputContainer}>
-          <Ionicons name="lock-closed-outline" size={22} color="#666" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            placeholderTextColor="#999"
-          />
-          <TouchableOpacity 
-            onPress={() => setShowPassword(!showPassword)}
-            style={styles.eyeIcon}
-          >
-            <Ionicons 
-              name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
-              size={22} 
-              color="#666" 
-            />
-          </TouchableOpacity>
-        </View>
-        
-        <OpaqueAuthButton
-          mode="login"
-          email={email}
-          password={password}
-          onSuccess={() => {
-            // Navigation will be handled by AuthContext
-            logger.info('Login successful via OPAQUE button');
-          }}
-          onError={(error) => {
-            setErrorMessage(error);
-          }}
-          disabled={!email || !password}
-          style={styles.opaqueButton}
-        />
-        
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.button}
-          onPress={handleLogin}
-          disabled={isLoading || authLoading}
-        >
-          {isLoading || authLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Traditional Login</Text>
+
+        {/* Login Form Card */}
+        <View style={styles.formCard}>
+          <View style={styles.formHeader}>
+            <Text style={styles.formTitle}>Sign In</Text>
+            <Text style={styles.formSubtitle}>Enter your credentials to access your account</Text>
+          </View>
+
+          {errorMessage && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={20} color={theme.colors.error} />
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
           )}
-        </TouchableOpacity>
-        
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.googleButton}
-          onPress={handleGoogleLogin}
-          disabled={isLoading || authLoading}
-        >
-          <Ionicons name="logo-google" size={22} color="#EA4335" />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={navigateToRegister}>
-            <Text style={styles.registerLink}>Register</Text>
+          
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Email address"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholderTextColor={theme.colors.textDisabled}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholderTextColor={theme.colors.textDisabled}
+              />
+              <TouchableOpacity 
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeIcon}
+              >
+                <Ionicons 
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                  size={20} 
+                  color={theme.colors.textSecondary} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <OpaqueAuthButton
+            mode="login"
+            email={email}
+            password={password}
+            onSuccess={() => {
+              // Navigation will be handled by AuthContext
+              logger.info('Login successful via OPAQUE');
+            }}
+            onError={(error: string) => {
+              setErrorMessage(error);
+            }}
+            disabled={!email || !password || isLoading || authLoading}
+            style={styles.loginButton}
+          />
+          
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.googleButton}
+            onPress={handleGoogleLogin}
+            disabled={isLoading || authLoading}
+          >
+            <Ionicons name="logo-google" size={20} color="#EA4335" />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
         </View>
-        
+
+        {/* Register Prompt Card */}
+        <View style={styles.registerCard}>
+          <Text style={styles.registerText}>Don't have an account?</Text>
+          <TouchableOpacity onPress={navigateToRegister} style={styles.registerButton}>
+            <Text style={styles.registerButtonText}>Create Account</Text>
+            <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+
         {isDev && (
           <TouchableOpacity 
             style={styles.debugButton}
             onPress={openLogViewer}
           >
-            <Ionicons name="bug-outline" size={16} color="#666" />
+            <Ionicons name="bug-outline" size={16} color={theme.colors.textSecondary} />
             <Text style={styles.debugButtonText}>Show Logs</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </SafeScrollView>
       
       <LogViewer 
         visible={showLogViewer} 
         onClose={() => setShowLogViewer(false)} 
       />
-    </SafeScrollView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.colors.background,
   },
   scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 40,
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xl,
+  },
+  welcomeCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.md,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 1 : 0,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.primaryLight + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.lg,
   },
   appName: {
-    fontSize: 42,
+    fontSize: theme.typography.fontSizes.xxxl,
     fontWeight: 'bold',
-    color: '#7D4CDB',
-    marginBottom: 8,
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+    marginBottom: theme.spacing.sm,
   },
   tagline: {
-    fontSize: 18,
-    color: '#666',
+    fontSize: theme.typography.fontSizes.lg,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+    textAlign: 'center',
   },
-  formContainer: {
-    width: '100%',
+  formCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.md,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 1 : 0,
+  },
+  formHeader: {
+    marginBottom: theme.spacing.xl,
+  },
+  formTitle: {
+    fontSize: theme.typography.fontSizes.xxl,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.bold,
+    marginBottom: theme.spacing.xs,
+  },
+  formSubtitle: {
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
-    marginBottom: 16,
-    padding: 12,
+    backgroundColor: theme.colors.errorLight,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: '#ffcdd2',
+    borderColor: theme.colors.error + '30',
   },
   errorText: {
-    color: '#d32f2f',
-    marginLeft: 8,
+    color: theme.colors.error,
+    fontSize: theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.medium,
+    marginLeft: theme.spacing.sm,
     flex: 1,
   },
   inputContainer: {
+    marginBottom: theme.spacing.lg,
+  },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
+    paddingHorizontal: theme.spacing.md,
+    height: 56,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: theme.spacing.md,
   },
   input: {
     flex: 1,
-    height: 50,
-    color: '#333',
-    fontSize: 16,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.regular,
+    color: theme.colors.text,
   },
   eyeIcon: {
-    padding: 8,
+    padding: theme.spacing.xs,
   },
-  button: {
-    backgroundColor: '#7D4CDB',
-    borderRadius: 8,
-    height: 50,
+  loginButton: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.lg,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.sm,
   },
-  opaqueButton: {
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  divider: {
+  dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 24,
+    marginVertical: theme.spacing.lg,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ddd',
+    backgroundColor: theme.colors.border,
   },
   dividerText: {
-    marginHorizontal: 10,
-    color: '#666',
-    fontSize: 14,
+    marginHorizontal: theme.spacing.md,
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.medium,
   },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    height: 50,
-    marginBottom: 16,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    height: 56,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
+    ...theme.shadows.sm,
   },
   googleButtonText: {
-    marginLeft: 10,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontSize: theme.typography.fontSizes.md,
+    fontWeight: '600',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    marginLeft: theme.spacing.sm,
   },
-  registerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
+  registerCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.sm,
+    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
+    borderWidth: theme.isDarkMode ? 1 : 0,
   },
   registerText: {
-    color: '#666',
-    fontSize: 14,
+    fontSize: theme.typography.fontSizes.md,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.regular,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
   },
-  registerLink: {
-    color: '#7D4CDB',
-    fontSize: 14,
+  registerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primaryLight + '20',
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  registerButtonText: {
+    fontSize: theme.typography.fontSizes.md,
     fontWeight: '600',
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    marginRight: theme.spacing.xs,
   },
   debugButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
-    padding: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.lg,
     alignSelf: 'center',
   },
   debugButtonText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
+    fontSize: theme.typography.fontSizes.xs,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.medium,
+    marginLeft: theme.spacing.xs,
   },
 });
 

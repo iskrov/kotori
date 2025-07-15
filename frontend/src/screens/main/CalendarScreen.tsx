@@ -26,7 +26,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import { CalendarSkeleton, JournalCardSkeleton } from '../../components/SkeletonLoader';
 import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
-// Legacy tagManager removed - OPAQUE system handles session management
+import { voicePhraseDetector } from '../../services/VoicePhraseDetector';
 import { AppTheme } from '../../config/theme';
 
 type CalendarScreenNavigationProp = CompositeNavigationProp<
@@ -72,8 +72,8 @@ const CalendarScreen = () => {
   // Check for active secret tags
   useEffect(() => {
     const checkActiveSecretTags = async () => {
-      const activeTags = await tagManager.getActiveSecretTags();
-      setHasActiveSecretTags(activeTags.length > 0);
+      const activeSessions = voicePhraseDetector.getActiveSessions();
+      setHasActiveSecretTags(activeSessions.length > 0);
     };
     
     checkActiveSecretTags();

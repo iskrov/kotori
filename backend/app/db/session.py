@@ -1,19 +1,46 @@
+"""
+Database Session Configuration
+
+This module provides database session configuration using the factory pattern
+for proper test isolation and GCP Cloud SQL support.
+"""
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from typing import Generator
 
 from ..core.config import settings
+from .session_factory import get_session_factory, get_db as factory_get_db
 
-# Create SQLAlchemy engine
-engine = create_engine(settings.DATABASE_URL)
+# Backward compatibility: Create engine and SessionLocal using factory
+def _get_legacy_session_components():
+    """Get legacy session components for backward compatibility."""
+    factory = get_session_factory()
+    return factory.get_engine(), factory._session_factory
 
-# Create SessionLocal class for database sessions
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Legacy global instances (for backward compatibility)
+engine, SessionLocal = _get_legacy_session_components()
 
 
-def get_db():
-    """Database dependency for FastAPI"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def get_db() -> Generator:
+    """
+    Database dependency for FastAPI.
+    
+    This function now uses the session factory pattern for proper
+    test isolation while maintaining backward compatibility.
+    """
+    # Use the factory-based get_db function
+    return factory_get_db()
+
+
+# Backward compatibility functions
+def get_database_session():
+    """Get a database session (backward compatibility)."""
+    factory = get_session_factory()
+    return factory.get_session()
+
+
+def refresh_session_components():
+    """Refresh global session components (for testing)."""
+    global engine, SessionLocal
+    engine, SessionLocal = _get_legacy_session_components()

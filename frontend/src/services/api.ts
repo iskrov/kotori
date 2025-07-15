@@ -136,12 +136,22 @@ api.interceptors.response.use(
     // Handle 401 (Unauthorized) errors
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      logger.info(`API Response: 401 Unauthorized for ${originalRequest.url}. Attempting token refresh.`);
+      logger.info(`API Response: 401 Unauthorized for ${originalRequest.url}. Checking authentication type.`);
       
       try {
-        logger.info('Attempting token refresh');
-        // Get refresh token
+        // Check if we have OPAQUE authentication (no refresh token)
         const refreshToken = await AsyncStorage.getItem('refresh_token');
+        const accessToken = await AsyncStorage.getItem('access_token');
+        
+        if (!refreshToken && accessToken) {
+          // OPAQUE authentication - no refresh tokens available
+          logger.warn('OPAQUE authentication detected (no refresh token). User needs to re-authenticate.');
+          await logout();
+          return Promise.reject({
+            message: 'Session expired. Please login again.',
+            status: 401
+          });
+        }
         
         if (!refreshToken) {
           // No refresh token available, logout user
@@ -153,7 +163,8 @@ api.interceptors.response.use(
           });
         }
         
-        // Call token refresh endpoint
+        // Traditional authentication - attempt token refresh
+        logger.info('Attempting token refresh');
         logger.info(`Calling /api/auth/refresh with refresh token: ${refreshToken ? refreshToken.substring(0, 10) + '...' : 'null'}`);
         const response = await axios.post(`${getApiUrl()}/api/auth/refresh`, {
           refresh_token: refreshToken,
