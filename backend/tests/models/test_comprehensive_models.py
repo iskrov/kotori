@@ -7,7 +7,7 @@ including CRUD operations, relationships, constraints, and error handling.
 
 import pytest
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
@@ -17,7 +17,7 @@ from app.models.journal_entry import JournalEntry
 from app.models.tag import Tag, JournalEntryTag
 from app.models.reminder import Reminder
 from app.models.secret_tag_opaque import SecretTag
-from app.models.monitoring import Monitoring
+from app.models.monitoring import SystemHealth
 from tests.test_config import TestDataFactory, TestAssertions
 
 
@@ -128,12 +128,12 @@ class TestUserModel:
         assert retrieved_user.email == user.email
         
         # Update
-        retrieved_user.full_name = "Updated Name"
+        retrieved_user.full_tag_display_tag_display_name= "Updated Name"
         db.commit()
         db.refresh(retrieved_user)
         
         updated_user = db.query(User).filter(User.id == original_id).first()
-        assert updated_user.full_name == "Updated Name"
+        assert updated_user.full_tag_display_tag_display_name== "Updated Name"
         assert updated_user.id == original_id  # ID should remain unchanged
         
         # Delete
@@ -261,7 +261,7 @@ class TestTagModel:
         db.refresh(user)
 
         # Create tag
-        tag = Tag(name="TestTag", user_id=user.id)
+        tag = Tag(tag_display_tag_display_name="TestTag", user_id=user.id)
         db.add(tag)
         db.commit()
         db.refresh(tag)
@@ -287,13 +287,13 @@ class TestTagModel:
         db.refresh(user)
 
         # Create first tag
-        tag1 = Tag(name="UniqueTag", user_id=user.id)
+        tag1 = Tag(tag_display_tag_display_name="UniqueTag", user_id=user.id)
         db.add(tag1)
         db.commit()
         db.refresh(tag1)
 
         # Try to create second tag with same name for same user (should fail)
-        tag2 = Tag(name="UniqueTag", user_id=user.id)
+        tag2 = Tag(tag_display_tag_display_name="UniqueTag", user_id=user.id)
         db.add(tag2)
         
         with pytest.raises(IntegrityError):
@@ -322,8 +322,8 @@ class TestTagModel:
         db.refresh(user2)
 
         # Create tags with same name for different users (should succeed)
-        tag1 = Tag(name="SharedName", user_id=user1.id)
-        tag2 = Tag(name="SharedName", user_id=user2.id)
+        tag1 = Tag(tag_display_tag_display_name="SharedName", user_id=user1.id)
+        tag2 = Tag(tag_display_tag_display_name="SharedName", user_id=user2.id)
         
         db.add(tag1)
         db.add(tag2)
@@ -333,7 +333,7 @@ class TestTagModel:
 
         # Verify both tags exist
         assert tag1.id != tag2.id
-        assert tag1.name == tag2.name
+        assert tag1.tag_name== tag2.name
         assert tag1.user_id != tag2.user_id
         
         # Clean up
@@ -430,7 +430,7 @@ class TestSecretTagModel:
         db.refresh(user)
 
         # Create secret tag
-        phrase_hash = b"test_phrase_hash_123456"  # 16 bytes for testing
+        phrase_hash= b"test_phrase_hash_123456"  # 16 bytes for testing
         secret_tag = SecretTag(
             tag_name="TestSecretTag",
             phrase_hash=phrase_hash,
@@ -443,7 +443,7 @@ class TestSecretTagModel:
         # Verify UUID primary key and phrase_hash separation
         assert secret_tag.id is not None
         assert isinstance(secret_tag.id, uuid.UUID)
-        assert secret_tag.phrase_hash == phrase_hash
+        assert secret_tag.phrase_hash== phrase_hash
         assert secret_tag.user_id == user.id
         assert isinstance(secret_tag.user_id, uuid.UUID)
         
@@ -462,7 +462,7 @@ class TestSecretTagModel:
         db.refresh(user)
 
         # Create first secret tag
-        phrase_hash = b"unique_phrase_hash_1"
+        phrase_hash= b"unique_phrase_hash_1"
         secret_tag1 = SecretTag(
             tag_name="SecretTag1",
             phrase_hash=phrase_hash,
@@ -500,7 +500,7 @@ class TestSecretTagModel:
         db.refresh(user)
 
         # Create secret tag
-        phrase_hash = b"lookup_phrase_hash_1"
+        phrase_hash= b"lookup_phrase_hash_1"
         secret_tag = SecretTag(
             tag_name="LookupTag",
             phrase_hash=phrase_hash,
@@ -511,10 +511,10 @@ class TestSecretTagModel:
         db.refresh(secret_tag)
 
         # Test lookup by phrase_hash
-        found_tag = db.query(SecretTag).filter(SecretTag.phrase_hash == phrase_hash).first()
+        found_tag = db.query(SecretTag).filter(SecretTag.phrase_phrase_phrase_hash== phrase_hash).first()
         assert found_tag is not None
         assert found_tag.id == secret_tag.id
-        assert found_tag.tag_name == "LookupTag"
+        assert found_tag.tag_name== "LookupTag"
         assert found_tag.user_id == user.id
         
         # Clean up
@@ -572,8 +572,8 @@ class TestModelRelationships:
         db.refresh(user)
 
         # Create multiple tags
-        tag1 = Tag(name="Tag1", user_id=user.id)
-        tag2 = Tag(name="Tag2", user_id=user.id)
+        tag1 = Tag(tag_display_tag_display_name="Tag1", user_id=user.id)
+        tag2 = Tag(tag_display_tag_display_name="Tag2", user_id=user.id)
         
         db.add(tag1)
         db.add(tag2)
@@ -612,7 +612,7 @@ class TestModelRelationships:
         db.refresh(entry)
 
         # Create tag
-        tag = Tag(name="AssocTag", user_id=user.id)
+        tag = Tag(tag_display_tag_display_name="AssocTag", user_id=user.id)
         db.add(tag)
         db.commit()
         db.refresh(tag)
@@ -620,7 +620,7 @@ class TestModelRelationships:
         # Create association
         association = JournalEntryTag(
             journal_entry_id=entry.id,
-            tag_id=tag.id
+            phrase_hash=tag.id
         )
         db.add(association)
         db.commit()
@@ -628,14 +628,14 @@ class TestModelRelationships:
 
         # Test association
         assert association.journal_entry_id == entry.id
-        assert association.tag_id == tag.id
+        assert association.phrase_hash== tag.id
         
         # Test querying through association
         entry_tags = db.query(JournalEntryTag).filter(
             JournalEntryTag.journal_entry_id == entry.id
         ).all()
         assert len(entry_tags) == 1
-        assert entry_tags[0].tag_id == tag.id
+        assert entry_tags[0].phrase_hash== tag.id
 
         # Clean up
         db.delete(association)
@@ -679,7 +679,7 @@ class TestConstraintValidation:
                 title="Test Entry",
                 content="Test content",
                 user_id=non_existent_user_id,
-                entry_date=datetime.now()
+                entry_date=datetime.now(UTC)
             )
             db.add(entry)
             db.commit()
@@ -696,14 +696,14 @@ class TestConstraintValidation:
         db.refresh(user)
 
         # Create tag
-        tag1 = Tag(name="UniqueConstraintTag", user_id=user.id)
+        tag1 = Tag(tag_display_tag_display_name="UniqueConstraintTag", user_id=user.id)
         db.add(tag1)
         db.commit()
         db.refresh(tag1)
 
         # Try to create another tag with same name for same user
         with pytest.raises(IntegrityError):
-            tag2 = Tag(name="UniqueConstraintTag", user_id=user.id)
+            tag2 = Tag(tag_display_tag_display_name="UniqueConstraintTag", user_id=user.id)
             db.add(tag2)
             db.commit()
         

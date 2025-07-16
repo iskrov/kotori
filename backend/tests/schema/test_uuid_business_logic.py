@@ -11,7 +11,7 @@ from typing import Dict, Any
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import text
 
-from .schema_validation_utils import (
+from tests.schema.schema_validation_utils import (
     SchemaValidationTester,
     ConstraintTestDataGenerator,
     ConstraintViolationError

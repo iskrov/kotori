@@ -1,4 +1,5 @@
 import logging
+import json
 from typing import List, Optional
 
 from fastapi import (
@@ -11,6 +12,7 @@ from fastapi import (
     status,
     Header,
 )
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -20,6 +22,13 @@ from app.models.user import User
 from app.services.speech_service import SpeechService, create_speech_service
 from app.core.config import settings
 from app.services.user_service import user_service
+from app.schemas.speech import (
+    SpeechTranscriptionResponse,
+    SecretTagActivationRequest,
+    SecretTagActivationResponse,
+    SpeechErrorResponse,
+    SpeechHealthResponse
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -81,7 +90,7 @@ class SecretTagActivationRequest(BaseModel):
     tag_id: str = Field(..., description="Secret tag ID to activate")
     action: str = Field(..., description="Action to perform: 'activate' or 'deactivate'")
 
-@router.post("/transcribe", response_model=dict)
+@router.post("/transcribe", response_model=SpeechTranscriptionResponse)
 async def transcribe_audio_endpoint(
     # Use Form(...) for form fields alongside File(...)
     language_codes_json: Optional[str] = Form(None), # Receive as JSON string
@@ -103,7 +112,6 @@ async def transcribe_audio_endpoint(
     if language_codes_json:
         try:
             # Parse the JSON string into a list
-            import json
             parsed_codes = json.loads(language_codes_json)
             # Basic validation: Ensure it's a list of strings
             if isinstance(parsed_codes, list) and all(isinstance(code, str) for code in parsed_codes):
@@ -170,11 +178,12 @@ async def transcribe_audio_endpoint(
         )
 
         # Return response with server-side secret phrase detection
-        return {
-            "transcript": transcription_data.get("transcript", ""),
-            "detected_language_code": transcription_data.get("detected_language_code"),
-            "code_phrase_detected": transcription_data.get("code_phrase_detected")  # Secret tag name or None
-        }
+        return SpeechTranscriptionResponse(
+            transcript=transcription_data.get("transcript", ""),
+            detected_language_code=transcription_data.get("detected_language_code"),
+            code_phrase_detected=transcription_data.get("code_phrase_detected"),
+            confidence=transcription_data.get("confidence")
+        )
 
     except RuntimeError as e:
         logger.error(
@@ -196,7 +205,7 @@ async def transcribe_audio_endpoint(
     finally:
         await file.close()
 
-@router.post("/secret-tag/activate", response_model=dict)
+@router.post("/secret-tag/activate", response_model=SecretTagActivationResponse)
 async def activate_secret_tag_endpoint(
     request: SecretTagActivationRequest,
     authorization: str | None = Header(None),
@@ -209,30 +218,31 @@ async def activate_secret_tag_endpoint(
     current_user = await manual_get_user_from_header(authorization, db)
     
     try:
-        # Validate that the secret tag belongs to the user
-        from app.models import SecretTag
-        secret_tag = db.query(SecretTag).filter(
-            SecretTag.tag_id == request.tag_id.encode() if isinstance(request.tag_id, str) else request.tag_id,
-            SecretTag.user_id == str(current_user.id)
-        ).first()
-        
-        if not secret_tag:
-            logger.warning(f"Secret tag {request.tag_id} not found or not owned by user {current_user.id}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Secret tag not found"
-            )
+        # Validate that the secret tag belongs to the user (if tag_name is provided)
+        if request.tag_name:
+            from app.models import SecretTag
+            secret_tag = db.query(SecretTag).filter(
+                SecretTag.tag_name == request.tag_name,
+                SecretTag.user_id == current_user.id
+            ).first()
+            
+            if not secret_tag:
+                logger.warning(f"Secret tag '{request.tag_name}' not found or not owned by user {current_user.id}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Secret tag not found"
+                )
         
         # Log the activation/deactivation
-        logger.info(f"Secret tag {request.action} requested for user {current_user.email}: {request.tag_id}")
+        logger.info(f"Secret tag {request.action} requested for user {current_user.email}: {request.tag_name}")
         
         # Return success - actual activation is handled client-side
-        return {
-            "success": True,
-            "tag_id": request.tag_id,
-            "action": request.action,
-            "message": f"Secret tag {request.action} processed successfully"
-        }
+        return SecretTagActivationResponse(
+            success=True,
+            message=f"Secret tag {request.action} processed successfully",
+            tag_name=request.tag_name,
+            session_token=None  # Could be generated if needed
+        )
         
     except HTTPException:
         raise

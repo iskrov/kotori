@@ -101,7 +101,7 @@ class TestEnhancedOpaqueService:
     def sample_auth_init_request(self):
         """Sample OPAQUE authentication init request."""
         return OpaqueAuthInitRequest(
-            tag_id="1234567890abcdef1234567890abcdef",
+            phrase_hash="1234567890abcdef1234567890abcdef",
             client_message="dGVzdC1jbGllbnQ="  # base64 encoded "test-client"
         )
     
@@ -238,7 +238,7 @@ class TestEnhancedOpaqueService:
             
             assert isinstance(response, OpaqueRegistrationResponse)
             assert response.success is True
-            assert response.tag_name == "Test Tag"
+            assert response.tag_name== "Test Tag"
             assert response.color_code == "#FF0000"
             assert response.vault_id is not None
             
@@ -277,8 +277,8 @@ class TestEnhancedOpaqueService:
         """Test retrieving user secret tags with vault stats."""
         # Mock database results
         mock_tag = Mock()
-        mock_tag.tag_id = b"A" * 16
-        mock_tag.tag_name = "Test Tag"
+        mock_tag.phrase_hash= b"A" * 16
+        mock_tag.tag_name= "Test Tag"
         mock_tag.color_code = "#FF0000"
         mock_tag.created_at = datetime.now(UTC)
         mock_tag.updated_at = datetime.now(UTC)
@@ -296,7 +296,7 @@ class TestEnhancedOpaqueService:
         
         assert len(result) == 1
         assert isinstance(result[0], SecretTagInfo)
-        assert result[0].tag_name == "Test Tag"
+        assert result[0].tag_name== "Test Tag"
         assert result[0].entry_count == 5  # Use entry_count instead of vault_size
 
     def test_validate_tag_exists_true(self, opaque_service, mock_db):
@@ -325,27 +325,27 @@ class TestEnhancedOpaqueService:
     def test_update_secret_tag_success(self, opaque_service, mock_db):
         """Test successful secret tag update."""
         mock_tag = Mock()
-        mock_tag.tag_name = "Old Name"
+        mock_tag.tag_name= "Old Name"
         mock_tag.color_code = "#000000"
         mock_db.query.return_value.filter.return_value.first.return_value = mock_tag
         mock_db.commit = Mock()
         
         result = opaque_service.update_secret_tag(
             user_id=123,
-            tag_id="1234567890abcdef1234567890abcdef",
+            phrase_hash="1234567890abcdef1234567890abcdef",
             tag_name="New Name",
             color_code="#FF0000"
         )
         
         assert result is True
-        assert mock_tag.tag_name == "New Name"
+        assert mock_tag.tag_name== "New Name"
         assert mock_tag.color_code == "#FF0000"
         mock_db.commit.assert_called_once()
 
     def test_delete_secret_tag_success(self, opaque_service, mock_db):
         """Test successful secret tag deletion."""
         mock_tag = Mock()
-        mock_tag.tag_name = "Test Tag"
+        mock_tag.tag_name= "Test Tag"
         mock_wrapped_key = Mock()
         mock_wrapped_key.vault_id = "test-vault-id"
         
@@ -357,7 +357,7 @@ class TestEnhancedOpaqueService:
         
         result = opaque_service.delete_secret_tag(
             user_id=123,
-            tag_id="1234567890abcdef1234567890abcdef"
+            phrase_hash="1234567890abcdef1234567890abcdef"
         )
         
         assert result is True
@@ -415,7 +415,7 @@ class TestEnhancedOpaqueService:
         # Mock session
         mock_session = Mock()
         mock_session.user_id = "123"
-        mock_session.tag_id = b"A" * 16
+        mock_session.phrase_hash= b"A" * 16
         mock_session.session_state = "initialized"
         mock_session.expires_at = datetime.now(UTC) + timedelta(minutes=5)
         mock_session.session_data = b'{"correlation_id": "test-id"}'
@@ -442,7 +442,7 @@ class TestEnhancedOpaqueService:
             
             assert isinstance(response, OpaqueAuthFinalizeResponse)
             assert response.success is True
-            assert response.tag_id is not None
+            assert response.phrase_hash is not None
             assert response.vault_id == "test-vault-id"
             assert response.session_token is not None
 
@@ -480,7 +480,7 @@ class TestEnhancedOpaqueService:
         
         result = opaque_service.get_vault_access_info(
             user_id=123,
-            tag_id="1234567890abcdef1234567890abcdef",
+            phrase_hash="1234567890abcdef1234567890abcdef",
             session_token="valid-token"
         )
         
@@ -495,7 +495,7 @@ class TestEnhancedOpaqueService:
         with pytest.raises(OpaqueAuthenticationError, match="Invalid session token"):
             opaque_service.get_vault_access_info(
                 user_id=123,
-                tag_id="1234567890abcdef1234567890abcdef",
+                phrase_hash="1234567890abcdef1234567890abcdef",
                 session_token="invalid-token"
             )
 

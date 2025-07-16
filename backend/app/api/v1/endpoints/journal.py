@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional, Union
+from uuid import UUID
 import logging
 
 from app.api.dependencies import get_current_user, get_db
@@ -13,7 +14,9 @@ from app.schemas.journal import (
     JournalEntryBulkResponse,
     JournalEntrySearchResponse,
     SecretPhraseAuthResponse,
-    JournalEntryCreateResponse
+    JournalEntryCreateResponse,
+    JournalEntryDeleteResponse,
+    JournalEntryCountResponse
 )
 from app.services.journal_service import journal_service
 from app.services.entry_processor import EntryProcessingError
@@ -149,7 +152,7 @@ async def get_journal_entries(
         include_hidden: Whether to include hidden entries (content will be encrypted)
     """
     try:
-        entries = JournalService.get_journal_entries(
+        entries = journal_service.get_journal_entries(
             db=db,
             user_id=current_user.id,
             skip=skip,
@@ -157,7 +160,7 @@ async def get_journal_entries(
             include_hidden=include_hidden
         )
         
-        total_count = JournalService.get_entry_count(
+        total_count = journal_service.get_entry_count(
             db=db,
             user_id=current_user.id,
             include_hidden=include_hidden
@@ -194,7 +197,7 @@ async def get_hidden_entries(
     Returns encrypted content that requires client-side decryption.
     """
     try:
-        entries = JournalService.get_hidden_entries_only(
+        entries = journal_service.get_hidden_entries_only(
             db=db,
             user_id=current_user.id,
             skip=skip,
@@ -231,7 +234,7 @@ async def search_journal_entries(
                 detail="Search term cannot be empty"
             )
         
-        entries = JournalService.search_journal_entries(
+        entries = journal_service.search_journal_entries(
             db=db,
             user_id=current_user.id,
             search_term=q.strip(),
@@ -256,13 +259,13 @@ async def search_journal_entries(
 
 @router.get("/{entry_id}", response_model=JournalEntry)
 async def get_journal_entry(
-    entry_id: int,
+    entry_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Get a specific journal entry by ID."""
     try:
-        entry = JournalService.get_journal_entry_by_id(
+        entry = journal_service.get_journal_entry_by_id(
             db=db,
             entry_id=entry_id,
             user_id=current_user.id
@@ -288,7 +291,7 @@ async def get_journal_entry(
 
 @router.put("/{entry_id}", response_model=JournalEntry)
 async def update_journal_entry(
-    entry_id: int,
+    entry_id: UUID,
     entry_update: JournalEntryUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -309,7 +312,7 @@ async def update_journal_entry(
                     detail="Hidden entries with new content must include encryption_iv"
                 )
         
-        updated_entry = JournalService.update_journal_entry(
+        updated_entry = journal_service.update_journal_entry(
             db=db,
             entry_id=entry_id,
             user_id=current_user.id,
@@ -335,15 +338,15 @@ async def update_journal_entry(
         )
 
 
-@router.delete("/{entry_id}")
+@router.delete("/{entry_id}", response_model=JournalEntryDeleteResponse)
 async def delete_journal_entry(
-    entry_id: int,
+    entry_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Delete a journal entry."""
     try:
-        success = JournalService.delete_journal_entry(
+        success = journal_service.delete_journal_entry(
             db=db,
             entry_id=entry_id,
             user_id=current_user.id
@@ -356,7 +359,10 @@ async def delete_journal_entry(
             )
         
         logger.info(f"Deleted journal entry {entry_id} for user {current_user.id}")
-        return {"message": "Journal entry deleted successfully"}
+        return JournalEntryDeleteResponse(
+            message="Journal entry deleted successfully",
+            deleted_entry_id=entry_id
+        )
         
     except HTTPException:
         raise
@@ -368,7 +374,7 @@ async def delete_journal_entry(
         )
 
 
-@router.get("/stats/count")
+@router.get("/stats/count", response_model=JournalEntryCountResponse)
 async def get_entry_count(
     include_hidden: bool = Query(False, description="Include hidden entries in count"),
     db: Session = Depends(get_db),
@@ -376,17 +382,17 @@ async def get_entry_count(
 ):
     """Get total count of journal entries for the current user."""
     try:
-        count = JournalService.get_entry_count(
+        count = journal_service.get_entry_count(
             db=db,
             user_id=current_user.id,
             include_hidden=include_hidden
         )
         
-        return {
-            "total_entries": count,
-            "include_hidden": include_hidden,
-            "user_id": current_user.id
-        }
+        return JournalEntryCountResponse(
+            total_entries=count,
+            include_hidden=include_hidden,
+            user_id=current_user.id
+        )
         
     except Exception as e:
         logger.error(f"Failed to get entry count: {str(e)}")

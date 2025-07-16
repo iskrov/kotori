@@ -80,7 +80,7 @@ describe('HomeScreen', () => {
       id: '1',
       email: 'test@example.com',
       full_name: 'Test User',
-      profile_picture: null,
+      avatar_url: null,
     },
     isAuthenticated: true,
     isLoading: false,

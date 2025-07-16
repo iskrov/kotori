@@ -105,6 +105,23 @@ class OpaqueStatusResponse(BaseModel):
         description="Supported OPAQUE features"
     )
 
+
+class UserRegistrationFinishResponse(BaseModel):
+    """Response for finishing user registration"""
+    success: bool = Field(..., description="Whether registration was successful")
+    message: str = Field(..., description="Registration status message")
+
+
+class UserLoginFinishResponse(BaseModel):
+    """Response for finishing user login"""
+    success: bool = Field(..., description="Whether login was successful")
+    user: Dict[str, Any] = Field(..., description="User information")
+    token: str = Field(..., description="JWT access token")
+    token_type: str = Field(..., description="Token type (bearer)")
+    sessionKey: str = Field(..., description="OPAQUE session key for client-side key derivation")
+    exportKey: str = Field(..., description="OPAQUE export key for client-side key derivation")
+    message: str = Field(..., description="Login status message")
+
 def call_opaque_server(operation: str, data: Dict[str, Any]) -> Dict[str, Any]:
     """Call the OPAQUE server implementation via Node.js"""
     try:
@@ -263,7 +280,7 @@ async def start_user_registration(
             detail="Registration start failed"
         )
 
-@router.post("/register/finish")
+@router.post("/register/finish", response_model=UserRegistrationFinishResponse)
 async def finish_user_registration(
     request: UserRegistrationFinishRequest,
     db: Session = Depends(get_db)
@@ -316,7 +333,10 @@ async def finish_user_registration(
         
         logger.info(f"OPAQUE user registration completed for {request.userIdentifier}")
         
-        return {"success": True, "message": "User registered successfully"}
+        return UserRegistrationFinishResponse(
+            success=True,
+            message="User registered successfully"
+        )
         
     except HTTPException:
         raise
@@ -394,7 +414,7 @@ async def start_user_login(
             detail=f"Login start failed: {str(e)}"
         )
 
-@router.post("/login/finish")
+@router.post("/login/finish", response_model=UserLoginFinishResponse)
 async def finish_user_login(
     request: UserLoginFinishRequest,
     db: Session = Depends(get_db)
@@ -444,9 +464,9 @@ async def finish_user_login(
         from ..core.security import create_access_token
         access_token = create_access_token(subject=user.id)
         
-        return {
-            "success": True,
-            "user": {
+        return UserLoginFinishResponse(
+            success=True,
+            user={
                 "id": str(user.id),  # Convert to string to match frontend type
                 "email": user.email,
                 "full_name": user.full_name,
@@ -455,12 +475,12 @@ async def finish_user_login(
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None
             },
-            "token": access_token,  # JWT token for API authentication
-            "token_type": "bearer",
-            "sessionKey": result.get('sessionKey'),  # The OPAQUE session key for client-side key derivation
-            "exportKey": result.get('exportKey'),  # The OPAQUE export key for client-side key derivation
-            "message": "Login successful"
-        }
+            token=access_token,  # JWT token for API authentication
+            token_type="bearer",
+            sessionKey=result.get('sessionKey'),  # The OPAQUE session key for client-side key derivation
+            exportKey=result.get('exportKey'),  # The OPAQUE export key for client-side key derivation
+            message="Login successful"
+        )
         
     except HTTPException:
         raise

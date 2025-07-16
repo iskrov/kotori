@@ -5,7 +5,7 @@ This module provides FastAPI routes for OPAQUE session management operations.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, HTTPException, Depends, status, Request
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -54,8 +54,10 @@ async def create_session(
     try:
         # Extract client information for session fingerprinting
         user_agent = http_request.headers.get("user-agent", "")
-        ip_address = http_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if not ip_address:
+        forwarded_for = http_request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            ip_address = forwarded_for.split(",")[0].strip()
+        else:
             ip_address = http_request.headers.get("x-real-ip", "")
         if not ip_address:
             ip_address = getattr(http_request.client, "host", "")
@@ -124,8 +126,10 @@ async def validate_session(
     try:
         # Extract client information
         user_agent = http_request.headers.get("user-agent", "")
-        ip_address = http_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if not ip_address:
+        forwarded_for = http_request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            ip_address = forwarded_for.split(",")[0].strip()
+        else:
             ip_address = http_request.headers.get("x-real-ip", "")
         if not ip_address:
             ip_address = getattr(http_request.client, "host", "")
@@ -205,8 +209,10 @@ async def refresh_session(
     try:
         # Extract client information
         user_agent = http_request.headers.get("user-agent", "")
-        ip_address = http_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if not ip_address:
+        forwarded_for = http_request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            ip_address = forwarded_for.split(",")[0].strip()
+        else:
             ip_address = http_request.headers.get("x-real-ip", "")
         if not ip_address:
             ip_address = getattr(http_request.client, "host", "")
@@ -498,7 +504,7 @@ async def get_token_info(
         return {
             "token_info": token_info,
             "service": "session_service",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
         
     except Exception as e:

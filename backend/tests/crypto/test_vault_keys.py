@@ -16,7 +16,7 @@ from app.crypto.vault_keys import (
     create_vault_key_for_phrase, unwrap_vault_key_with_phrase,
     vault_key_context
 )
-from app.crypto.key_manager import KeyManager, KeyType
+from app.crypto.key_manager import SessionKeyManager, KeyType
 from app.crypto.aes_kw import AESKeyWrapError
 from app.crypto.errors import InvalidInputError
 
@@ -29,13 +29,13 @@ class TestWrappedVaultKey:
         wrapped_key = WrappedVaultKey(
             wrapped_key="dGVzdCBkYXRh",  # base64 for "test data"
             key_size=32,
-            tag_id="abc123",
+            phrase_hash="abc123",
             metadata={"algorithm": "AES-KW"}
         )
         
         assert wrapped_key.wrapped_key == "dGVzdCBkYXRh"
         assert wrapped_key.key_size == 32
-        assert wrapped_key.tag_id == "abc123"
+        assert wrapped_key.phrase_hash== "abc123"
         assert wrapped_key.metadata["algorithm"] == "AES-KW"
         assert isinstance(wrapped_key.created_at, float)
     
@@ -44,7 +44,7 @@ class TestWrappedVaultKey:
         wrapped_key = WrappedVaultKey(
             wrapped_key="dGVzdCBkYXRh",
             key_size=32,
-            tag_id="abc123",
+            phrase_hash="abc123",
             metadata={"algorithm": "AES-KW"}
         )
         
@@ -70,7 +70,7 @@ class TestWrappedVaultKey:
         
         assert wrapped_key.wrapped_key == "dGVzdCBkYXRh"
         assert wrapped_key.key_size == 32
-        assert wrapped_key.tag_id == "abc123"
+        assert wrapped_key.phrase_hash== "abc123"
         assert wrapped_key.created_at == 1234567890.0
     
     def test_wrapped_vault_key_from_dict_defaults(self):
@@ -84,7 +84,7 @@ class TestWrappedVaultKey:
         
         assert wrapped_key.wrapped_key == "dGVzdCBkYXRh"
         assert wrapped_key.key_size == 32
-        assert wrapped_key.tag_id is None
+        assert wrapped_key.phrase_hash is None
         assert wrapped_key.metadata == {}
         assert isinstance(wrapped_key.created_at, float)
     
@@ -119,7 +119,7 @@ class TestVaultKeyManager:
     def setup_method(self):
         """Set up test fixtures."""
         self.test_phrase = "test secret phrase for vault keys"
-        self.key_manager = KeyManager()
+        self.key_manager = SessionKeyManager()
         self.vault_manager = VaultKeyManager(self.key_manager)
     
     def test_create_vault_key_basic(self):
@@ -128,7 +128,7 @@ class TestVaultKeyManager:
         
         assert isinstance(wrapped_key, WrappedVaultKey)
         assert wrapped_key.key_size == 32  # Default size
-        assert wrapped_key.tag_id is not None
+        assert wrapped_key.phrase_hash is not None
         assert wrapped_key.metadata["algorithm"] == "AES-KW"
         assert wrapped_key.metadata["kek_size"] == 32
         assert len(wrapped_key.wrapped_key) > 0
@@ -214,7 +214,7 @@ class TestVaultKeyManager:
         wrapped_key = self.vault_manager.create_vault_key(self.test_phrase)
         
         # Modify TagID to simulate mismatch
-        wrapped_key.tag_id = "wrong_tag_id"
+        wrapped_key.phrase_hash= "wrong_tag_id"
         
         with pytest.raises(VaultKeyError, match="TagID mismatch"):
             self.vault_manager.unwrap_vault_key(wrapped_key, self.test_phrase)
@@ -255,7 +255,7 @@ class TestVaultKeyManager:
         )
         
         assert new_wrapped_key.key_size == old_wrapped_key.key_size
-        assert new_wrapped_key.tag_id == old_wrapped_key.tag_id  # Same phrase
+        assert new_wrapped_key.phrase_hash== old_wrapped_key.phrase_hash  # Same phrase
         assert new_wrapped_key.wrapped_key != old_wrapped_key.wrapped_key  # Different key
         assert "rotated_from" in new_wrapped_key.metadata
         assert new_wrapped_key.metadata["rotated_from"]["old_key_size"] == old_wrapped_key.key_size
@@ -377,7 +377,7 @@ class TestVaultKeyRoundTrip:
         key2 = manager.create_vault_key(phrase, key_size=32)
         
         # Should have same TagID but different wrapped keys
-        assert key1.tag_id == key2.tag_id
+        assert key1.phrase_hash== key2.phrase_hash
         assert key1.wrapped_key != key2.wrapped_key
         
         # Both should unwrap successfully

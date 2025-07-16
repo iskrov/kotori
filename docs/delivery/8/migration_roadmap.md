@@ -58,7 +58,7 @@ def upgrade():
         sa.Column('is_active', sa.Boolean(), nullable=False, default=True),
         sa.Column('is_superuser', sa.Boolean(), nullable=False, default=False),
         sa.Column('google_id', sa.String(), nullable=True),
-        sa.Column('profile_picture', sa.String(), nullable=True),
+        sa.Column('avatar_url', sa.String(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.UniqueConstraint('email'),

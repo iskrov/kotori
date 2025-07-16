@@ -87,7 +87,6 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             # Legacy fields
             is_superuser=obj_in.is_superuser,
             is_active=True,
-            profile_picture=obj_in.profile_picture,
             
             # Timestamps
             created_at=datetime.now(UTC),

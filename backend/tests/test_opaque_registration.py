@@ -68,7 +68,7 @@ class TestOpaqueRegistration:
         request = OpaqueRegistrationRequest(**VALID_OPAQUE_DATA)
         
         # Verify the data was parsed correctly
-        assert request.tag_name == "Test Secret Tag"
+        assert request.tag_name== "Test Secret Tag"
         assert request.color_code == "#FF5733"
         assert len(base64.b64decode(request.verifier_kv)) == 32
         assert len(base64.b64decode(request.salt)) == 16

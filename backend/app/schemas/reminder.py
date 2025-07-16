@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -50,3 +50,22 @@ class Reminder(ReminderInDBBase):
 # Properties stored in DB
 class ReminderInDB(ReminderInDBBase):
     pass
+
+
+# Bulk response for reminders
+class ReminderBulkResponse(BaseModel):
+    """Response schema for bulk reminder operations"""
+    reminders: List[Reminder]
+    total_count: int
+    has_more: bool
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Reminder deletion response
+class ReminderDeleteResponse(BaseModel):
+    """Response schema for reminder deletion"""
+    message: str
+    deleted_reminder_id: UUID
+    
+    model_config = ConfigDict(from_attributes=True)

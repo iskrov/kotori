@@ -21,13 +21,13 @@ class TestOpaqueKeys:
     def test_valid_opaque_keys(self):
         """Test creation of valid OpaqueKeys."""
         keys = OpaqueKeys(
-            tag_id=b'x' * 16,
+            phrase_hash=b'x' * 16,
             verification_key=b'y' * 32,
             encryption_key=b'z' * 32,
             salt=b'a' * 16
         )
         
-        assert len(keys.tag_id) == 16
+        assert len(keys.phrase_hash) == 16
         assert len(keys.verification_key) == 32
         assert len(keys.encryption_key) == 32
         assert len(keys.salt) == 16
@@ -36,7 +36,7 @@ class TestOpaqueKeys:
         """Test validation of TagID length."""
         with pytest.raises(ValueError) as exc_info:
             OpaqueKeys(
-                tag_id=b'x' * 15,  # Wrong length
+                phrase_hash=b'x' * 15,  # Wrong length
                 verification_key=b'y' * 32,
                 encryption_key=b'z' * 32,
                 salt=b'a' * 16
@@ -48,7 +48,7 @@ class TestOpaqueKeys:
         """Test validation of verification key length."""
         with pytest.raises(ValueError) as exc_info:
             OpaqueKeys(
-                tag_id=b'x' * 16,
+                phrase_hash=b'x' * 16,
                 verification_key=b'y' * 31,  # Wrong length
                 encryption_key=b'z' * 32,
                 salt=b'a' * 16
@@ -60,7 +60,7 @@ class TestOpaqueKeys:
         """Test validation of encryption key length."""
         with pytest.raises(ValueError) as exc_info:
             OpaqueKeys(
-                tag_id=b'x' * 16,
+                phrase_hash=b'x' * 16,
                 verification_key=b'y' * 32,
                 encryption_key=b'z' * 31,  # Wrong length
                 salt=b'a' * 16
@@ -72,7 +72,7 @@ class TestOpaqueKeys:
         """Test validation of salt length."""
         with pytest.raises(ValueError) as exc_info:
             OpaqueKeys(
-                tag_id=b'x' * 16,
+                phrase_hash=b'x' * 16,
                 verification_key=b'y' * 32,
                 encryption_key=b'z' * 32,
                 salt=b'a' * 15  # Wrong length
@@ -90,13 +90,13 @@ class TestDeriveOpaqueKeysFromPhrase:
         keys = derive_opaque_keys_from_phrase(password_phrase)
         
         # Verify all keys are generated with correct lengths
-        assert len(keys.tag_id) == 16
+        assert len(keys.phrase_hash) == 16
         assert len(keys.verification_key) == 32
         assert len(keys.encryption_key) == 32
         assert len(keys.salt) == 16
         
         # Verify keys are not empty
-        assert keys.tag_id != b'\x00' * 16
+        assert keys.phrase_hash != b'\x00' * 16
         assert keys.verification_key != b'\x00' * 32
         assert keys.encryption_key != b'\x00' * 32
         assert keys.salt != b'\x00' * 16
@@ -109,7 +109,7 @@ class TestDeriveOpaqueKeysFromPhrase:
         keys2 = derive_opaque_keys_from_phrase(password_phrase)
         
         # TagID should be the same (deterministic)
-        assert keys1.tag_id == keys2.tag_id
+        assert keys1.phrase_hash== keys2.phrase_hash
         
         # But other keys should be different (random salts)
         assert keys1.salt != keys2.salt
@@ -125,7 +125,7 @@ class TestDeriveOpaqueKeysFromPhrase:
         keys2 = derive_opaque_keys_from_phrase(password_phrase, salt)
         
         # All keys should be identical
-        assert keys1.tag_id == keys2.tag_id
+        assert keys1.phrase_hash== keys2.phrase_hash
         assert keys1.verification_key == keys2.verification_key
         assert keys1.encryption_key == keys2.encryption_key
         assert keys1.salt == keys2.salt
@@ -138,7 +138,7 @@ class TestDeriveOpaqueKeysFromPhrase:
         keys2 = derive_opaque_keys_from_phrase("phrase two", salt)
         
         # All keys should be different
-        assert keys1.tag_id != keys2.tag_id
+        assert keys1.phrase_hash != keys2.phrase_hash
         assert keys1.verification_key != keys2.verification_key
         assert keys1.encryption_key != keys2.encryption_key
         assert keys1.salt == keys2.salt  # Same salt
@@ -158,7 +158,7 @@ class TestDeriveOpaqueKeysFromPhrase:
         keys = derive_opaque_keys_from_phrase(password_phrase, config=config)
         
         # Should still produce valid keys
-        assert len(keys.tag_id) == 16
+        assert len(keys.phrase_hash) == 16
         assert len(keys.verification_key) == 32
         assert len(keys.encryption_key) == 32
         assert len(keys.salt) == 16
@@ -207,7 +207,7 @@ class TestDeriveOpaqueKeysFromPhrase:
         keys2 = derive_opaque_keys_from_phrase(phrase2)
         
         # TagID should be the same after normalization
-        assert keys1.tag_id == keys2.tag_id
+        assert keys1.phrase_hash== keys2.phrase_hash
 
 
 class TestDeriveOpaqueKeysWithKnownSalt:
@@ -221,7 +221,7 @@ class TestDeriveOpaqueKeysWithKnownSalt:
         keys = derive_opaque_keys_with_known_salt(password_phrase, salt)
         
         # Verify keys are generated correctly
-        assert len(keys.tag_id) == 16
+        assert len(keys.phrase_hash) == 16
         assert len(keys.verification_key) == 32
         assert len(keys.encryption_key) == 32
         assert keys.salt == salt
@@ -249,7 +249,7 @@ class TestVerifyTagIdMatchesPhrase:
         password_phrase = "test secret phrase"
         keys = derive_opaque_keys_from_phrase(password_phrase)
         
-        result = verify_tag_id_matches_phrase(keys.tag_id, password_phrase)
+        result = verify_tag_id_matches_phrase(keys.phrase_hash, password_phrase)
         assert result is True
     
     def test_failed_verification_wrong_phrase(self):
@@ -258,13 +258,13 @@ class TestVerifyTagIdMatchesPhrase:
         wrong_phrase = "wrong secret phrase"
         keys = derive_opaque_keys_from_phrase(password_phrase)
         
-        result = verify_tag_id_matches_phrase(keys.tag_id, wrong_phrase)
+        result = verify_tag_id_matches_phrase(keys.phrase_hash, wrong_phrase)
         assert result is False
     
     def test_failed_verification_wrong_tag_id(self):
         """Test failed verification with wrong TagID."""
         password_phrase = "test secret phrase"
-        wrong_tag_id = b"wrong_tag_id_16b"
+        wrong_phrase_hash= b"wrong_tag_id_16b"
         
         result = verify_tag_id_matches_phrase(wrong_tag_id, password_phrase)
         assert result is False
@@ -290,7 +290,7 @@ class TestValidateOpaqueKeys:
     def test_valid_keys(self):
         """Test validation of valid keys."""
         keys = OpaqueKeys(
-            tag_id=b'x' * 16,
+            phrase_hash=b'x' * 16,
             verification_key=b'y' * 32,
             encryption_key=b'z' * 32,
             salt=b'a' * 16
@@ -309,7 +309,7 @@ class TestValidateOpaqueKeys:
     def test_all_zero_tag_id(self):
         """Test validation rejects all-zero TagID."""
         keys = OpaqueKeys(
-            tag_id=b'\x00' * 16,  # All zeros
+            phrase_hash=b'\x00' * 16,  # All zeros
             verification_key=b'y' * 32,
             encryption_key=b'z' * 32,
             salt=b'a' * 16
@@ -323,7 +323,7 @@ class TestValidateOpaqueKeys:
     def test_all_zero_verification_key(self):
         """Test validation rejects all-zero verification key."""
         keys = OpaqueKeys(
-            tag_id=b'x' * 16,
+            phrase_hash=b'x' * 16,
             verification_key=b'\x00' * 32,  # All zeros
             encryption_key=b'z' * 32,
             salt=b'a' * 16
@@ -337,7 +337,7 @@ class TestValidateOpaqueKeys:
     def test_all_zero_encryption_key(self):
         """Test validation rejects all-zero encryption key."""
         keys = OpaqueKeys(
-            tag_id=b'x' * 16,
+            phrase_hash=b'x' * 16,
             verification_key=b'y' * 32,
             encryption_key=b'\x00' * 32,  # All zeros
             salt=b'a' * 16
@@ -352,7 +352,7 @@ class TestValidateOpaqueKeys:
         """Test validation rejects identical verification and encryption keys."""
         same_key = b'y' * 32
         keys = OpaqueKeys(
-            tag_id=b'x' * 16,
+            phrase_hash=b'x' * 16,
             verification_key=same_key,
             encryption_key=same_key,  # Same as verification key
             salt=b'a' * 16
@@ -408,14 +408,14 @@ class TestSpecificationCompliance:
         # - Kv = HKDF(S, "verify") — 32 B
         # - Ke = HKDF(S, "encrypt") — 32 B
         
-        assert len(keys.tag_id) == 16      # 128-bit TagID
+        assert len(keys.phrase_hash) == 16      # 128-bit TagID
         assert len(keys.verification_key) == 32  # 32-byte Kv
         assert len(keys.encryption_key) == 32    # 32-byte Ke
         assert len(keys.salt) == 16       # 16-byte salt
         
         # TagID should be deterministic (salt-free)
         keys2 = derive_opaque_keys_from_phrase(password_phrase, b"different_salt16")
-        assert keys.tag_id == keys2.tag_id  # Same TagID despite different salt
+        assert keys.phrase_hash== keys2.phrase_hash  # Same TagID despite different salt
         
         # Kv and Ke should be different with different salts
         assert keys.verification_key != keys2.verification_key
@@ -435,7 +435,7 @@ class TestSpecificationCompliance:
         prod_keys = derive_opaque_keys_from_phrase(password_phrase, salt, prod_config)
         
         # TagID should be the same (deterministic)
-        assert dev_keys.tag_id == prod_keys.tag_id
+        assert dev_keys.phrase_hash== prod_keys.phrase_hash
         
         # But derived keys should be different (different Argon2id parameters)
         assert dev_keys.verification_key != prod_keys.verification_key

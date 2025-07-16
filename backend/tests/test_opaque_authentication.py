@@ -34,24 +34,24 @@ class TestOpaqueAuthenticationEndpoints:
         
         # Test valid request (32 hex chars = 16 bytes)
         valid_request = OpaqueAuthInitRequest(
-            tag_id="a1b2c3d4e5f6789012345678901234ab",
+            phrase_hash="a1b2c3d4e5f6789012345678901234ab",
             client_message="dGVzdCBjbGllbnQgbWVzc2FnZQ=="  # "test client message"
         )
         
-        assert valid_request.tag_id == "a1b2c3d4e5f6789012345678901234ab"
+        assert valid_request.phrase_hash== "a1b2c3d4e5f6789012345678901234ab"
         assert valid_request.client_message == "dGVzdCBjbGllbnQgbWVzc2FnZQ=="
         
         # Test invalid tag_id (too short)
         with pytest.raises(ValueError):
             OpaqueAuthInitRequest(
-                tag_id="short",
+                phrase_hash="short",
                 client_message="dGVzdCBjbGllbnQgbWVzc2FnZQ=="
             )
         
         # Test invalid base64 client_message
         with pytest.raises(ValueError):
             OpaqueAuthInitRequest(
-                tag_id="a1b2c3d4e5f6789012345678901234ab",
+                phrase_hash="a1b2c3d4e5f6789012345678901234ab",
                 client_message="invalid-base64!"
             )
     
@@ -106,7 +106,7 @@ class TestOpaqueAuthenticationEndpoints:
         
         # Generate session token
         user_id = "test_user_123"
-        tag_id = "a1b2c3d4e5f6789012345678901234ab"
+        phrase_hash= "a1b2c3d4e5f6789012345678901234ab"
         
         token = service._generate_session_token(user_id, tag_id)
         
@@ -134,7 +134,7 @@ class TestOpaqueAuthenticationEndpoints:
         expired_session = OpaqueSession(
             session_id="expired_session_123",
             user_id="test_user_123",
-            tag_id=bytes.fromhex("a1b2c3d4e5f6789012345678901234ab"),
+            phrase_hash=bytes.fromhex("a1b2c3d4e5f6789012345678901234ab"),
             session_state="initialized",
             created_at=current_time - timedelta(hours=1),
             expires_at=current_time - timedelta(minutes=1),  # Expired 1 minute ago
@@ -145,7 +145,7 @@ class TestOpaqueAuthenticationEndpoints:
         valid_session = OpaqueSession(
             session_id="valid_session_123",
             user_id="test_user_123",
-            tag_id=bytes.fromhex("a1b2c3d4e5f6789012345678901234ab"),
+            phrase_hash=bytes.fromhex("a1b2c3d4e5f6789012345678901234ab"),
             session_state="initialized",
             created_at=current_time,
             expires_at=current_time + timedelta(minutes=5),  # Expires in 5 minutes

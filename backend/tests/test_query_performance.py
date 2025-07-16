@@ -78,9 +78,9 @@ class TestQueryPerformance:
         users, _ = bulk_test_data
         test_user = users[0]
 
-        from datetime import datetime, timedelta
-        start_date = datetime.now() - timedelta(days=30)
-        end_date = datetime.now()
+        from datetime import datetime, timedelta, UTC
+        start_date = datetime.now(UTC) - timedelta(days=30)
+        end_date = datetime.now(UTC)
 
         def date_range_query(session):
             return session.query(JournalEntry).filter(
@@ -104,7 +104,7 @@ class TestQueryPerformance:
         # Create some tags and associations
         tags = []
         for i in range(5):
-            tag = Tag(name=f"PerfTestTag{i}")
+            tag = Tag(tag_display_tag_display_name=f"PerfTestTag{i}")
             tags.append(tag)
         
         db.add_all(tags)
@@ -114,7 +114,7 @@ class TestQueryPerformance:
         associations = []
         for i, entry in enumerate(entries[:20]):  # Associate tags with first 20 entries
             tag = tags[i % len(tags)]
-            association = JournalEntryTag(journal_entry_id=entry.id, tag_id=tag.id)
+            association = JournalEntryTag(journal_entry_id=entry.id, phrase_hash=tag.id)
             associations.append(association)
         
         db.add_all(associations)
@@ -122,7 +122,7 @@ class TestQueryPerformance:
 
         def tag_query(session):
             return session.query(JournalEntry).join(JournalEntryTag).join(Tag).filter(
-                Tag.name == "PerfTestTag0"
+                Tag.tag_name== "PerfTestTag0"
             ).all()
 
         # Measure performance
@@ -306,8 +306,8 @@ class TestIndexEffectiveness:
         db.commit()
 
         # Test composite query (user_id + entry_date) - should benefit from composite index
-        from datetime import datetime, timedelta
-        start_date = datetime.now() - timedelta(days=1)
+        from datetime import datetime, timedelta, UTC
+        start_date = datetime.now(UTC) - timedelta(days=1)
         
         start_time = time.time()
         result = db.query(JournalEntry).filter(

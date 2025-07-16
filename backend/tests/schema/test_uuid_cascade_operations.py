@@ -10,7 +10,7 @@ import uuid
 from typing import Dict, Any
 from sqlalchemy import text
 
-from .schema_validation_utils import (
+from tests.schema.schema_validation_utils import (
     SchemaValidationTester,
     ConstraintTestDataGenerator,
     CascadeTestHelper

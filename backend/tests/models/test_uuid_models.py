@@ -7,7 +7,7 @@ the existing test_models.py file.
 
 import pytest
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -74,7 +74,7 @@ class TestUUIDPrimaryKeys:
         db.refresh(user)
 
         # Create tag
-        tag = Tag(name="UUIDTestTag", user_id=user.id)
+        tag = Tag(tag_display_tag_display_name="UUIDTestTag", user_id=user.id)
         db.add(tag)
         db.commit()
         db.refresh(tag)
@@ -125,7 +125,7 @@ class TestUUIDPrimaryKeys:
         db.refresh(user)
 
         # Create secret tag
-        phrase_hash = b"test_phrase_hash_16b"  # 16 bytes
+        phrase_hash= b"test_phrase_hash_16b"  # 16 bytes
         secret_tag = SecretTag(
             tag_name="UUIDSecretTag",
             phrase_hash=phrase_hash,
@@ -141,7 +141,7 @@ class TestUUIDPrimaryKeys:
         test_assertions.assert_foreign_key_relationship(secret_tag, user)
         
         # Verify phrase_hash is separate from primary key
-        assert secret_tag.phrase_hash == phrase_hash
+        assert secret_tag.phrase_hash== phrase_hash
         assert isinstance(secret_tag.id, uuid.UUID)
         assert secret_tag.id != phrase_hash
         
@@ -237,7 +237,7 @@ class TestUUIDConstraints:
         db.refresh(user)
 
         # Create first secret tag
-        phrase_hash = b"unique_phrase_hash_1"
+        phrase_hash= b"unique_phrase_hash_1"
         secret_tag1 = SecretTag(
             tag_name="SecretTag1",
             phrase_hash=phrase_hash,
@@ -276,13 +276,13 @@ class TestUUIDConstraints:
         db.refresh(user)
 
         # Create first tag
-        tag1 = Tag(name="UniqueTagName", user_id=user.id)
+        tag1 = Tag(tag_display_tag_display_name="UniqueTagName", user_id=user.id)
         db.add(tag1)
         db.commit()
         db.refresh(tag1)
 
         # Try to create second tag with same name for same user
-        tag2 = Tag(name="UniqueTagName", user_id=user.id)
+        tag2 = Tag(tag_display_tag_display_name="UniqueTagName", user_id=user.id)
         db.add(tag2)
 
         # Should raise IntegrityError

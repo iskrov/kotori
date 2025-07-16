@@ -61,7 +61,8 @@ class User(Base, TimestampMixin):
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
     google_id = Column(String, unique=True, nullable=True)
-    profile_picture = Column(String, nullable=True)  # Keep for backward compatibility
+    
+
 
     # Relationships
     journal_entries = relationship("JournalEntry", back_populates="user")

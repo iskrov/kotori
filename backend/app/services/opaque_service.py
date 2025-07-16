@@ -259,13 +259,13 @@ class EnhancedOpaqueService:
                 except Exception as e:
                     raise OpaqueRegistrationError(f"Invalid OPAQUE data encoding: {str(e)}")
                 
-                # Generate deterministic tag_id from envelope
-                tag_id = self._generate_tag_id_from_envelope(opaque_envelope)
+                # Generate deterministic phrase_hash from envelope
+                phrase_hash = self._generate_tag_id_from_envelope(opaque_envelope)
                 
                 # Check for duplicate tag
                 existing_tag = self.db.query(SecretTag).filter(
                     SecretTag.user_id == user_id,
-                    SecretTag.tag_id == tag_id
+                    SecretTag.phrase_hash == phrase_hash
                 ).first()
                 
                 if existing_tag:
@@ -295,29 +295,28 @@ class EnhancedOpaqueService:
                 
                 # Begin database transaction
                 try:
+                    # Generate UUID for the secret tag
+                    secret_tag_id = uuid.uuid4()
+                    
                     # Create secret tag record
                     secret_tag = SecretTag(
-                        tag_id=tag_id,
+                        id=secret_tag_id,
+                        phrase_hash=phrase_hash,
                         user_id=user_id,
                         salt=salt,
                         verifier_kv=verifier_kv,
                         opaque_envelope=opaque_envelope,
                         tag_name=tag_name,
-                        color_code=color_code,
-                        created_at=datetime.now(UTC),
-                        updated_at=datetime.now(UTC)
+                        color_code=color_code
                     )
                     
                     # Create wrapped key record
                     wrapped_key = WrappedKey(
-                        id=str(uuid.uuid4()),
-                        tag_id=tag_id,
+                        tag_id=secret_tag_id,
                         vault_id=vault_id,
                         wrapped_key=wrapped_data_key,
                         key_purpose="vault_data",
-                        key_version=1,
-                        created_at=datetime.now(UTC),
-                        updated_at=datetime.now(UTC)
+                        key_version=1
                     )
                     
                     # Save to database atomically
@@ -339,7 +338,7 @@ class EnhancedOpaqueService:
                     secure_zero(kek)
                     secure_zero(export_key)
                     
-                    logger.info(f"Successfully registered secret tag {tag_id.hex()} for user {user_id}")
+                    logger.info(f"Successfully registered secret tag {secret_tag_id} for user {user_id}")
                     
                     # Log successful registration
                     self._audit_service.log_authentication_event(
@@ -351,7 +350,7 @@ class EnhancedOpaqueService:
                         user_agent=user_agent,
                         correlation_id=correlation_id,
                         additional_data={
-                            "tag_id": tag_id.hex(),
+                            "tag_id": str(secret_tag_id),
                             "tag_name": tag_name,
                             "vault_id": vault_id,
                             "registration_method": "opaque_enhanced"
@@ -360,7 +359,7 @@ class EnhancedOpaqueService:
                     
                     # Return success response
                     return OpaqueRegistrationResponse(
-                        tag_id=tag_id.hex(),
+                        tag_id=str(secret_tag_id),
                         tag_name=tag_name,
                         color_code=color_code,
                         vault_id=vault_id,
@@ -466,7 +465,7 @@ class EnhancedOpaqueService:
             for tag in secret_tags:
                 # Get vault information for this tag
                 wrapped_key = self.db.query(WrappedKey).filter(
-                    WrappedKey.tag_id == tag.tag_id
+                    WrappedKey.tag_id == tag.id
                 ).first()
                 
                 vault_id = wrapped_key.vault_id if wrapped_key else None
@@ -484,7 +483,7 @@ class EnhancedOpaqueService:
                         logger.warning(f"Could not get vault stats for {vault_id}: {e}")
                 
                 tag_info = SecretTagInfo(
-                    tag_id=tag.tag_id.hex(),
+                    tag_id=str(tag.id),
                     tag_name=tag.tag_name,
                     color_code=tag.color_code,
                     vault_id=vault_id,
@@ -507,17 +506,18 @@ class EnhancedOpaqueService:
         
         Args:
             user_id: ID of the user
-            tag_id: Hex-encoded tag ID
+            tag_id: UUID string of the tag
             
         Returns:
             True if tag exists, False otherwise
         """
         try:
-            tag_id_bytes = bytes.fromhex(tag_id)
+            from uuid import UUID
+            tag_id_uuid = UUID(tag_id)
             
             tag = self.db.query(SecretTag).filter(
                 SecretTag.user_id == user_id,
-                SecretTag.tag_id == tag_id_bytes
+                SecretTag.id == tag_id_uuid
             ).first()
             
             return tag is not None
@@ -540,7 +540,7 @@ class EnhancedOpaqueService:
         
         Args:
             user_id: ID of the user
-            tag_id: Hex-encoded tag ID
+            tag_id: UUID string of the tag
             tag_name: New tag name (optional)
             color_code: New color code (optional)
             ip_address: Client IP address for audit logging
@@ -554,12 +554,13 @@ class EnhancedOpaqueService:
         """
         with self._audit_context() as correlation_id:
             try:
-                tag_id_bytes = bytes.fromhex(tag_id)
+                from uuid import UUID
+                tag_id_uuid = UUID(tag_id)
                 
                 # Find the secret tag
                 secret_tag = self.db.query(SecretTag).filter(
                     SecretTag.user_id == user_id,
-                    SecretTag.tag_id == tag_id_bytes
+                    SecretTag.id == tag_id_uuid
                 ).first()
                 
                 if not secret_tag:
@@ -617,7 +618,7 @@ class EnhancedOpaqueService:
         
         Args:
             user_id: ID of the user
-            tag_id: Hex-encoded tag ID
+            tag_id: UUID string of the tag
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
             
@@ -626,12 +627,13 @@ class EnhancedOpaqueService:
         """
         with self._audit_context() as correlation_id:
             try:
-                tag_id_bytes = bytes.fromhex(tag_id)
+                from uuid import UUID
+                tag_id_uuid = UUID(tag_id)
                 
                 # Find the secret tag
                 secret_tag = self.db.query(SecretTag).filter(
                     SecretTag.user_id == user_id,
-                    SecretTag.tag_id == tag_id_bytes
+                    SecretTag.id == tag_id_uuid
                 ).first()
                 
                 if not secret_tag:
@@ -639,7 +641,7 @@ class EnhancedOpaqueService:
                 
                 # Get vault information before deletion
                 wrapped_keys = self.db.query(WrappedKey).filter(
-                    WrappedKey.tag_id == tag_id_bytes
+                    WrappedKey.tag_id == tag_id_uuid
                 ).all()
                 
                 vault_ids = [key.vault_id for key in wrapped_keys]
@@ -648,7 +650,7 @@ class EnhancedOpaqueService:
                 try:
                     # Delete associated wrapped keys
                     self.db.query(WrappedKey).filter(
-                        WrappedKey.tag_id == tag_id_bytes
+                        WrappedKey.tag_id == tag_id_uuid
                     ).delete()
                     
                     # Delete the secret tag
@@ -758,9 +760,10 @@ class EnhancedOpaqueService:
                     )
                     raise OpaqueAuthenticationError("Too many failed authentication attempts")
                 
-                # Validate tag_id format
+                # Validate tag_id format (now UUID instead of hex)
                 try:
-                    tag_id_bytes = bytes.fromhex(request.tag_id)
+                    from uuid import UUID
+                    tag_id_uuid = UUID(request.tag_id)
                 except ValueError:
                     self._audit_service.log_authentication_event(
                         db=self.db,
@@ -778,7 +781,7 @@ class EnhancedOpaqueService:
                 # Verify that the tag exists and belongs to the user
                 secret_tag = self.db.query(SecretTag).filter(
                     SecretTag.user_id == user_id,
-                    SecretTag.tag_id == tag_id_bytes
+                    SecretTag.id == tag_id_uuid
                 ).first()
                 
                 if not secret_tag:
@@ -854,7 +857,7 @@ class EnhancedOpaqueService:
                 opaque_session = OpaqueSession(
                     session_id=session_id,
                     user_id=str(user_id),
-                    tag_id=tag_id_bytes,
+                    tag_id=tag_id_uuid,
                     session_state='initialized',
                     session_data=json.dumps(session_data).encode(),
                     created_at=datetime.now(UTC),
@@ -1146,7 +1149,7 @@ class EnhancedOpaqueService:
         
         Args:
             user_id: User ID
-            tag_id: Tag ID
+            tag_id: UUID string of the tag
             session_token: Valid session token
             
         Returns:
@@ -1160,11 +1163,12 @@ class EnhancedOpaqueService:
             if not self._session_service.validate_session_token(session_token, user_id, tag_id):
                 raise OpaqueAuthenticationError("Invalid session token")
             
-            tag_id_bytes = bytes.fromhex(tag_id)
+            from uuid import UUID
+            tag_id_uuid = UUID(tag_id)
             
             # Get wrapped keys
             wrapped_keys = self.db.query(WrappedKey).filter(
-                WrappedKey.tag_id == tag_id_bytes
+                WrappedKey.tag_id == tag_id_uuid
             ).all()
             
             if not wrapped_keys:

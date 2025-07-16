@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 import base64
 
 # Add the project root to the Python path
@@ -33,7 +33,7 @@ class TestRegularTags:
             "title": "My first entry",
             "content": "This is a test entry with new tags.",
             "tags": ["testing", "python", "fastapi"],
-            "entry_date": datetime.now().isoformat()
+            "entry_date": datetime.now(UTC).isoformat()
         }
         response = client.post("/api/journals/", headers=token_headers, json=entry_data)
         assert response.status_code == 200
@@ -54,7 +54,7 @@ class TestRegularTags:
     def test_create_journal_with_existing_tags(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test creating a journal entry with existing regular tags."""
         # Pre-populate a tag
-        tag = Tag(name="existing_tag")
+        tag = Tag(tag_display_tag_display_name="existing_tag")
         db.add(tag)
         db.commit()
 
@@ -62,7 +62,7 @@ class TestRegularTags:
             "title": "Another entry",
             "content": "This entry uses an existing tag.",
             "tags": ["existing_tag", "new_tag"],
-            "entry_date": datetime.now().isoformat()
+            "entry_date": datetime.now(UTC).isoformat()
         }
         response = client.post("/api/journals/", headers=token_headers, json=entry_data)
         assert response.status_code == 200
@@ -72,8 +72,8 @@ class TestRegularTags:
         # Verify only one new tag was created
         tags_in_db = db.query(Tag).order_by(Tag.name).all()
         assert len(tags_in_db) == 2
-        assert tags_in_db[0].name == "existing_tag"
-        assert tags_in_db[1].name == "new_tag"
+        assert tags_in_db[0].tag_name== "existing_tag"
+        assert tags_in_db[1].tag_name== "new_tag"
 
     def test_update_journal_tags(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test updating the tags of a journal entry."""
@@ -82,7 +82,7 @@ class TestRegularTags:
             "title": "Entry to be updated",
             "content": "Initial tags.",
             "tags": ["initial"],
-            "entry_date": datetime.now().isoformat()
+            "entry_date": datetime.now(UTC).isoformat()
         }
         response = client.post("/api/journals/", headers=token_headers, json=entry_data)
         assert response.status_code == 200
@@ -104,41 +104,41 @@ class TestRegularTags:
         assert current_tag_names == ["new", "updated"]
         
         # Verify the 'initial' tag still exists in the tags table
-        initial_tag = db.query(Tag).filter_by(name="initial").first()
+        initial_tag = db.query(Tag).filter_by(tag_tag_display_tag_tag_display_name="initial").first()
         assert initial_tag is not None
 
     def test_tags_are_shared_not_duplicated(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test that tags are shared between entries and not duplicated."""
         # Entry 1
-        client.post("/api/journals/", headers=token_headers, json={"title": "Entry 1", "content": "c1", "tags": ["shared"], "entry_date": datetime.now().isoformat()})
+        client.post("/api/journals/", headers=token_headers, json={"title": "Entry 1", "content": "c1", "tags": ["shared"], "entry_date": datetime.now(UTC).isoformat()})
         
         # Entry 2
-        client.post("/api/journals/", headers=token_headers, json={"title": "Entry 2", "content": "c2", "tags": ["shared"], "entry_date": datetime.now().isoformat()})
+        client.post("/api/journals/", headers=token_headers, json={"title": "Entry 2", "content": "c2", "tags": ["shared"], "entry_date": datetime.now(UTC).isoformat()})
 
         # Should only be one "shared" tag in the database
-        tags_in_db = db.query(Tag).filter_by(name="shared").all()
+        tags_in_db = db.query(Tag).filter_by(tag_tag_display_tag_tag_display_name="shared").all()
         assert len(tags_in_db) == 1
 
     def test_deleting_entry_does_not_delete_shared_tag(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test that deleting an entry doesn't delete a tag if it's used by another entry."""
         # Entry 1 with tag 'persistent'
-        res1 = client.post("/api/journals/", headers=token_headers, json={"title": "Entry 1", "content": "c1", "tags": ["persistent"], "entry_date": datetime.now().isoformat()})
+        res1 = client.post("/api/journals/", headers=token_headers, json={"title": "Entry 1", "content": "c1", "tags": ["persistent"], "entry_date": datetime.now(UTC).isoformat()})
         entry1_id = res1.json()["id"]
         
         # Entry 2 with tag 'persistent'
-        client.post("/api/journals/", headers=token_headers, json={"title": "Entry 2", "content": "c2", "tags": ["persistent"], "entry_date": datetime.now().isoformat()})
+        client.post("/api/journals/", headers=token_headers, json={"title": "Entry 2", "content": "c2", "tags": ["persistent"], "entry_date": datetime.now(UTC).isoformat()})
 
         # Delete Entry 1
         client.delete(f"/api/journals/{entry1_id}", headers=token_headers)
 
         # The 'persistent' tag should still exist in the tags table
-        tag = db.query(Tag).filter_by(name="persistent").first()
+        tag = db.query(Tag).filter_by(tag_tag_display_tag_tag_display_name="persistent").first()
         assert tag is not None
         
         # And it should still be associated with Entry 2
         entry2 = db.query(JournalEntry).filter_by(title="Entry 2").one()
         assert len(entry2.tags) == 1
-        assert entry2.tags[0].tag.name == "persistent"
+        assert entry2.tags[0].tag.tag_name== "persistent"
 
 class TestSecretTags:
     @pytest.mark.skip(reason="API endpoint may not be updated for OPAQUE model yet")
@@ -165,13 +165,13 @@ class TestSecretTags:
     def test_list_secret_tags(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test listing all secret tags for a user."""
         # Create a tag first using correct OPAQUE fields
-        tag_id = uuid.uuid4().bytes
+        phrase_hash= uuid.uuid4().bytes
         salt_bytes = b'a_16_byte_salt!!'  # 16 bytes for salt
         verifier_kv_bytes = b'a_32_byte_verifier_kv_for_test_' # 32 bytes for verifier_kv
         opaque_envelope_bytes = b'opaque_envelope_test_data_for_secret_tag'
         
         tag = SecretTag(
-            tag_id=tag_id,
+            phrase_hash=tag_id,
             user_id=str(test_user.id),  # Convert to string to match model definition
             tag_name="List Test",
             salt=salt_bytes,
@@ -182,9 +182,9 @@ class TestSecretTags:
         db.commit()
         
         # Verify the tag was created correctly in the database
-        created_tag = db.query(SecretTag).filter_by(tag_id=tag_id).first()
+        created_tag = db.query(SecretTag).filter_by(phrase_phrase_phrase_hash=phrase_hash).first()
         assert created_tag is not None
-        assert created_tag.tag_name == "List Test"
+        assert created_tag.tag_name== "List Test"
         assert created_tag.user_id == str(test_user.id)  # Convert to string for comparison
         assert created_tag.salt == salt_bytes
         assert created_tag.verifier_kv == verifier_kv_bytes
@@ -205,13 +205,13 @@ class TestSecretTags:
     def test_update_secret_tag(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test updating a secret tag's name."""
         # Create a tag first using correct OPAQUE fields
-        tag_id = uuid.uuid4().bytes
+        phrase_hash= uuid.uuid4().bytes
         salt_bytes = b'a_16_byte_salt!!'  # 16 bytes for salt
         verifier_kv_bytes = b'a_32_byte_verifier_kv_for_test_' # 32 bytes for verifier_kv
         opaque_envelope_bytes = b'opaque_envelope_test_data_for_secret_tag'
         
         tag = SecretTag(
-            tag_id=tag_id,
+            phrase_hash=tag_id,
             user_id=str(test_user.id),  # Convert to string to match model definition
             tag_name="Before Update",
             salt=salt_bytes,
@@ -225,11 +225,11 @@ class TestSecretTags:
         update_data = {
             "tag_name": "After Update"
         }
-        response = client.put(f"/api/secret-tags/{tag.tag_id.hex()}", headers=token_headers, json=update_data)
+        response = client.put(f"/api/secret-tags/{tag.phrase_hash.hex()}", headers=token_headers, json=update_data)
         assert response.status_code == 200
         data = response.json()
         assert data["tag_name"] == "After Update"
-        assert data["id"] == tag.tag_id.hex()
+        assert data["id"] == tag.phrase_hash.hex()
 
     def test_secret_tag_isolation(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test that users can only see their own secret tags."""
@@ -240,7 +240,7 @@ class TestSecretTags:
         opaque_envelope_bytes = b'opaque_envelope_test_data_for_secret_tag'
         
         tag1 = SecretTag(
-            tag_id=tag_id1,
+            phrase_hash=tag_id1,
             user_id=str(test_user.id),  # Convert to string to match model definition
             tag_name="User 1 Tag",
             salt=salt_bytes,
@@ -257,7 +257,7 @@ class TestSecretTags:
 
         tag_id2 = uuid.uuid4().bytes
         tag2 = SecretTag(
-            tag_id=tag_id2,
+            phrase_hash=tag_id2,
             user_id=str(user2.id),  # Convert to string to match model definition
             tag_name="User 2 Tag",
             salt=salt_bytes,
@@ -277,13 +277,13 @@ class TestSecretTags:
     def test_delete_secret_tag(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test deleting a secret tag."""
         # Create a tag using correct OPAQUE fields
-        tag_id = uuid.uuid4().bytes
+        phrase_hash= uuid.uuid4().bytes
         salt_bytes = b'a_16_byte_salt!!'  # 16 bytes for salt
         verifier_kv_bytes = b'a_32_byte_verifier_kv_for_test_' # 32 bytes for verifier_kv
         opaque_envelope_bytes = b'opaque_envelope_test_data_for_secret_tag'
         
         tag = SecretTag(
-            tag_id=tag_id,
+            phrase_hash=tag_id,
             user_id=str(test_user.id),  # Convert to string to match model definition
             tag_name="To Delete",
             salt=salt_bytes,
@@ -293,7 +293,7 @@ class TestSecretTags:
         db.add(tag)
         db.commit()
         db.refresh(tag)
-        tag_id_hex = tag.tag_id.hex()
+        tag_id_hex = tag.phrase_hash.hex()
 
         # Delete the tag
         response = client.delete(f"/api/secret-tags/{tag_id_hex}", headers=token_headers)
@@ -310,13 +310,13 @@ class TestSecretTags:
     def test_delete_secret_tag_and_cascade(self, client: TestClient, token_headers, test_user: User, db: Session):
         """Test deleting a secret tag and ensuring associated journal entries are also deleted."""
         # 1. Create secret tag using correct OPAQUE fields
-        tag_id = uuid.uuid4().bytes
+        phrase_hash= uuid.uuid4().bytes
         salt_bytes = b'a_16_byte_salt!!'  # 16 bytes for salt
         verifier_kv_bytes = b'a_32_byte_verifier_kv_for_test_' # 32 bytes for verifier_kv
         opaque_envelope_bytes = b'opaque_envelope_test_data_for_secret_tag'
         
         secret_tag = SecretTag(
-            tag_id=tag_id,
+            phrase_hash=tag_id,
             user_id=str(test_user.id),  # Convert to string to match model definition
             tag_name="To Be Deleted",
             salt=salt_bytes,
@@ -326,16 +326,16 @@ class TestSecretTags:
         db.add(secret_tag)
         db.commit()
         db.refresh(secret_tag)
-        tag_id_binary = secret_tag.tag_id
+        tag_id_binary = secret_tag.phrase_hash
 
         # 2. Create a journal entry linked to this secret tag
         # We create it directly in the DB to bypass the schema validation issue
         entry = JournalEntry(
             title="Entry with Secret Tag",
             content="This should be deleted.",
-            entry_date=datetime.now(),
+            entry_date=datetime.now(UTC),
             user_id=test_user.id,
-            secret_tag_id=tag_id_binary
+            secret_phrase_hash=tag_id_binary
         )
         db.add(entry)
         db.commit()
@@ -347,11 +347,11 @@ class TestSecretTags:
         assert response.status_code == 200
 
         # 4. Verify the secret tag is deleted
-        assert db.query(SecretTag).filter_by(tag_id=tag_id_binary).count() == 0
+        assert db.query(SecretTag).filter_by(phrase_phrase_phrase_hash=phrase_hash_binary).count() == 0
         
         # 5. Verify the associated journal entry is also deleted due to cascade
         assert db.query(JournalEntry).filter_by(id=entry_id).count() == 0
 
         # Verify that the tag is removed from journal_entry_tags
-        assert db.query(Tag).filter(Tag.name.in_(['new_tag', 'another_new_tag'])).count() == 2
+        assert db.query(Tag).filter(Tag.tag_tag_tag_name.in_(['new_tag', 'another_new_tag'])).count() == 2
         assert db.query(JournalEntryTag).filter_by(journal_entry_id=entry_id).count() == 2 

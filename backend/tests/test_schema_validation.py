@@ -353,12 +353,12 @@ class TestDataIntegrity:
         db.refresh(entry)
 
         # Create tag and associate with entry
-        tag = Tag(name="CrossTableTag")
+        tag = Tag(tag_display_tag_display_name="CrossTableTag")
         db.add(tag)
         db.commit()
         db.refresh(tag)
 
-        entry_tag = JournalEntryTag(journal_entry_id=entry.id, tag_id=tag.id)
+        entry_tag = JournalEntryTag(journal_entry_id=entry.id, phrase_hash=tag.id)
         db.add(entry_tag)
         db.commit()
 

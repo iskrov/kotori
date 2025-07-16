@@ -11,7 +11,7 @@ import asyncio
 import time
 import uuid
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List, Optional
 from unittest.mock import patch, Mock
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -122,7 +122,7 @@ class TestIntegration:
             id=str(uuid.uuid4()),
             email=TEST_USER_EMAIL,
             hashed_password=self.hasher.hash_password(TEST_USER_PASSWORD),
-            full_name="Integration Test User"
+            full_tag_display_tag_display_name="Integration Test User"
         )
         self.db.add(user)
         self.db.commit()
@@ -138,10 +138,10 @@ class TestIntegration:
             # Create secret tag with OPAQUE registration
             tag = SecretTag(
                 id=str(uuid.uuid4()),
-                name=tag_name,
+                tag_name=tag_name,
                 user_id=self.user_id,
                 phrase_hash=self.hasher.hash_password(phrase),
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
                 is_active=True
             )
             self.db.add(tag)
@@ -171,7 +171,7 @@ class TestIntegration:
         """Test communication between different services."""
         # Test OPAQUE service -> Vault service communication
         phrase = TEST_PHRASES[0]
-        tag_name = "cross_service_test"
+        tag_name= "cross_service_test"
         
         # Create secret tag through OPAQUE service
         tag = self.test_tags[0]
@@ -202,7 +202,7 @@ class TestIntegration:
     def test_data_consistency_across_services(self):
         """Test data consistency across multiple services."""
         phrase = TEST_PHRASES[1]
-        tag_name = "consistency_test"
+        tag_name= "consistency_test"
         
         # Create secret tag
         tag = self.test_tags[1]
@@ -214,7 +214,7 @@ class TestIntegration:
                 id=str(uuid.uuid4()),
                 user_id=self.user_id,
                 content="Test entry for consistency check",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             self.db.add(entry)
             
@@ -224,7 +224,7 @@ class TestIntegration:
                 user_id=self.user_id,
                 content_type="text/plain",
                 encrypted_content=b"encrypted_test_content",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             self.db.add(vault_blob)
             
@@ -266,7 +266,7 @@ class TestIntegration:
                     id=str(uuid.uuid4()),
                     user_id=self.user_id,
                     content="Valid entry",
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(UTC)
                 )
                 self.db.add(entry)
                 
@@ -312,7 +312,7 @@ class TestIntegration:
                 id=str(uuid.uuid4()),
                 user_id=self.user_id,
                 content=f"Concurrent entry {entry_id}",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             self.db.add(entry)
             self.db.commit()
@@ -325,7 +325,7 @@ class TestIntegration:
                 user_id=self.user_id,
                 content_type="text/plain",
                 encrypted_content=f"encrypted_content_{blob_id}".encode(),
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             self.db.add(blob)
             self.db.commit()
@@ -383,8 +383,8 @@ class TestIntegration:
             user_id=self.user_id,
             client_public_key=b"test_key",
             server_public_key=b"test_server_key",
-            created_at=datetime.utcnow() - timedelta(hours=2),
-            expires_at=datetime.utcnow() - timedelta(hours=1)
+            created_at=datetime.now(UTC) - timedelta(hours=2),
+            expires_at=datetime.now(UTC) - timedelta(hours=1)
         )
         self.db.add(expired_session)
         self.db.commit()
@@ -407,7 +407,7 @@ class TestIntegration:
                 id=str(uuid.uuid4()),
                 user_id=self.user_id,
                 content=f"Performance test entry {i}",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             self.db.add(entry)
             
@@ -435,7 +435,7 @@ class TestIntegration:
             id=str(uuid.uuid4()),
             email="second_user@example.com",
             hashed_password=self.hasher.hash_password("SecondUserPassword123!"),
-            full_name="Second Test User"
+            full_tag_display_tag_display_name="Second Test User"
         )
         self.db.add(second_user)
         self.db.commit()
@@ -445,14 +445,14 @@ class TestIntegration:
             id=str(uuid.uuid4()),
             user_id=self.user_id,
             content="First user's entry",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         
         entry2 = JournalEntry(
             id=str(uuid.uuid4()),
             user_id=second_user.id,
             content="Second user's entry",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         
         self.db.add(entry1)
@@ -500,7 +500,7 @@ class TestIntegration:
         overall_health = {
             "database": self.db.is_active,
             "services": len(services),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
         
         assert overall_health["database"] is True

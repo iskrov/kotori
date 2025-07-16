@@ -9,7 +9,7 @@ of core functionality.
 import pytest
 import asyncio
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, Optional
 
 from fastapi.testclient import TestClient
@@ -130,7 +130,7 @@ class TestSecretTagRegistration:
             email=TEST_USER_EMAIL,
             hashed_password=hashed_password,
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(user)
         self.db.commit()
@@ -207,7 +207,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": tag_name,
             "color_code": color_code,
-            "tag_id": opaque_keys.tag_id.hex(),
+            "tag_id": opaque_keys.phrase_hash.hex(),
             "salt": opaque_keys.salt.hex(),
             "verification_key": opaque_keys.verification_key.hex()
         }
@@ -223,16 +223,16 @@ class TestSecretTagRegistration:
         assert response.status_code == 200
         result = response.json()
         assert result["success"] is True
-        assert result["tag_id"] == opaque_keys.tag_id.hex()
+        assert result["tag_id"] == opaque_keys.phrase_hash.hex()
         assert "vault_id" in result
         
         # 7. Verify database persistence
         secret_tag = self.db.query(SecretTag).filter(
-            SecretTag.tag_id == opaque_keys.tag_id
+            SecretTag.phrase_hash== opaque_keys.phrase_hash
         ).first()
         assert secret_tag is not None
         assert secret_tag.user_id == self.user_id
-        assert secret_tag.tag_name == tag_name
+        assert secret_tag.tag_name== tag_name
         assert secret_tag.color_code == color_code
         
         # 8. Verify OPAQUE verifier is stored
@@ -254,7 +254,7 @@ class TestSecretTagRegistration:
         
         # 11. Verify tag_id is deterministic
         keys_2 = derive_opaque_keys_from_phrase(phrase)
-        assert opaque_keys.tag_id == keys_2.tag_id
+        assert opaque_keys.phrase_hash== keys_2.phrase_hash
 
     @pytest.mark.asyncio
     async def test_registration_with_duplicate_tag_name(self):
@@ -271,7 +271,7 @@ class TestSecretTagRegistration:
             "phrase": phrase1,
             "tag_name": tag_name,
             "color_code": "#FF5733",
-            "tag_id": keys1.tag_id.hex(),
+            "tag_id": keys1.phrase_hash.hex(),
             "salt": keys1.salt.hex(),
             "verification_key": keys1.verification_key.hex()
         }
@@ -291,7 +291,7 @@ class TestSecretTagRegistration:
             "phrase": phrase2,
             "tag_name": tag_name,  # Same name
             "color_code": "#33FF57",
-            "tag_id": keys2.tag_id.hex(),
+            "tag_id": keys2.phrase_hash.hex(),
             "salt": keys2.salt.hex(),
             "verification_key": keys2.verification_key.hex()
         }
@@ -318,7 +318,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": TEST_TAG_NAMES[0],
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -335,7 +335,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,  # Same phrase
             "tag_name": TEST_TAG_NAMES[1],
             "color_code": "#33FF57",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -358,12 +358,12 @@ class TestSecretTagRegistration:
         # Generate keys for invalid phrase (may fail)
         try:
             keys = derive_opaque_keys_from_phrase(invalid_phrase)
-            tag_id = keys.tag_id.hex()
+            phrase_hash = keys.phrase_hash.hex()
             salt = keys.salt.hex()
             verification_key = keys.verification_key.hex()
         except Exception:
             # If key derivation fails, use dummy values
-            tag_id = "0" * 32
+            phrase_hash = "0" * 32
             salt = "0" * 32
             verification_key = "0" * 64
         
@@ -371,7 +371,7 @@ class TestSecretTagRegistration:
             "phrase": invalid_phrase,
             "tag_name": TEST_TAG_NAMES[0],
             "color_code": "#FF5733",
-            "tag_id": tag_id,
+            "tag_id": phrase_hash,
             "salt": salt,
             "verification_key": verification_key
         }
@@ -397,7 +397,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": invalid_tag_name,
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -426,7 +426,7 @@ class TestSecretTagRegistration:
                 "phrase": phrase,
                 "tag_name": f"Test Tag {i}",
                 "color_code": "#FF5733",
-                "tag_id": keys.tag_id.hex(),
+                "tag_id": keys.phrase_hash.hex(),
                 "salt": keys.salt.hex(),
                 "verification_key": keys.verification_key.hex()
             }
@@ -446,7 +446,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": "Limit Exceeded Tag",
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -474,7 +474,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": TEST_TAG_NAMES[0],
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -515,7 +515,7 @@ class TestSecretTagRegistration:
                 email=user_email,
                 hashed_password=hashed_password,
                 is_active=True,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             self.db.add(user)
             users.append(user)
@@ -544,7 +544,7 @@ class TestSecretTagRegistration:
                 "phrase": phrase,
                 "tag_name": f"Concurrent Tag {user_index}",
                 "color_code": "#FF5733",
-                "tag_id": keys.tag_id.hex(),
+                "tag_id": keys.phrase_hash.hex(),
                 "salt": keys.salt.hex(),
                 "verification_key": keys.verification_key.hex()
             }
@@ -596,7 +596,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": TEST_TAG_NAMES[0],
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -631,7 +631,7 @@ class TestSecretTagRegistration:
                 "phrase": phrase,
                 "tag_name": f"Rate Limit Tag {i}",
                 "color_code": "#FF5733",
-                "tag_id": keys.tag_id.hex(),
+                "tag_id": keys.phrase_hash.hex(),
                 "salt": keys.salt.hex(),
                 "verification_key": keys.verification_key.hex()
             }
@@ -664,7 +664,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": TEST_TAG_NAMES[0],
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -681,7 +681,7 @@ class TestSecretTagRegistration:
         # Verify database consistency
         # 1. Secret tag exists
         secret_tag = self.db.query(SecretTag).filter(
-            SecretTag.tag_id == keys.tag_id
+            SecretTag.phrase_hash== keys.phrase_hash
         ).first()
         assert secret_tag is not None
         
@@ -696,11 +696,11 @@ class TestSecretTagRegistration:
         assert vault_keys is not None
         
         # 4. Timestamps are reasonable
-        assert secret_tag.created_at <= datetime.utcnow()
-        assert secret_tag.updated_at <= datetime.utcnow()
+        assert secret_tag.created_at <= datetime.now(UTC)
+        assert secret_tag.updated_at <= datetime.now(UTC)
         
         # 5. Data integrity
-        assert len(secret_tag.tag_id) == 16  # 16 bytes
+        assert len(secret_tag.phrase_hash) == 16  # 16 bytes
         assert len(secret_tag.salt) == 16    # 16 bytes
         assert len(secret_tag.verifier_kv) == 32  # 32 bytes
         assert secret_tag.opaque_envelope is not None
@@ -727,7 +727,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": TEST_TAG_NAMES[0],
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }
@@ -760,7 +760,7 @@ class TestSecretTagRegistration:
             "phrase": phrase,
             "tag_name": TEST_TAG_NAMES[0],
             "color_code": "#FF5733",
-            "tag_id": keys.tag_id.hex(),
+            "tag_id": keys.phrase_hash.hex(),
             "salt": keys.salt.hex(),
             "verification_key": keys.verification_key.hex()
         }

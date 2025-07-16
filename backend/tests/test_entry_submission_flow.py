@@ -66,7 +66,7 @@ class TestEntrySubmissionFlow:
     def sample_secret_tag(self):
         """Sample secret tag for testing"""
         return SecretTag(
-            tag_id=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10',
+            phrase_hash=b'\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10',
             user_id=1,
             salt=b'\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20',
             verifier_kv=b'\x21' * 32,
@@ -177,8 +177,8 @@ class TestEntrySubmissionFlow:
             
             mock_response = SecretPhraseAuthResponse(
                 authentication_successful=True,
-                secret_tag_id=sample_secret_tag.tag_id.hex(),
-                tag_name=sample_secret_tag.tag_name,
+                secret_phrase_hash=sample_secret_tag.phrase_hash.hex(),
+                tag_name=sample_secret_tag.name,
                 encrypted_entries=[],
                 total_entries=0,
                 message="Success"
@@ -232,7 +232,7 @@ class TestEntrySubmissionFlow:
             ip_address="127.0.0.1",
             entry_request=sample_entry_request,
             authenticated_tags=[sample_secret_tag],
-            encryption_keys={sample_secret_tag.tag_id.hex(): encryption_key}
+            encryption_keys={sample_secret_tag.phrase_hash.hex(): encryption_key}
         )
         
         with patch.object(entry_processor.aes_crypto, 'encrypt_separate_iv') as mock_encrypt, \

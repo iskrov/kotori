@@ -10,7 +10,7 @@ import uuid
 import random
 from typing import List, Dict, Any
 
-from .performance_utils import (
+from tests.performance.performance_utils import (
     DatabasePerformanceTester,
     PerformanceMetrics,
     PerformanceTestSetup,

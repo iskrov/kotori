@@ -2,7 +2,7 @@ from datetime import datetime, date
 from typing import Dict, Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic import EmailStr
 
 
@@ -29,19 +29,20 @@ class UserBase(BaseModel):
     # Legacy fields (maintain compatibility)
     is_active: bool = True
     is_superuser: bool = False
-    profile_picture: str | None = None  # Keep for backward compatibility
     
     # Enhanced User Experience
     avatar_url: str | None = Field(None, max_length=500)
     cover_image_url: str | None = Field(None, max_length=500)
     
-    @validator('phone')
+    @field_validator('phone')
+    @classmethod
     def validate_phone(cls, v):
         if v is not None and len(v) > 20:
             raise ValueError('Phone number too long')
         return v
     
-    @validator('display_name')
+    @field_validator('display_name')
+    @classmethod
     def validate_display_name(cls, v):
         if v is not None and len(v) > 150:
             raise ValueError('Display name too long')
@@ -91,16 +92,17 @@ class UserUpdate(BaseModel):
     # Legacy fields
     is_active: bool | None = None
     is_superuser: bool | None = None
-    profile_picture: str | None = None
     password: str | None = None
     
-    @validator('phone')
+    @field_validator('phone')
+    @classmethod
     def validate_phone(cls, v):
         if v is not None and len(v) > 20:
             raise ValueError('Phone number too long')
         return v
     
-    @validator('display_name')
+    @field_validator('display_name')
+    @classmethod
     def validate_display_name(cls, v):
         if v is not None and len(v) > 150:
             raise ValueError('Display name too long')
@@ -176,13 +178,15 @@ class UserProfile(BaseModel):
     avatar_url: str | None = Field(None, max_length=500)
     cover_image_url: str | None = Field(None, max_length=500)
     
-    @validator('phone')
+    @field_validator('phone')
+    @classmethod
     def validate_phone(cls, v):
         if v is not None and len(v) > 20:
             raise ValueError('Phone number too long')
         return v
     
-    @validator('display_name')
+    @field_validator('display_name')
+    @classmethod
     def validate_display_name(cls, v):
         if v is not None and len(v) > 150:
             raise ValueError('Display name too long')
@@ -229,10 +233,9 @@ class UserStats(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Schema for profile picture upload response
-class ProfilePictureUploadResponse(BaseModel):
-    profile_picture_url: str
-    avatar_url: str  # New field for consistency
+# Schema for avatar upload response
+class AvatarUploadResponse(BaseModel):
+    avatar_url: str
 
 
 # Schema for email verification

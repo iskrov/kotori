@@ -10,7 +10,7 @@ import uuid
 from typing import Dict, Any
 from sqlalchemy import text
 
-from .schema_validation_utils import (
+from tests.schema.schema_validation_utils import (
     SchemaValidationTester,
     ConstraintTestDataGenerator,
     ConstraintViolationError
@@ -179,7 +179,7 @@ class TestUUIDForeignKeys:
         with schema_tester.get_session() as session:
             session.execute(text("""
                 UPDATE users 
-                SET first_name = :new_name 
+                SET first_tag_display_tag_display_name= :new_name 
                 WHERE id = :user_id
             """), {"new_name": "Updated Name", "user_id": user_data["id"]})
         

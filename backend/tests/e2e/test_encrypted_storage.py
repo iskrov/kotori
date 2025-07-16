@@ -11,7 +11,7 @@ import asyncio
 import time
 import uuid
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List, Optional, Union
 from unittest.mock import patch
 
@@ -154,7 +154,7 @@ class TestEncryptedStorage:
             id=str(uuid.uuid4()),
             email=TEST_USER_EMAIL,
             hashed_password=self.hasher.hash_password(TEST_USER_PASSWORD),
-            full_name="Storage Test User"
+            full_tag_display_tag_display_name="Storage Test User"
         )
         self.db.add(user)
         self.db.commit()
@@ -176,22 +176,22 @@ class TestEncryptedStorage:
                 self.db.delete(existing_tag)
             
             # Create new tag
-            tag_id = uuid.uuid4().bytes
+            phrase_hash = uuid.uuid4().bytes
             salt = uuid.uuid4().bytes
             verifier_kv = uuid.uuid4().bytes
             opaque_envelope = uuid.uuid4().bytes
             
-            tag = SecretTag(
-                tag_id=tag_id,
-                user_id=self.user_id,
-                salt=salt,
-                verifier_kv=verifier_kv,
-                opaque_envelope=opaque_envelope,
-                tag_name=tag_name,
-                color_code="#FF0000"
-            )
-            self.db.add(tag)
-            tags.append(tag)
+        tag = SecretTag(
+            phrase_hash=phrase_hash,
+            user_id=self.user_id,
+            salt=salt,
+            verifier_kv=verifier_kv,
+            opaque_envelope=opaque_envelope,
+            tag_name=tag_name,
+            color_code="#FF0000"
+        )
+        self.db.add(tag)
+        tags.append(tag)
         
         self.db.commit()
         return tags
@@ -203,7 +203,7 @@ class TestEncryptedStorage:
             user_id=self.user_id,
             key_type="vault",
             wrapped_key=self.test_vault_key,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(wrapped_key)
         self.db.commit()
@@ -242,7 +242,7 @@ class TestEncryptedStorage:
             user_id=self.user_id,
             content_type=content_type,
             encrypted_content=encrypted_content,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(vault_blob)
         self.db.commit()
@@ -404,8 +404,8 @@ class TestEncryptedStorage:
             user_id=self.user_id,
             content=test_content,
             is_encrypted=True,
-            secret_tag_id=tag.id,
-            created_at=datetime.utcnow()
+            secret_phrase_hash=tag.id,
+            created_at=datetime.now(UTC)
         )
         self.db.add(journal_entry)
         self.db.commit()
@@ -418,7 +418,7 @@ class TestEncryptedStorage:
         
         assert stored_entry is not None
         assert stored_entry.is_encrypted is True
-        assert stored_entry.secret_tag_id == tag.id
+        assert stored_entry.secret_phrase_hash== tag.id
 
     def test_key_management_and_rotation(self):
         """Test key management and rotation functionality."""
@@ -429,7 +429,7 @@ class TestEncryptedStorage:
             user_id=self.user_id,
             key_type="vault",
             wrapped_key=new_vault_key,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(new_wrapped_key)
         self.db.commit()
@@ -460,7 +460,7 @@ class TestEncryptedStorage:
             id=str(uuid.uuid4()),
             email="second_storage_user@example.com",
             hashed_password=self.hasher.hash_password("SecondPassword123!"),
-            name="Second Storage User"
+            tag_display_tag_display_name="Second Storage User"
         )
         self.db.add(second_user)
         self.db.commit()

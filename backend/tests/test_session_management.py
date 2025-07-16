@@ -83,7 +83,7 @@ class TestSessionCreation:
         
         service = SessionService()
         user_id = "test_user@example.com"
-        tag_id = b"test_tag_id"
+        phrase_hash= b"test_tag_id"
         
         # Mock the session object that would be created
         mock_session = Mock(spec=OpaqueSession)
@@ -93,7 +93,7 @@ class TestSessionCreation:
         token, session = service.create_session(
             db=mock_db,
             user_id=user_id,
-            tag_id=tag_id,
+            phrase_hash=tag_id,
             user_agent="Mozilla/5.0",
             ip_address="192.168.1.1"
         )
@@ -367,17 +367,17 @@ class TestSessionSchemas:
         # Valid request
         request = SessionCreateRequest(
             user_id="test@example.com",
-            tag_id="tag123",
+            phrase_hash="tag123",
             session_data={"key": "value"}
         )
         assert request.user_id == "test@example.com"
-        assert request.tag_id == "tag123"
+        assert request.phrase_hash== "tag123"
         assert request.session_data == {"key": "value"}
         
         # Minimal valid request
         minimal_request = SessionCreateRequest(user_id="test@example.com")
         assert minimal_request.user_id == "test@example.com"
-        assert minimal_request.tag_id is None
+        assert minimal_request.phrase_hash is None
         assert minimal_request.session_data is None
     
     def test_session_validate_request_validation(self):

@@ -10,7 +10,7 @@ import uuid
 import secrets
 import time
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List, Optional, Union, Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -140,7 +140,7 @@ class UserTestHelper:
             email=email,
             hashed_password=self.hasher.hash_password(password),
             full_name=full_name,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(user)
         self.db.commit()
@@ -154,7 +154,7 @@ class UserTestHelper:
             user = self.create_test_user(
                 email=f"test_user_{i}@example.com",
                 password=f"TestPassword{i}!",
-                full_name=f"Test User {i}"
+                full_tag_display_tag_display_name=f"Test User {i}"
             )
             users.append(user)
         return users
@@ -175,10 +175,10 @@ class UserTestHelper:
         for i, phrase in enumerate(phrases):
             tag = SecretTag(
                 id=str(uuid.uuid4()),
-                name=f"test_tag_{i}",
+                tag_name=f"test_tag_{i}",
                 user_id=user.id,
                 phrase_hash=self.hasher.hash_password(phrase),
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
                 is_active=True
             )
             self.db.add(tag)
@@ -190,7 +190,7 @@ class UserTestHelper:
             user=user,
             email=email,
             password=password,
-            full_name=user.full_name,
+            full_tag_display_name=user.display_name,
             secret_tags=secret_tags,
             journal_entries=[],
             vault_blobs=[]
@@ -214,10 +214,10 @@ class SecretTagTestHelper:
         """Create a secret tag."""
         tag = SecretTag(
             id=str(uuid.uuid4()),
-            name=name,
+            tag_name=name,
             user_id=user_id,
             phrase_hash=self.hasher.hash_password(phrase),
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             is_active=is_active
         )
         self.db.add(tag)
@@ -240,7 +240,7 @@ class SecretTagTestHelper:
             phrase = phrases[i % len(phrases)]
             tag = self.create_secret_tag(
                 user_id=user_id,
-                name=f"test_tag_{i}",
+                tag_display_tag_display_name=f"test_tag_{i}",
                 phrase=phrase
             )
             tags.append(tag)
@@ -267,8 +267,8 @@ class JournalEntryTestHelper:
             user_id=user_id,
             content=content,
             is_encrypted=is_encrypted,
-            secret_tag_id=secret_tag_id,
-            created_at=datetime.utcnow()
+            secret_phrase_hash=secret_tag_id,
+            created_at=datetime.now(UTC)
         )
         self.db.add(entry)
         self.db.commit()
@@ -303,7 +303,7 @@ class JournalEntryTestHelper:
             user_id=user_id,
             content=content,
             is_encrypted=True,
-            secret_tag_id=secret_tag_id
+            secret_phrase_hash=secret_tag_id
         )
 
 
@@ -335,7 +335,7 @@ class VaultTestHelper:
             user_id=user_id,
             content_type=content_type,
             encrypted_content=encrypted_content,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(blob)
         self.db.commit()
@@ -357,7 +357,7 @@ class VaultTestHelper:
             user_id=user_id,
             key_type=key_type,
             wrapped_key=key_data,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(wrapped_key)
         self.db.commit()
@@ -393,7 +393,7 @@ class PerformanceTestHelper:
             memory_after = process.memory_info().rss
             
             metrics = PerformanceMetrics(
-                operation_name=operation_name,
+                operation_tag_display_tag_display_name=operation_name,
                 start_time=start_time,
                 end_time=end_time,
                 duration=end_time - start_time,
@@ -577,7 +577,7 @@ class TestAssertionHelper:
     @staticmethod
     def assert_datetime_recent(dt: datetime, tolerance_seconds: int = 60):
         """Assert that a datetime is recent (within tolerance)."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         diff = abs((now - dt).total_seconds())
         assert diff <= tolerance_seconds, f"DateTime {dt} is not recent (diff: {diff}s)"
     

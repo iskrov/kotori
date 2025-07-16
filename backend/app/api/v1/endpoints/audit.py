@@ -57,8 +57,10 @@ async def create_audit_log(
     
     try:
         # Extract client information
-        ip_address = http_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if not ip_address:
+        forwarded_for = http_request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            ip_address = forwarded_for.split(",")[0].strip()
+        else:
             ip_address = http_request.headers.get("x-real-ip", "")
         if not ip_address:
             ip_address = getattr(http_request.client, "host", "")

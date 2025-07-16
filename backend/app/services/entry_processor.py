@@ -308,12 +308,12 @@ class EntryProcessor:
                         if encryption_key:
                             authenticated_tags.append(secret_tag)
                             # Store encryption key securely
-                            tag_id_hex = secret_tag.tag_id.hex()
+                            tag_id_hex = secret_tag.phrase_hash.hex()
                             context.encryption_keys[tag_id_hex] = encryption_key
                             
                             logger.info(f"Successfully authenticated secret tag {tag_id_hex} for user {context.user_id}")
                         else:
-                            logger.warning(f"OPAQUE authentication failed for phrase with tag {secret_tag.tag_id.hex()}")
+                            logger.warning(f"OPAQUE authentication failed for phrase with tag {secret_tag.phrase_hash.hex()}")
                     else:
                         logger.debug(f"No matching secret tag found for detected phrase")
                 
@@ -646,7 +646,7 @@ class EntryProcessor:
             event_type="secret_entry_created",
             user_id=context.user_id,
             details={
-                "secret_tag_id": secret_tag.tag_id.hex(),
+                "secret_tag_id": secret_tag.phrase_hash.hex(),
                 "tag_name": secret_tag.tag_name,
                 "ip_address": context.ip_address,
                 "session_id": context.session_id
@@ -696,7 +696,7 @@ class EntryProcessor:
             user_id=context.user_id,
             details={
                 "action": "password_entry_authentication",
-                "secret_tag_id": secret_tag.tag_id.hex(),
+                "secret_tag_id": secret_tag.phrase_hash.hex(),
                 "tag_name": secret_tag.tag_name,
                 "ip_address": context.ip_address,
                 "session_id": context.session_id,
@@ -713,7 +713,7 @@ class EntryProcessor:
             user_id=context.user_id,
             details={
                 "action": "mixed_content_entry_created",
-                "secret_tag_id": secret_tag.tag_id.hex(),
+                "secret_tag_id": secret_tag.phrase_hash.hex(),
                 "tag_name": secret_tag.tag_name,
                 "ip_address": context.ip_address,
                 "session_id": context.session_id,

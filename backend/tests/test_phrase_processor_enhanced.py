@@ -33,7 +33,7 @@ class TestEnhancedPhraseProcessor:
     def mock_secret_tag(self):
         """Mock secret tag for testing."""
         return SecretTag(
-            tag_id=b'test_tag_id_123',
+            phrase_hash=b'test_tag_id_123',
             user_id=1,
             salt=b'test_salt_123456',
             verifier_kv=b'test_verifier_key_123456789012',
@@ -282,7 +282,7 @@ class TestEnhancedPhraseProcessor:
             assert f"user={user_id}" in log_message
             assert f"phrases={phrase_count}" in log_message
             assert f"success={auth_success}" in log_message
-            assert "ip_hash=" in log_message
+            assert "ip_phrase_hash=" in log_message
     
     def test_configuration_flexibility(self, phrase_processor):
         """Test configuration flexibility."""

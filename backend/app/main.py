@@ -1,6 +1,8 @@
 import logging
 import time
 import traceback
+import json
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi import Request
@@ -8,6 +10,7 @@ from fastapi import status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 
 from app.api.v1.endpoints import speech as speech_router_module
 from app.api.v1.endpoints import opaque as opaque_router_module
@@ -21,6 +24,7 @@ from app.routers import auth_router
 from app.routers import journals_router
 from app.routers import reminders_router
 from app.routers import users_router
+from app.routers.tags import router as tags_router
 from app.routers.user_opaque_auth import router as user_opaque_auth_router
 
 from app.websockets import speech as speech_websocket_router
@@ -34,10 +38,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# Custom JSON encoder for UUID support
+class UUIDJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles UUID objects"""
+    def default(self, obj):
+        if isinstance(obj, UUID):
+            return str(obj)
+        return super().default(obj)
+
+
+# Custom JSONResponse class that uses our UUID encoder
+class UUIDJSONResponse(JSONResponse):
+    """JSONResponse that properly handles UUID serialization"""
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            cls=UUIDJSONEncoder,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+
 app = FastAPI(
     title="Vibes API",
     description="API for Vibes: Voice-Controlled Journaling Application",
     version="0.1.0",
+    default_response_class=UUIDJSONResponse,  # Use our custom response class
 )
 
 
@@ -54,7 +83,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         msg = error["msg"]
         error_details.append(f"{field}: {msg}")
 
-    return JSONResponse(
+    return UUIDJSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": "Validation error", "errors": error_details},
     )
@@ -66,7 +95,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}")
     logger.error(traceback.format_exc())
 
-    return JSONResponse(
+    return UUIDJSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "An unexpected error occurred. Please try again later."},
     )
@@ -144,6 +173,7 @@ app.include_router(session_router_module.router, prefix="/api/session", tags=["S
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(journals_router, prefix="/api/journals", tags=["Journals"])
 app.include_router(reminders_router, prefix="/api/reminders", tags=["Reminders"])
+app.include_router(tags_router, prefix="/api/tags", tags=["Tags"])
 app.include_router(speech_router_module.router, prefix="/api/speech", tags=["Speech"])
 
 app.include_router(speech_websocket_router.router, prefix="/ws", tags=["WebSockets"])

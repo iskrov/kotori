@@ -14,7 +14,7 @@ from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from .performance_utils import (
+from tests.performance.performance_utils import (
     DatabasePerformanceTester,
     PerformanceMetrics,
     PerformanceTestSetup,
@@ -154,7 +154,7 @@ class TestUUIDConcurrentAccess:
                     with db_tester.get_session() as session:
                         session.execute("""
                             UPDATE users 
-                            SET first_name = :new_name, updated_at = :updated_at
+                            SET first_tag_display_tag_display_name= :new_name, updated_at = :updated_at
                             WHERE id = :user_id
                         """, {
                             "new_name": f"Updated_{user_id}",
@@ -363,7 +363,7 @@ class TestUUIDConcurrentAccess:
                         # 1. Update user
                         session.execute("""
                             UPDATE users 
-                            SET first_name = :new_name, updated_at = :updated_at
+                            SET first_tag_display_tag_display_name= :new_name, updated_at = :updated_at
                             WHERE id = :user_id
                         """, {
                             "new_name": f"Transaction_{user_id}",

@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Union, Any, Tuple
 from dataclasses import dataclass
 from urllib.parse import urlparse
 import ipaddress
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import bcrypt
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -540,7 +540,7 @@ class SecureLogger:
             Dict[str, Any]: Structured audit log entry
         """
         log_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(UTC).isoformat(),
             'user_id': user_id,
             'action': action,
             'resource': resource,
@@ -571,7 +571,7 @@ class SecureLogger:
             user_id: User ID if applicable
         """
         log_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(UTC).isoformat(),
             'event_type': event_type,
             'severity': severity,
             'message': message,

@@ -11,7 +11,7 @@ import random
 from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta
 
-from .performance_utils import (
+from tests.performance.performance_utils import (
     DatabasePerformanceTester,
     PerformanceMetrics,
     PerformanceTestSetup,
@@ -116,7 +116,7 @@ class TestUUIDBulkOperations:
                 for user_id in user_ids:
                     session.execute("""
                         UPDATE users 
-                        SET first_name = :new_name, updated_at = :updated_at
+                        SET first_tag_display_tag_display_name= :new_name, updated_at = :updated_at
                         WHERE id = :user_id
                     """, {
                         "new_name": f"Updated_User_{user_id}",
@@ -465,7 +465,7 @@ class TestUUIDBulkOperations:
                 SELECT t.*, j.title as journal_title
                 FROM tags t
                 JOIN journal_entries j ON t.journal_id = j.id
-                WHERE t.name = ANY(:tag_names)
+                WHERE t.tag_name= ANY(:tag_names)
                 ORDER BY t.created_at DESC
                 LIMIT 100
             """, {"tag_names": tag_patterns})

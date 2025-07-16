@@ -23,7 +23,7 @@ from ..schemas.user import (
     User as UserSchema, UserUpdate, UserStats, UserProfile, UserPreferences,
     UserSubscription, UserSecurity, ReferralInfo, OnboardingUpdate,
     EmailVerificationRequest, PhoneVerificationRequest, VerificationResponse,
-    TermsAcceptanceRequest, ProfilePictureUploadResponse
+    TermsAcceptanceRequest, AvatarUploadResponse
 )
 from ..services.user_service import user_service
 

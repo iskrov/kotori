@@ -21,7 +21,8 @@ from app.schemas.maintenance import (
     DatabaseCleanupResponse,
     SecurityHygieneResponse,
     ComprehensiveCleanupResponse,
-    MaintenanceHealthResponse
+    MaintenanceHealthResponse,
+    EmergencyCleanupResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -346,13 +347,14 @@ async def perform_comprehensive_cleanup(
 
 @router.post(
     "/emergency",
+    response_model=EmergencyCleanupResponse,
     summary="Emergency Cleanup",
     description="Perform emergency cleanup operations for critical situations"
 )
 async def emergency_cleanup(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> EmergencyCleanupResponse:
     """
     Perform emergency cleanup operations for critical situations.
     
@@ -374,15 +376,15 @@ async def emergency_cleanup(
         # Perform emergency session cleanup
         session_cleanup_stats = cleanup_svc.cleanup_expired_sessions()
         
-        return {
-            "success": True,
-            "emergency_cleanup_performed": True,
-            "memory_cleanup": True,
-            "key_cleanup_count": key_cleanup_count,
-            "session_cleanup_stats": session_cleanup_stats,
-            "message": "Emergency cleanup completed successfully",
-            "timestamp": cleanup_svc._cleanup_stats.get('last_cleanup')
-        }
+        return EmergencyCleanupResponse(
+            success=True,
+            emergency_cleanup_performed=True,
+            memory_cleanup=True,
+            key_cleanup_count=key_cleanup_count,
+            session_cleanup_stats=session_cleanup_stats,
+            message="Emergency cleanup completed successfully",
+            timestamp=cleanup_svc._cleanup_stats.get('last_cleanup')
+        )
         
     except Exception as e:
         logger.error(f"Error during emergency cleanup: {e}")

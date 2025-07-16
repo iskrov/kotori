@@ -11,7 +11,7 @@ import asyncio
 import time
 import uuid
 import statistics
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -30,7 +30,7 @@ from app.security.constant_time import ConstantTimeOperations
 from app.security.rate_limiter import RateLimitStrategy, AttackDetector
 from app.security.memory_protection import SecureMemoryManager
 from app.security.input_validator import InputValidator, SQLInjectionDetector, XSSProtector
-from app.security.security_headers import SecurityHeadersManager
+from app.security.security_headers import SecurityHeadersManager, SecurityConfig
 from app.utils.secure_utils import SecureTokenGenerator, SecureHasher
 
 # Test configuration
@@ -122,7 +122,7 @@ class TestSecurityMeasures:
         self.input_validator = InputValidator()
         self.sql_detector = SQLInjectionDetector()
         self.xss_protector = XSSProtector()
-        self.security_headers = SecurityHeadersManager()
+        self.security_headers = SecurityHeadersManager(SecurityConfig())
         
         # Create test database session
         self.engine = create_engine(TEST_DATABASE_URL)
@@ -175,7 +175,7 @@ class TestSecurityMeasures:
             email=TEST_USER_EMAIL,
             hashed_password=hashed_password,
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(user)
         self.db.commit()
@@ -188,15 +188,15 @@ class TestSecurityMeasures:
         opaque_keys = derive_opaque_keys_from_phrase(phrase)
         
         secret_tag = SecretTag(
-            tag_id=opaque_keys.tag_id,
+            phrase_hash=opaque_keys.phrase_hash,
             user_id=self.user_id,
             salt=opaque_keys.salt,
             verifier_kv=b"test_verifier",
             opaque_envelope=b"test_envelope",
             tag_name="Security Test Tag",
             color_code="#FF0000",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC)
         )
         
         self.db.add(secret_tag)
@@ -243,7 +243,7 @@ class TestSecurityMeasures:
         headers = {"Authorization": f"Bearer {access_token}"}
         
         # Test authentication timing consistency
-        tag_id = self.test_secret_tag.tag_id.hex()
+        phrase_hash= self.test_secret_tag.phrase_hash.hex()
         correct_phrase = TIMING_TEST_PHRASES[0]
         wrong_phrases = TIMING_TEST_PHRASES[1:]
         
@@ -309,7 +309,7 @@ class TestSecurityMeasures:
         headers = {"Authorization": f"Bearer {access_token}"}
         
         # Test authentication rate limiting
-        tag_id = self.test_secret_tag.tag_id.hex()
+        phrase_hash= self.test_secret_tag.phrase_hash.hex()
         wrong_phrase = TIMING_TEST_PHRASES[1]
         
         # Send rapid authentication requests
@@ -353,7 +353,7 @@ class TestSecurityMeasures:
                     "/api/opaque/auth/init",
                     json={
                         "phrase": TIMING_TEST_PHRASES[1],
-                        "tag_id": self.test_secret_tag.tag_id.hex()
+                        "tag_id": self.test_secret_tag.phrase_hash.hex()
                     },
                     headers=headers
                 )
@@ -386,7 +386,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": TIMING_TEST_PHRASES[0],  # Correct phrase
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             )
@@ -400,7 +400,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": TIMING_TEST_PHRASES[1],  # Wrong phrase
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             )
@@ -477,7 +477,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": payload,
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             )
@@ -537,7 +537,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": TIMING_TEST_PHRASES[0],
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             ),
@@ -667,7 +667,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": TIMING_TEST_PHRASES[1],  # Wrong phrase
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             )
@@ -702,7 +702,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": TIMING_TEST_PHRASES[1],
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             ),
@@ -711,7 +711,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": TIMING_TEST_PHRASES[0],
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             ),
@@ -743,7 +743,7 @@ class TestSecurityMeasures:
         # Check log content
         recent_logs = self.db.query(SecurityAuditLog).filter(
             SecurityAuditLog.user_id == str(self.user_id),
-            SecurityAuditLog.created_at > datetime.utcnow() - timedelta(minutes=1)
+            SecurityAuditLog.created_at > datetime.now(UTC) - timedelta(minutes=1)
         ).all()
         
         assert len(recent_logs) > 0, "Recent security logs should exist"
@@ -858,7 +858,7 @@ class TestSecurityMeasures:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": TIMING_TEST_PHRASES[1],  # Wrong phrase
-                    "tag_id": self.test_secret_tag.tag_id.hex()
+                    "tag_id": self.test_secret_tag.phrase_hash.hex()
                 },
                 headers=headers
             )

@@ -72,6 +72,69 @@ from .audit import (
     EventSeverity
 )
 
+# Journal schemas
+from .journal import (
+    JournalEntry,
+    JournalEntryCreate,
+    JournalEntryUpdate,
+    JournalEntryCreateResponse,
+    JournalEntryDeleteResponse,
+    JournalEntryCountResponse,
+    JournalEntryBulkResponse,
+    JournalEntrySearchResponse,
+    HiddenJournalEntry,
+    SecretPhraseAuthResponse,
+    SecretTagJournalEntry,
+    Tag,
+    TagCreate
+)
+
+# Speech schemas
+from .speech import (
+    SpeechTranscriptionResponse,
+    SecretTagActivationRequest,
+    SecretTagActivationResponse,
+    SpeechErrorResponse,
+    SpeechHealthResponse
+)
+
+# Monitoring schemas
+from .monitoring import (
+    HealthHistoryResponse,
+    MonitoringConfigResponse,
+    ServiceHealthCheckResponse,
+    MonitoringDashboardResponse,
+    HealthCheckTriggerResponse,
+    MonitoringStatusResponse,
+    AlertCreateResponse,
+    AlertUpdateResponse
+)
+
+# Maintenance schemas
+from .maintenance import (
+    CleanupStatsResponse,
+    SessionCleanupResponse,
+    VaultCleanupResponse,
+    DatabaseCleanupResponse,
+    SecurityHygieneResponse,
+    ComprehensiveCleanupResponse,
+    MaintenanceHealthResponse,
+    EmergencyCleanupResponse
+)
+
+# User OPAQUE Auth schemas
+from .user_opaque_auth import (
+    UserRegistrationStartRequest,
+    UserRegistrationStartResponse,
+    UserRegistrationFinishRequest,
+    UserRegistrationFinishResponse,
+    UserLoginStartRequest,
+    UserLoginStartResponse,
+    UserLoginFinishRequest,
+    UserLoginFinishResponse,
+    OpaqueStatusResponse
+)
+
 __all__ = [
     "User",
     "UserCreate",
@@ -134,4 +197,52 @@ __all__ = [
     "AuditErrorResponse",
     "EventCategory",
     "EventSeverity",
+    # Journal schemas
+    "JournalEntry",
+    "JournalEntryCreate",
+    "JournalEntryUpdate",
+    "JournalEntryCreateResponse",
+    "JournalEntryDeleteResponse",
+    "JournalEntryCountResponse",
+    "JournalEntryBulkResponse",
+    "JournalEntrySearchResponse",
+    "HiddenJournalEntry",
+    "SecretPhraseAuthResponse",
+    "SecretTagJournalEntry",
+    "Tag",
+    "TagCreate",
+    # Speech schemas
+    "SpeechTranscriptionResponse",
+    "SecretTagActivationRequest",
+    "SecretTagActivationResponse",
+    "SpeechErrorResponse",
+    "SpeechHealthResponse",
+    # Monitoring schemas
+    "HealthHistoryResponse",
+    "MonitoringConfigResponse",
+    "ServiceHealthCheckResponse",
+    "MonitoringDashboardResponse",
+    "HealthCheckTriggerResponse",
+    "MonitoringStatusResponse",
+    "AlertCreateResponse",
+    "AlertUpdateResponse",
+    # Maintenance schemas
+    "CleanupStatsResponse",
+    "SessionCleanupResponse",
+    "VaultCleanupResponse",
+    "DatabaseCleanupResponse",
+    "SecurityHygieneResponse",
+    "ComprehensiveCleanupResponse",
+    "MaintenanceHealthResponse",
+    "EmergencyCleanupResponse",
+    # User OPAQUE Auth schemas
+    "UserRegistrationStartRequest",
+    "UserRegistrationStartResponse",
+    "UserRegistrationFinishRequest",
+    "UserRegistrationFinishResponse",
+    "UserLoginStartRequest",
+    "UserLoginStartResponse",
+    "UserLoginFinishRequest",
+    "UserLoginFinishResponse",
+    "OpaqueStatusResponse",
 ]

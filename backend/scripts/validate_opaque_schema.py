@@ -25,7 +25,7 @@ from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 
-from app.models import SecretTagV3, WrappedKey, VaultBlob, OpaqueSession, User
+from app.models import SecretTag, WrappedKey, VaultBlob, OpaqueSession, User
 from app.models.base import Base
 
 
@@ -93,14 +93,14 @@ class OpaqueSchemaValidator:
         
         with self.SessionLocal() as session:
             try:
-                # Test SecretTagV3 with proper data types
-                tag_id = secrets.token_bytes(16)  # 16-byte deterministic ID
+                # Test SecretTag with proper data types
+                phrase_hash = secrets.token_bytes(16)  # 16-byte deterministic ID
                 salt = secrets.token_bytes(16)    # 16-byte salt
                 verifier = secrets.token_bytes(32)  # 32-byte OPAQUE verifier
                 envelope = secrets.token_bytes(64)  # OPAQUE envelope data
                 
-                secret_tag = SecretTagV3(
-                    tag_id=tag_id,
+                secret_tag = SecretTag(
+                    phrase_hash=phrase_hash,
                     user_id=self.test_user_id,
                     salt=salt,
                     verifier_kv=verifier,
@@ -116,7 +116,7 @@ class OpaqueSchemaValidator:
                 # Test WrappedKey with proper sizes
                 wrapped_key_data = secrets.token_bytes(40)  # AES-KW wrapped key
                 wrapped_key = WrappedKey(
-                    tag_id=tag_id,
+                    tag_id=secret_tag.id,
                     vault_id=uuid.uuid4(),
                     wrapped_key=wrapped_key_data,
                     key_purpose="vault_data",
@@ -154,9 +154,9 @@ class OpaqueSchemaValidator:
         with self.SessionLocal() as session:
             try:
                 # Test that wrapped keys are linked to secret tags
-                secret_tag = session.query(SecretTagV3).first()
+                secret_tag = session.query(SecretTag).first()
                 wrapped_keys = session.query(WrappedKey).filter(
-                    WrappedKey.tag_id == secret_tag.tag_id
+                    WrappedKey.tag_id == secret_tag.id
                 ).all()
                 
                 if wrapped_keys:
@@ -188,11 +188,11 @@ class OpaqueSchemaValidator:
         with self.SessionLocal() as session:
             try:
                 # Test tag lookup performance
-                tag_id = secrets.token_bytes(16)
+                phrase_hash = secrets.token_bytes(16)
                 
                 start_time = time.time()
-                result = session.query(SecretTagV3).filter(
-                    SecretTagV3.tag_id == tag_id
+                result = session.query(SecretTag).filter(
+                    SecretTag.phrase_hash == phrase_hash
                 ).first()
                 lookup_time = (time.time() - start_time) * 1000
                 
@@ -206,9 +206,9 @@ class OpaqueSchemaValidator:
                 # Test bulk operations
                 start_time = time.time()
                 for i in range(10):
-                    tag_id = secrets.token_bytes(16)
-                    secret_tag = SecretTagV3(
-                        tag_id=tag_id,
+                    phrase_hash = secrets.token_bytes(16)
+                    secret_tag = SecretTag(
+                        phrase_hash=phrase_hash,
                         user_id=self.test_user_id,
                         salt=secrets.token_bytes(16),
                         verifier_kv=secrets.token_bytes(32),
@@ -233,7 +233,7 @@ class OpaqueSchemaValidator:
         with self.SessionLocal() as session:
             try:
                 # Verify no recoverable secrets in database
-                secret_tags = session.query(SecretTagV3).all()
+                secret_tags = session.query(SecretTag).all()
                 
                 for tag in secret_tags:
                     # Check that we only have verifiers, not recoverable data
@@ -329,7 +329,7 @@ class OpaqueSchemaValidator:
             for result in self.test_results:
                 print(f"  - {result}")
         
-        print(f"\nTest completed at: {datetime.now()}")
+        print(f"\nTest completed at: {datetime.now(UTC)}")
     
     def cleanup(self):
         """Clean up test database"""

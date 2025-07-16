@@ -40,8 +40,7 @@ export interface User {
   full_name: string;
   is_active?: boolean;
   is_superuser?: boolean;
-  avatar_url?: string;
-  profile_picture?: string | null;
+  avatar_url?: string | null;
   created_at: string;
   updated_at: string;
 }

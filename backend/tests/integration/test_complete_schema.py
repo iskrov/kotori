@@ -65,14 +65,14 @@ class TestCompleteSchemaIntegration:
             # Create tags
             tags = []
             for j in range(2):
-                tag = Tag(name=f"User_{i}_Tag_{j}", user_id=user.id)
+                tag = Tag(tag_display_tag_display_name=f"User_{i}_Tag_{j}", user_id=user.id)
                 tags.append(tag)
             
             # Create reminders
             reminders = []
             for j in range(2):
                 reminder = Reminder(
-                    reminder_text=f"User {i} Reminder {j}",
+                    message=f"User {i} Reminder {j}",
                     user_id=user.id,
                     reminder_type="daily"
                 )
@@ -133,7 +133,7 @@ class TestCompleteSchemaIntegration:
         # Create tags
         tags = []
         for i in range(3):
-            tag = Tag(name=f"ComplexTag_{i}", user_id=user.id)
+            tag = Tag(tag_display_tag_display_name=f"ComplexTag_{i}", user_id=user.id)
             tags.append(tag)
         
         db.add_all(tags)
@@ -145,7 +145,7 @@ class TestCompleteSchemaIntegration:
         entry_tags = []
         for entry in entries:
             for tag in tags:
-                entry_tag = JournalEntryTag(entry_id=entry.id, tag_id=tag.id)
+                entry_tag = JournalEntryTag(entry_id=entry.id, phrase_hash=tag.id)
                 entry_tags.append(entry_tag)
         
         db.add_all(entry_tags)
@@ -158,7 +158,7 @@ class TestCompleteSchemaIntegration:
             
             for entry_tag in entry_tag_records:
                 assert entry_tag.entry_id == entry.id, "Entry tag should reference correct entry"
-                assert entry_tag.tag_id in [tag.id for tag in tags], "Entry tag should reference valid tag"
+                assert entry_tag.phrase_hash in [tag.id for tag in tags], "Entry tag should reference valid tag"
         
         # Test relationship navigation
         for entry in entries:
@@ -223,13 +223,13 @@ class TestCompleteSchemaIntegration:
             
             # Create tags
             for i in range(3):
-                tag = Tag(name=f"ConcurrentTag_{user.id}_{i}", user_id=user.id)
+                tag = Tag(tag_display_tag_display_name=f"ConcurrentTag_{user.id}_{i}", user_id=user.id)
                 all_tags.append(tag)
             
             # Create reminders
             for i in range(2):
                 reminder = Reminder(
-                    reminder_text=f"Concurrent reminder {i}",
+                    message=f"Concurrent reminder {i}",
                     user_id=user.id,
                     reminder_type="daily"
                 )
@@ -271,18 +271,18 @@ class TestCompleteSchemaIntegration:
         # Test NOT NULL constraints
         with pytest.raises(Exception):
             # This should fail because user_id is required
-            invalid_tag = Tag(name="InvalidTag")
+            invalid_tag = Tag(tag_display_tag_display_name="InvalidTag")
             db.add(invalid_tag)
             db.commit()
         
         # Test unique constraints
-        tag1 = Tag(name="UniqueTestTag", user_id=user.id)
+        tag1 = Tag(tag_display_tag_display_name="UniqueTestTag", user_id=user.id)
         db.add(tag1)
         db.commit()
         
         # This should fail because tag name should be unique
         with pytest.raises(Exception):
-            tag2 = Tag(name="UniqueTestTag", user_id=user.id)
+            tag2 = Tag(tag_display_tag_display_name="UniqueTestTag", user_id=user.id)
             db.add(tag2)
             db.commit()
         
@@ -314,13 +314,13 @@ class TestCompleteSchemaIntegration:
         db.commit()
         db.refresh(entry)
         
-        tag = Tag(name="CRUDTestTag", user_id=user.id)
+        tag = Tag(tag_display_tag_display_name="CRUDTestTag", user_id=user.id)
         db.add(tag)
         db.commit()
         db.refresh(tag)
         
         reminder = Reminder(
-            reminder_text="CRUD test reminder",
+            message="CRUD test reminder",
             user_id=user.id,
             reminder_type="daily"
         )
@@ -343,8 +343,8 @@ class TestCompleteSchemaIntegration:
         
         # UPDATE operations
         entry.title = "Updated CRUD test entry"
-        tag.name = "UpdatedCRUDTestTag"
-        reminder.reminder_text = "Updated CRUD test reminder"
+        tag.tag_name= "UpdatedCRUDTestTag"
+        reminder.message = "Updated CRUD test reminder"
         db.commit()
         
         # Verify updates
@@ -353,12 +353,12 @@ class TestCompleteSchemaIntegration:
         db.refresh(reminder)
         
         assert entry.title == "Updated CRUD test entry", "Entry should be updated"
-        assert tag.name == "UpdatedCRUDTestTag", "Tag should be updated"
-        assert reminder.reminder_text == "Updated CRUD test reminder", "Reminder should be updated"
+        assert tag.tag_name== "UpdatedCRUDTestTag", "Tag should be updated"
+        assert reminder.message == "Updated CRUD test reminder", "Reminder should be updated"
         
         # DELETE operations
         entry_id = entry.id
-        tag_id = tag.id
+        phrase_hash= tag.id
         reminder_id = reminder.id
         
         db.delete(entry)
@@ -368,7 +368,7 @@ class TestCompleteSchemaIntegration:
         
         # Verify deletions
         assert db.query(JournalEntry).filter_by(id=entry_id).first() is None, "Entry should be deleted"
-        assert db.query(Tag).filter_by(id=tag_id).first() is None, "Tag should be deleted"
+        assert db.query(Tag).filter_by(id=phrase_hash).first() is None, "Tag should be deleted"
         assert db.query(Reminder).filter_by(id=reminder_id).first() is None, "Reminder should be deleted"
 
 

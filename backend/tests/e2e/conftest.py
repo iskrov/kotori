@@ -12,7 +12,7 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Generator, List, Callable, Dict, Any
 from contextlib import asynccontextmanager
 
@@ -154,7 +154,7 @@ class TestDatabaseManager:
                 email=user_data["email"],
                 hashed_password=hashed_password,
                 is_active=True,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             session.add(user)
             users.append(user)
@@ -183,15 +183,15 @@ class TestDataManager:
             
             # Create secret tag
             secret_tag = SecretTag(
-                tag_id=opaque_keys.tag_id,
+                phrase_hash=opaque_keys.phrase_hash,
                 user_id=user.id,
                 salt=opaque_keys.salt,
                 verifier_kv=b"test_verifier_" + str(i).encode(),
                 opaque_envelope=b"test_envelope_" + str(i).encode(),
                 tag_name=f"Test Secret Tag {i+1}",
                 color_code=f"#FF{i:02d}{i:02d}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC)
             )
             
             session.add(secret_tag)
@@ -210,8 +210,8 @@ class TestDataManager:
                 user_id=user.id,
                 title=f"Test Entry {i+1}",
                 content=f"This is test journal entry number {i+1}. It contains sample content for testing purposes.",
-                created_at=datetime.utcnow() - timedelta(days=i),
-                updated_at=datetime.utcnow() - timedelta(days=i)
+                created_at=datetime.now(UTC) - timedelta(days=i),
+                updated_at=datetime.now(UTC) - timedelta(days=i)
             )
             session.add(entry)
             entries.append(entry)
@@ -227,10 +227,10 @@ class TestDataManager:
             tag = Tag(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
-                name=f"Test Tag {i+1}",
+                tag_name=f"Test Tag {i+1}",
                 color_code=f"#00{i:02d}FF",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC)
             )
             session.add(tag)
             tags.append(tag)
@@ -522,7 +522,7 @@ def database_consistency_checker(db_session: Session):
             
             orphaned_secret_tags = self.session.execute(
                 text("""
-                SELECT st.tag_id FROM secret_tags st 
+                SELECT st.phrase_hash FROM secret_tags st 
                 LEFT JOIN users u ON st.user_id = u.id 
                 WHERE u.id IS NULL
                 """)

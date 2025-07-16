@@ -147,7 +147,7 @@ class TestVaultService:
         """Create sample wrapped key."""
         return WrappedKey(
             id=str(uuid.uuid4()),
-            tag_id=b"1234567890123456",
+            phrase_hash=b"1234567890123456",
             vault_id=sample_vault_id,
             wrapped_key=b"wrapped_key_data_here_32_bytes_long",
             key_purpose="vault_data"

@@ -8,7 +8,7 @@ including users, phrases, journal entries, vault content, and security test data
 import uuid
 import secrets
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
@@ -154,7 +154,7 @@ PERFORMANCE_TEST_DATA = {
     "medium_content": "Medium test content " * 100,
     "large_content": "Large test content " * 1000,
     "binary_data": secrets.token_bytes(1024),
-    "json_data": json.dumps({"key": "value"} for i in range(100))
+    "json_data": json.dumps([{"key": "value"} for i in range(100)])
 }
 
 # Security Test Data
@@ -248,7 +248,7 @@ MOCK_RESPONSES = {
         "success": True,
         "session_token": secrets.token_bytes(32).hex(),
         "vault_key": secrets.token_bytes(32).hex(),
-        "expires_at": (datetime.utcnow() + timedelta(hours=1)).isoformat()
+        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat()
     },
     "vault_upload": {
         "success": True,

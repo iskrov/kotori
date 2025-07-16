@@ -155,7 +155,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         self, db: Session, *, tag_id: UUID, tag_in: TagSchema, user_id: UUID
     ) -> TagModel:
         """Update a tag."""
-        tag_obj = db.query(TagModel).get(tag_id)
+        tag_obj = db.get(TagModel, tag_id)
         if not tag_obj:
             raise ValueError("Tag not found")
         
@@ -170,7 +170,7 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
 
     def delete_tag(self, db: Session, *, tag_id: UUID, user_id: UUID) -> TagModel:
         """Delete a tag and all its associations."""
-        tag_obj = db.query(TagModel).get(tag_id)
+        tag_obj = db.get(TagModel, tag_id)
         if not tag_obj:
             raise ValueError("Tag not found")
         

@@ -11,7 +11,7 @@ import time
 import uuid
 import asyncio
 import subprocess
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 import json
@@ -75,42 +75,42 @@ class E2ETestRunner:
         """Define all test suites."""
         return [
             TestSuite(
-                name="registration",
+                tag_display_tag_display_name="registration",
                 description="Secret tag registration end-to-end tests",
                 test_files=["test_secret_tag_registration.py"],
                 dependencies=["database", "opaque_service"],
                 estimated_duration=15
             ),
             TestSuite(
-                name="authentication",
+                tag_display_tag_display_name="authentication",
                 description="OPAQUE authentication flow tests",
                 test_files=["test_authentication_flow.py"],
                 dependencies=["database", "opaque_service", "session_service"],
                 estimated_duration=20
             ),
             TestSuite(
-                name="phrase_detection",
+                tag_display_tag_display_name="phrase_detection",
                 description="Phrase detection functionality tests",
                 test_files=["test_phrase_detection.py"],
                 dependencies=["database", "phrase_processor", "speech_service"],
                 estimated_duration=25
             ),
             TestSuite(
-                name="security",
+                tag_display_tag_display_name="security",
                 description="Security measures validation tests",
                 test_files=["test_security_measures.py"],
                 dependencies=["database", "security_middleware", "rate_limiter"],
                 estimated_duration=30
             ),
             TestSuite(
-                name="performance",
+                tag_display_tag_display_name="performance",
                 description="Performance and scalability tests",
                 test_files=["test_performance.py"],
                 dependencies=["database", "all_services"],
                 estimated_duration=45
             ),
             TestSuite(
-                name="integration",
+                tag_display_tag_display_name="integration",
                 description="Full system integration tests",
                 test_files=["test_integration.py"],
                 dependencies=["database", "all_services", "frontend"],
@@ -257,7 +257,7 @@ class E2ETestRunner:
     
     def run_test_suite(self, suite_name: str) -> List[TestResult]:
         """Run a specific test suite."""
-        suite = next((s for s in self.test_suites if s.name == suite_name), None)
+        suite = next((s for s in self.test_suites if s.tag_name== suite_name), None)
         if not suite:
             raise ValueError(f"Test suite '{suite_name}' not found")
         
@@ -299,7 +299,7 @@ class E2ETestRunner:
         
         # Create test result
         test_result = TestResult(
-            test_name=test_file,
+            test_tag_display_tag_display_name=test_file,
             status="PASSED" if result == 0 else "FAILED",
             duration=duration,
             error_message=None if result == 0 else f"pytest exit code: {result}"
@@ -311,7 +311,7 @@ class E2ETestRunner:
         """Run all test suites."""
         self.logger.info("Starting comprehensive E2E test run")
         
-        start_time = datetime.now()
+        start_time = datetime.now(UTC)
         all_results = []
         
         # Collect system information
@@ -334,14 +334,14 @@ class E2ETestRunner:
                 
                 # Create failure result
                 failure_result = TestResult(
-                    test_name=f"{suite.name}_suite",
+                    test_tag_display_tag_display_name=f"{suite.name}_suite",
                     status="FAILED",
                     duration=time.time() - suite_start,
                     error_message=str(e)
                 )
                 all_results.append(failure_result)
         
-        end_time = datetime.now()
+        end_time = datetime.now(UTC)
         total_duration = (end_time - start_time).total_seconds()
         
         # Compile results
@@ -377,7 +377,7 @@ class E2ETestRunner:
             "memory_gb": psutil.virtual_memory().total / (1024**3),
             "disk_usage": psutil.disk_usage('/').percent,
             "test_runner_version": "1.0.0",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
     
     def _compile_performance_summary(self, results: List[TestResult]) -> Dict[str, Any]:
@@ -402,7 +402,7 @@ class E2ETestRunner:
     
     def generate_report(self, report: TestReport) -> str:
         """Generate comprehensive test report."""
-        report_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         report_file = f"{REPORT_DIR}/e2e_test_report_{report_timestamp}.json"
         
         # Generate JSON report

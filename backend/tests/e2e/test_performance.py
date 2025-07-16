@@ -13,7 +13,7 @@ import uuid
 import statistics
 import psutil
 import tracemalloc
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -174,7 +174,7 @@ class TestPerformance:
             email=TEST_USER_EMAIL,
             hashed_password=hashed_password,
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(user)
         self.db.commit()
@@ -189,15 +189,15 @@ class TestPerformance:
             opaque_keys = derive_opaque_keys_from_phrase(phrase)
             
             secret_tag = SecretTag(
-                tag_id=opaque_keys.tag_id,
+                phrase_hash=opaque_keys.phrase_hash,
                 user_id=self.user_id,
                 salt=opaque_keys.salt,
                 verifier_kv=b"test_verifier_" + str(i).encode(),
                 opaque_envelope=b"test_envelope_" + str(i).encode(),
                 tag_name=f"Performance Test Tag {i+1}",
                 color_code=f"#FF{i:02d}{i:02d}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC)
             )
             
             self.db.add(secret_tag)
@@ -307,7 +307,7 @@ class TestPerformance:
         
         test_tag_data = self.test_tags[0]
         phrase = test_tag_data['phrase']
-        tag_id = test_tag_data['keys'].tag_id.hex()
+        phrase_hash = test_tag_data['keys'].phrase_hash.hex()
         
         # Define authentication operation
         def auth_operation():
@@ -315,7 +315,7 @@ class TestPerformance:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": phrase,
-                    "tag_id": tag_id
+                    "tag_id": phrase_hash
                 },
                 headers=headers
             )
@@ -388,7 +388,7 @@ class TestPerformance:
                     "phrase": phrase,
                     "tag_name": f"Perf Test Tag {uuid.uuid4()}",
                     "color_code": "#FF0000",
-                    "tag_id": keys.tag_id.hex(),
+                    "tag_id": keys.phrase_hash.hex(),
                     "salt": keys.salt.hex(),
                     "verification_key": keys.verification_key.hex()
                 },
@@ -419,7 +419,7 @@ class TestPerformance:
         
         test_tag_data = self.test_tags[0]
         phrase = test_tag_data['phrase']
-        tag_id = test_tag_data['keys'].tag_id.hex()
+        phrase_hash = test_tag_data['keys'].phrase_hash.hex()
         
         # Define concurrent authentication operation
         async def concurrent_auth():
@@ -428,7 +428,7 @@ class TestPerformance:
                     "/api/opaque/auth/init",
                     json={
                         "phrase": phrase,
-                        "tag_id": tag_id
+                        "tag_id": phrase_hash
                     },
                     headers=headers
                 )
@@ -501,7 +501,7 @@ class TestPerformance:
                     "/api/opaque/auth/init",
                     json={
                         "phrase": self.test_tags[0]['phrase'],
-                        "tag_id": self.test_tags[0]['keys'].tag_id.hex()
+                        "tag_id": self.test_tags[0]['keys'].phrase_hash.hex()
                     },
                     headers=headers
                 ) for _ in range(50)
@@ -585,8 +585,8 @@ class TestPerformance:
                     user_id=self.user_id,
                     title=f"Performance Test Entry {i}",
                     content=f"Test content {i}",
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC)
                 )
                 self.db.add(entry)
             
@@ -598,7 +598,7 @@ class TestPerformance:
             ).limit(5).all()
             
             for entry in entries:
-                entry.updated_at = datetime.utcnow()
+                entry.updated_at = datetime.now(UTC)
             
             self.db.commit()
         
@@ -632,7 +632,7 @@ class TestPerformance:
                     "phrase": phrase,
                     "tag_name": f"E2E Test Tag {uuid.uuid4()}",
                     "color_code": "#FF0000",
-                    "tag_id": keys.tag_id.hex(),
+                    "tag_id": keys.phrase_hash.hex(),
                     "salt": keys.salt.hex(),
                     "verification_key": keys.verification_key.hex()
                 },
@@ -645,7 +645,7 @@ class TestPerformance:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": phrase,
-                    "tag_id": keys.tag_id.hex()
+                    "tag_id": keys.phrase_hash.hex()
                 },
                 headers=headers
             )
@@ -697,7 +697,7 @@ class TestPerformance:
                     "/api/opaque/auth/init",
                     json={
                         "phrase": self.test_tags[0]['phrase'],
-                        "tag_id": self.test_tags[0]['keys'].tag_id.hex()
+                        "tag_id": self.test_tags[0]['keys'].phrase_hash.hex()
                     },
                     headers=headers
                 )
@@ -770,7 +770,7 @@ class TestPerformance:
                         "phrase": phrase,
                         "tag_name": f"Cleanup Test Tag {i}",
                         "color_code": "#FF0000",
-                        "tag_id": keys.tag_id.hex(),
+                        "tag_id": keys.phrase_hash.hex(),
                         "salt": keys.salt.hex(),
                         "verification_key": keys.verification_key.hex()
                     },
@@ -845,7 +845,7 @@ class TestPerformance:
                 "/api/opaque/auth/init",
                 json={
                     "phrase": self.test_tags[0]['phrase'],
-                    "tag_id": self.test_tags[0]['keys'].tag_id.hex()
+                    "tag_id": self.test_tags[0]['keys'].phrase_hash.hex()
                 },
                 headers=headers
             )

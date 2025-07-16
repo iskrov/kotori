@@ -1,0 +1,24 @@
+Field Name Migration Report
+==============================
+
+Current Model Field Mappings:
+
+SecretTag:
+  Current fields: ['id', 'phrase_hash', 'user_id', 'salt', 'verifier_kv', 'opaque_envelope', 'tag_name', 'color_code', 'created_at', 'updated_at']
+  Deprecated mappings: {'tag_id': 'phrase_hash', 'binary_tag_id': 'phrase_hash', 'name': 'tag_name', 'hash': 'phrase_hash', 'tag_hash': 'phrase_hash', 'secret_tag_id': 'id'}
+
+User:
+  Current fields: ['id', 'email', 'hashed_password', 'display_name', 'first_name', 'last_name', 'full_name', 'phone', 'is_active', 'created_at', 'updated_at']
+  Deprecated mappings: {'name': 'display_name', 'username': 'email'}
+
+JournalEntry:
+  Current fields: ['id', 'title', 'content', 'user_id', 'secret_tag_id', 'encrypted_content', 'wrapped_key', 'encryption_iv', 'wrap_iv', 'entry_date', 'created_at', 'updated_at']
+  Deprecated mappings: {'tag_id': 'secret_tag_id', 'encrypted_data': 'encrypted_content', 'encryption_salt': 'encryption_iv', 'encrypted_key': 'wrapped_key'}
+
+Tag:
+  Current fields: ['id', 'name', 'color', 'user_id', 'created_at', 'updated_at']
+  Deprecated mappings: {'tag_name': 'name'}
+
+Reminder:
+  Current fields: ['id', 'title', 'message', 'frequency', 'time', 'is_active', 'custom_days', 'user_id', 'created_at', 'updated_at']
+  Deprecated mappings: {'reminder_text': 'message', 'reminder_time': 'time'}

@@ -71,7 +71,7 @@ class TestPBI8AcceptanceCriteria:
         assert isinstance(entry.user_id, uuid.UUID), "Journal entry user_id should be UUID"
         
         # Test tag with UUID user_id
-        tag = Tag(name="CoS_Test_Tag", user_id=self.test_user.id)
+        tag = Tag(tag_display_tag_display_name="CoS_Test_Tag", user_id=self.test_user.id)
         db.add(tag)
         db.commit()
         db.refresh(tag)
@@ -201,13 +201,13 @@ class TestPBI8AcceptanceCriteria:
         assert len(retrieved_entries) >= 1, "Should be able to retrieve journal entries by user_id"
         
         # Test tag creation and association
-        tag = Tag(name="CoS_Workflow_Tag", user_id=user.id)
+        tag = Tag(tag_display_tag_display_name="CoS_Workflow_Tag", user_id=user.id)
         db.add(tag)
         db.commit()
         db.refresh(tag)
         
         # Test tag-entry association
-        entry_tag = JournalEntryTag(entry_id=entry.id, tag_id=tag.id)
+        entry_tag = JournalEntryTag(entry_id=entry.id, phrase_hash=tag.id)
         db.add(entry_tag)
         db.commit()
         
@@ -260,7 +260,7 @@ class TestSchemaConsistencyValidation:
         db.refresh(entry)
         
         # Test tag timestamps
-        tag = Tag(name="TimestampTestTag", user_id=user.id)
+        tag = Tag(tag_display_tag_display_name="TimestampTestTag", user_id=user.id)
         db.add(tag)
         db.commit()
         db.refresh(tag)

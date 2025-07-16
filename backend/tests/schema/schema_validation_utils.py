@@ -15,8 +15,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError, DataError
 import psycopg2.errors
 
-from app.database.database import get_db_url
-from app.database.models import User, JournalEntry, Tag, Reminder, SecretTag
+from app.core.config import settings
+from app.models.user import User
+from app.models.journal_entry import JournalEntry
+from app.models.tag import Tag
+from app.models.reminder import Reminder
+from app.models.secret_tag_opaque import SecretTag
 
 
 class ConstraintViolationError:
@@ -36,7 +40,7 @@ class SchemaValidationTester:
     """Provides utilities for testing database schema constraints."""
     
     def __init__(self, db_url: str = None):
-        self.db_url = db_url or get_db_url()
+        self.db_url = db_url or settings.DATABASE_URL
         self.engine = create_engine(self.db_url)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
     
@@ -92,21 +96,21 @@ class SchemaValidationTester:
             error_type = "UniqueViolation"
             # Extract constraint name from message
             if 'duplicate key value violates unique constraint' in error_message:
-                constraint_name = error_message.split('"')[1] if '"' in error_message else "unknown"
+                constraint_name= error_message.split('"')[1] if '"' in error_message else "unknown"
             else:
-                constraint_name = "unique_constraint"
+                constraint_name= "unique_constraint"
         elif error_code == '23503':  # foreign_key_violation
             error_type = "ForeignKeyViolation"
-            constraint_name = "foreign_key_constraint"
+            constraint_name= "foreign_key_constraint"
         elif error_code == '23502':  # not_null_violation
             error_type = "NotNullViolation"
-            constraint_name = "not_null_constraint"
+            constraint_name= "not_null_constraint"
         elif error_code == '23514':  # check_violation
             error_type = "CheckViolation"
-            constraint_name = "check_constraint"
+            constraint_name= "check_constraint"
         else:
             error_type = "IntegrityError"
-            constraint_name = "unknown_constraint"
+            constraint_name= "unknown_constraint"
         
         return ConstraintViolationError(
             error_type=error_type,

@@ -47,12 +47,12 @@ class TestSecurityAuditService:
         assert hash1 != user_id  # Should be different from original
         
         # Test empty identifier
-        empty_hash = self.service._hash_identifier("")
-        assert empty_hash == ""
+        empty_phrase_hash= self.service._hash_identifier("")
+        assert empty_phrase_hash== ""
         
         # Test None identifier
-        none_hash = self.service._hash_identifier(None)
-        assert none_hash == ""
+        none_phrase_hash= self.service._hash_identifier(None)
+        assert none_phrase_hash== ""
     
     def test_sanitize_event_data(self):
         """Test event data sanitization"""
@@ -94,7 +94,7 @@ class TestSecurityAuditService:
         log_entry.event_type = "test_event"
         log_entry.event_category = "test"
         log_entry.severity = "info"
-        log_entry.user_id_hash = "user_hash"
+        log_entry.user_id_phrase_hash= "user_hash"
         log_entry.timestamp = datetime.now(UTC)
         log_entry.event_message = "test message"
         log_entry.success = True
@@ -416,7 +416,7 @@ class TestAuditModels:
             event_category="auth",
             severity="info",
             event_message="Test message",
-            user_id_hash="user_hash",
+            user_id_phrase_hash="user_hash",
             timestamp=datetime.now(UTC),
             success=True
         )
@@ -431,7 +431,7 @@ class TestAuditModels:
         """Test SecurityMetrics model creation"""
         metric = SecurityMetrics(
             id="metric-id",
-            metric_name="auth_attempts",
+            metric_tag_display_tag_display_name="auth_attempts",
             metric_type="counter",
             time_window="1h",
             window_start=datetime.now(UTC),
@@ -439,7 +439,7 @@ class TestAuditModels:
             value=100
         )
         
-        assert metric.metric_name == "auth_attempts"
+        assert metric.metric_tag_display_tag_display_name== "auth_attempts"
         assert metric.metric_type == "counter"
         assert metric.value == 100
     
@@ -515,7 +515,7 @@ class TestAuditIntegration:
         log_entry.event_type = "test_event"
         log_entry.event_category = "auth"
         log_entry.severity = "info"
-        log_entry.user_id_hash = "user_hash"
+        log_entry.user_id_phrase_hash= "user_hash"
         log_entry.timestamp = datetime.now(UTC)
         log_entry.event_message = "test message"
         log_entry.success = True
@@ -550,7 +550,7 @@ class TestAuditPerformance:
         log_entry.event_type = "test_event"
         log_entry.event_category = "auth"
         log_entry.severity = "info"
-        log_entry.user_id_hash = "user_hash"
+        log_entry.user_id_phrase_hash= "user_hash"
         log_entry.timestamp = datetime.now(UTC)
         log_entry.event_message = "test message"
         log_entry.success = True

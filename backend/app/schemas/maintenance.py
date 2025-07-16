@@ -6,7 +6,7 @@ Pydantic schemas for maintenance and cleanup API requests and responses.
 
 from datetime import datetime
 from typing import Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CleanupStatsResponse(BaseModel):
@@ -37,8 +37,8 @@ class CleanupStatsResponse(BaseModel):
         description="Timestamp of statistics generation"
     )
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "cleanup_statistics": {
                     "sessions_cleaned": 150,
@@ -66,7 +66,7 @@ class CleanupStatsResponse(BaseModel):
                 },
                 "timestamp": "2025-06-27T03:30:00"
             }
-        }
+        })
 
 
 class SessionCleanupResponse(BaseModel):
@@ -79,8 +79,8 @@ class SessionCleanupResponse(BaseModel):
     wrapped_keys_cleaned: int = Field(..., description="Number of wrapped keys cleaned")
     message: str = Field(..., description="Cleanup status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "sessions_cleaned": 45,
@@ -90,6 +90,7 @@ class SessionCleanupResponse(BaseModel):
                 "message": "Cleaned up 45 session-related items"
             }
         }
+    )
 
 
 class VaultCleanupResponse(BaseModel):
@@ -102,8 +103,8 @@ class VaultCleanupResponse(BaseModel):
     vault_records_cleaned: int = Field(..., description="Number of vault database records cleaned")
     message: str = Field(..., description="Cleanup status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "vault_data_cleaned": 12,
@@ -113,6 +114,7 @@ class VaultCleanupResponse(BaseModel):
                 "message": "Cleaned up 12 vault-related items"
             }
         }
+    )
 
 
 class DatabaseCleanupResponse(BaseModel):
@@ -125,8 +127,8 @@ class DatabaseCleanupResponse(BaseModel):
     database_optimized: bool = Field(..., description="Whether database optimization was performed")
     message: str = Field(..., description="Cleanup status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "records_cleaned": 150,
@@ -136,6 +138,7 @@ class DatabaseCleanupResponse(BaseModel):
                 "message": "Cleaned up 150 database records"
             }
         }
+    )
 
 
 class SecurityHygieneResponse(BaseModel):
@@ -148,8 +151,8 @@ class SecurityHygieneResponse(BaseModel):
     security_checks_performed: int = Field(..., description="Number of security checks performed")
     message: str = Field(..., description="Security hygiene status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "operations_performed": 5,
@@ -159,51 +162,34 @@ class SecurityHygieneResponse(BaseModel):
                 "message": "Performed 5 security hygiene operations"
             }
         }
+    )
 
 
 class ComprehensiveCleanupResponse(BaseModel):
-    """Response schema for comprehensive cleanup operations."""
+    """Response schema for comprehensive cleanup operations"""
+    success: bool = Field(..., description="Whether the cleanup was successful")
+    total_items_cleaned: int = Field(..., description="Total number of items cleaned")
+    session_cleanup_stats: Dict[str, Any] = Field(..., description="Session cleanup statistics")
+    vault_cleanup_stats: Dict[str, Any] = Field(..., description="Vault cleanup statistics")
+    database_cleanup_stats: Dict[str, Any] = Field(..., description="Database cleanup statistics")
+    security_hygiene_stats: Dict[str, Any] = Field(..., description="Security hygiene statistics")
+    total_duration_seconds: float = Field(..., description="Total duration in seconds")
+    message: str = Field(..., description="Summary message")
     
-    success: bool = Field(..., description="Whether comprehensive cleanup was successful")
-    total_items_cleaned: int = Field(..., description="Total number of items cleaned across all operations")
-    session_cleanup_stats: Dict[str, int] = Field(..., description="Session cleanup statistics")
-    vault_cleanup_stats: Dict[str, int] = Field(..., description="Vault cleanup statistics")
-    database_cleanup_stats: Dict[str, int] = Field(..., description="Database cleanup statistics")
-    security_hygiene_stats: Dict[str, int] = Field(..., description="Security hygiene statistics")
-    total_duration_seconds: float = Field(..., description="Total duration of cleanup in seconds")
-    message: str = Field(..., description="Comprehensive cleanup status message")
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EmergencyCleanupResponse(BaseModel):
+    """Response schema for emergency cleanup operations"""
+    success: bool = Field(..., description="Whether the emergency cleanup was successful")
+    emergency_cleanup_performed: bool = Field(..., description="Whether emergency cleanup was performed")
+    memory_cleanup: bool = Field(..., description="Whether memory cleanup was performed")
+    key_cleanup_count: int = Field(..., description="Number of keys cleaned up")
+    session_cleanup_stats: Dict[str, Any] = Field(..., description="Session cleanup statistics")
+    message: str = Field(..., description="Emergency cleanup summary message")
+    timestamp: Optional[str] = Field(None, description="Timestamp of the cleanup operation")
     
-    class Config:
-        schema_extra = {
-            "example": {
-                "success": True,
-                "total_items_cleaned": 212,
-                "session_cleanup_stats": {
-                    "total_cleaned": 45,
-                    "opaque_sessions": 15,
-                    "session_keys": 25,
-                    "wrapped_keys": 5
-                },
-                "vault_cleanup_stats": {
-                    "total_cleaned": 12,
-                    "orphaned_vaults": 3,
-                    "orphaned_keys": 8,
-                    "vault_data_cleaned": 1
-                },
-                "database_cleanup_stats": {
-                    "total_cleaned": 150,
-                    "audit_logs_cleaned": 100,
-                    "expired_records_cleaned": 50
-                },
-                "security_hygiene_stats": {
-                    "total_operations": 5,
-                    "key_store_cleanup": 3,
-                    "security_checks": 3
-                },
-                "total_duration_seconds": 12.45,
-                "message": "Comprehensive cleanup completed: 212 items processed in 12.45s"
-            }
-        }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MaintenanceHealthResponse(BaseModel):
@@ -215,8 +201,8 @@ class MaintenanceHealthResponse(BaseModel):
     dependencies: Dict[str, Dict[str, Any]] = Field(..., description="Dependency health status")
     statistics: Dict[str, Any] = Field(..., description="Service statistics")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "service": "cleanup_service",
                 "status": "healthy",
@@ -235,6 +221,7 @@ class MaintenanceHealthResponse(BaseModel):
                 }
             }
         }
+    )
 
 
 class MaintenanceScheduleRequest(BaseModel):
@@ -261,8 +248,8 @@ class MaintenanceScheduleRequest(BaseModel):
         description="Optional configuration overrides"
     )
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "operation_type": "comprehensive",
                 "schedule_cron": "0 2 * * *",
@@ -272,7 +259,7 @@ class MaintenanceScheduleRequest(BaseModel):
                     "session_retention_days": 14
                 }
             }
-        }
+        })
 
 
 class MaintenanceScheduleResponse(BaseModel):
@@ -285,8 +272,8 @@ class MaintenanceScheduleResponse(BaseModel):
     configuration: Dict[str, Any] = Field(..., description="Operation configuration")
     message: str = Field(..., description="Scheduling status message")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "operation_type": "comprehensive",
@@ -298,4 +285,5 @@ class MaintenanceScheduleResponse(BaseModel):
                 },
                 "message": "Comprehensive cleanup scheduled successfully"
             }
-        } 
+        }
+    ) 

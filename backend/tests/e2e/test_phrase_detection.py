@@ -10,7 +10,7 @@ import pytest
 import asyncio
 import uuid
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, Optional, List
 from unittest.mock import patch
 
@@ -156,7 +156,7 @@ class TestPhraseDetection:
             email=TEST_USER_EMAIL,
             hashed_password=hashed_password,
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(user)
         self.db.commit()
@@ -173,15 +173,15 @@ class TestPhraseDetection:
             
             # Create secret tag
             secret_tag = SecretTag(
-                tag_id=opaque_keys.tag_id,
+                phrase_hash=opaque_keys.phrase_hash,
                 user_id=self.user_id,
                 salt=opaque_keys.salt,
                 verifier_kv=b"mock_verifier",  # Simplified for testing
                 opaque_envelope=b"mock_envelope",  # Simplified for testing
                 tag_name=f"Test Tag {i+1}",
                 color_code=f"#FF{i:02d}{i:02d}",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC)
             )
             
             self.db.add(secret_tag)
@@ -235,7 +235,7 @@ class TestPhraseDetection:
         # Test phrase detection for each test phrase
         for i, test_tag_data in enumerate(self.test_tags):
             phrase = test_tag_data['phrase']
-            tag_id = test_tag_data['keys'].tag_id
+            phrase_hash= test_tag_data['keys'].phrase_hash
             
             # Test detection in various text formats
             test_contents = [
@@ -256,7 +256,7 @@ class TestPhraseDetection:
                 # Verify detection
                 assert detected, f"Should detect phrase in: {content}"
                 assert secret_tag is not None
-                assert secret_tag.tag_id == tag_id
+                assert secret_tag.phrase_hash== tag_id
                 assert len(entries) > 0
 
     @pytest.mark.asyncio
@@ -264,7 +264,7 @@ class TestPhraseDetection:
         """Test phrase normalization and detection accuracy."""
         test_tag_data = self.test_tags[0]
         phrase = test_tag_data['phrase']
-        tag_id = test_tag_data['keys'].tag_id
+        phrase_hash= test_tag_data['keys'].phrase_hash
         
         # Test various normalization scenarios
         normalization_tests = [
@@ -285,7 +285,7 @@ class TestPhraseDetection:
             # All normalized versions should be detected
             assert detected, f"Should detect normalized phrase: {test_content}"
             assert secret_tag is not None
-            assert secret_tag.tag_id == tag_id
+            assert secret_tag.phrase_hash== tag_id
 
     @pytest.mark.asyncio
     async def test_phrase_detection_false_positives(self):
@@ -324,7 +324,7 @@ class TestPhraseDetection:
                 mixed_content, self.user_id
             )
             assert detected2
-            assert secret_tag2.tag_id == secret_tag.tag_id
+            assert secret_tag2.phrase_hash== secret_tag.phrase_hash
 
     @pytest.mark.asyncio
     async def test_phrase_detection_entry_types(self):
@@ -544,7 +544,7 @@ class TestPhraseDetection:
     async def test_phrase_detection_case_sensitivity(self):
         """Test phrase detection case sensitivity handling."""
         original_phrase = self.test_tags[0]['phrase']
-        tag_id = self.test_tags[0]['keys'].tag_id
+        phrase_hash= self.test_tags[0]['keys'].phrase_hash
         
         # Test various case combinations
         case_tests = [
@@ -564,13 +564,13 @@ class TestPhraseDetection:
             # All case variations should be detected
             assert detected, f"Should detect case variation: {test_phrase}"
             assert secret_tag is not None
-            assert secret_tag.tag_id == tag_id
+            assert secret_tag.phrase_hash== tag_id
 
     @pytest.mark.asyncio
     async def test_phrase_detection_punctuation_handling(self):
         """Test phrase detection with various punctuation."""
         original_phrase = self.test_tags[0]['phrase']
-        tag_id = self.test_tags[0]['keys'].tag_id
+        phrase_hash= self.test_tags[0]['keys'].phrase_hash
         
         # Test with various punctuation
         punctuation_tests = [
@@ -595,7 +595,7 @@ class TestPhraseDetection:
             # All punctuation variations should be detected
             assert detected, f"Should detect punctuation variation: {test_phrase}"
             assert secret_tag is not None
-            assert secret_tag.tag_id == tag_id
+            assert secret_tag.phrase_hash== tag_id
 
     @pytest.mark.asyncio
     async def test_phrase_detection_word_boundaries(self):

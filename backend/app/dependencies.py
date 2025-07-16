@@ -163,8 +163,10 @@ async def get_current_user_from_session_token(
         # Extract client information for fingerprinting
         user_agent = request.headers.get("user-agent", "")
         # Get client IP (considering proxy headers)
-        ip_address = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if not ip_address:
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            ip_address = forwarded_for.split(",")[0].strip()
+        else:
             ip_address = request.headers.get("x-real-ip", "")
         if not ip_address:
             ip_address = getattr(request.client, "host", "")

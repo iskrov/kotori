@@ -8,7 +8,7 @@ and comprehensive key lifecycle functionality.
 import pytest
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import patch, MagicMock
 
 from backend.app.crypto.key_manager import (
@@ -58,7 +58,7 @@ class TestKeyMetadata:
     
     def test_metadata_creation(self):
         """Test creating key metadata."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         metadata = KeyMetadata(
             key_id="test-key-123",
             key_type=KeyType.ENCRYPTION,
@@ -380,7 +380,7 @@ class TestSessionKeyManager:
         
         # Check session expiry time
         expires_at = manager._sessions[session_id]
-        expected_expiry = datetime.now() + timedelta(seconds=1800)
+        expected_expiry = datetime.now(UTC) + timedelta(seconds=1800)
         
         # Allow for small timing differences
         time_diff = abs((expires_at - expected_expiry).total_seconds())

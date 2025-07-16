@@ -513,26 +513,26 @@ class TestDataFactory:
     @staticmethod
     def create_journal_entry_data(user_id, title_suffix="entry"):
         """Create test journal entry data with proper UUID foreign key."""
-        from datetime import datetime
+        from datetime import datetime, UTC
         
         return {
             'title': f'Test Entry {title_suffix.title()}',
             'content': f'Test content for {title_suffix}',
             'user_id': user_id,
-            'entry_date': datetime.now(),
+            'entry_date': datetime.now(UTC),
         }
     
     @staticmethod
     def create_reminder_data(user_id, title_suffix="reminder"):
         """Create test reminder data with proper UUID foreign key."""
-        from datetime import datetime
+        from datetime import datetime, UTC
         from app.schemas.reminder import ReminderFrequency
         
         return {
             'title': f'Test Reminder {title_suffix.title()}',
             'message': f'Test message for {title_suffix}',
             'frequency': ReminderFrequency.DAILY,
-            'time': datetime.now(),
+            'time': datetime.now(UTC),
             'user_id': user_id,
             'is_active': True,
         }
@@ -637,7 +637,7 @@ class SchemaValidationHelpers:
         
         # Check foreign key constraints
         result = db_session.execute(text(
-            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=:table_name"
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_tag_display_tag_display_name=:table_name"
         ), {"table_name": table_name})
         
         indexes = [row[0] for row in result.fetchall()]

@@ -365,7 +365,7 @@ class TestCleanupServiceIntegration:
         expired_session = OpaqueSession(
             session_id="test_expired_session",
             user_id="test_user",
-            tag_id=b"test_tag_id_123456",
+            phrase_hash=b"test_tag_id_123456",
             session_state="expired",
             expires_at=datetime.now(UTC) - timedelta(hours=1),
             session_data=b"test_session_data",

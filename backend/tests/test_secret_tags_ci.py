@@ -29,7 +29,7 @@ class TestSecretTagsCICD:
         """Test secret tag model validation rules"""
         user = User(
             email="ci_test@example.com",
-            full_name="CI Test User",
+            full_tag_display_tag_display_name="CI Test User",
             hashed_password="password",
             is_active=True
         )
@@ -38,13 +38,13 @@ class TestSecretTagsCICD:
         db.refresh(user)
 
         # Test valid secret tag using correct OPAQUE fields
-        tag_id = uuid.uuid4().bytes
+        phrase_hash= uuid.uuid4().bytes
         salt_bytes = b'a_16_byte_salt!!'  # 16 bytes for salt
         verifier_kv_bytes = b'a_32_byte_verifier_kv_for_test_' # 32 bytes for verifier_kv
         opaque_envelope_bytes = b'opaque_envelope_test_data_for_secret_tag'
         
         valid_tag = SecretTag(
-            tag_id=tag_id,
+            phrase_hash=phrase_hash,
             user_id=str(user.id),  # Convert to string to match model definition
             tag_name="CI Test Tag",
             salt=salt_bytes,
@@ -56,15 +56,15 @@ class TestSecretTagsCICD:
         db.commit()
         db.refresh(valid_tag)
 
-        assert valid_tag.tag_id == tag_id
+        assert valid_tag.phrase_hash== phrase_hash
         assert valid_tag.user_id == str(user.id)
         assert valid_tag.color_code == "#FF5733"
-        assert valid_tag.tag_name == "CI Test Tag"
+        assert valid_tag.tag_name== "CI Test Tag"
 
         # Test default values
-        tag_id2 = uuid.uuid4().bytes
+        phrase_hash2 = uuid.uuid4().bytes
         minimal_tag = SecretTag(
-            tag_id=tag_id2,
+            phrase_hash=phrase_hash2,
             user_id=str(user.id),
             tag_name="CI Minimal Tag",
             salt=salt_bytes,
@@ -76,7 +76,7 @@ class TestSecretTagsCICD:
         db.refresh(minimal_tag)
 
         assert minimal_tag.color_code == "#007AFF"  # Default
-        assert minimal_tag.tag_name == "CI Minimal Tag"
+        assert minimal_tag.tag_name== "CI Minimal Tag"
 
         # Clean up
         db.delete(valid_tag)
@@ -88,7 +88,7 @@ class TestSecretTagsCICD:
         """Test journal entry secret tag field validation"""
         user = User(
             email="journal_ci@example.com",
-            full_name="Journal CI User",
+            full_tag_display_tag_display_name="Journal CI User",
             hashed_password="password"
         )
         db.add(user)
@@ -103,18 +103,17 @@ class TestSecretTagsCICD:
             user_id=user.id,
             encrypted_content="ci_encrypted_content",
             encryption_iv="ci_iv",
-            encryption_salt="ci_salt",
-            encrypted_key="ci_key",
+            wrapped_key="ci_key",
             encryption_algorithm="AES-GCM",
-            secret_tag_id="ci-tag-123",
-            secret_tag_hash="ci_tag_hash"
+            secret_phrase_hash="ci-tag-123",
+            secret_tag_phrase_hash="ci_tag_hash"
         )
         db.add(encrypted_entry)
         db.commit()
         db.refresh(encrypted_entry)
 
-        assert encrypted_entry.secret_tag_id == "ci-tag-123"
-        assert encrypted_entry.secret_tag_hash == "ci_tag_hash"
+        assert encrypted_entry.secret_phrase_hash== "ci-tag-123"
+        assert encrypted_entry.secret_tag_phrase_hash== "ci_tag_hash"
         assert encrypted_entry.encrypted_content == "ci_encrypted_content"
         assert encrypted_entry.content == ""
 
@@ -124,14 +123,14 @@ class TestSecretTagsCICD:
             content="Public content for CI",
             entry_date=datetime.now(UTC),
             user_id=user.id,
-            secret_tag_id=None,
-            secret_tag_hash=None
+            secret_phrase_hash=None,
+            secret_tag_phrase_hash=None
         )
         db.add(public_entry)
         db.commit()
         db.refresh(public_entry)
 
-        assert public_entry.secret_tag_id is None
+        assert public_entry.id is None
         assert public_entry.secret_tag_hash is None
         assert public_entry.content == "Public content for CI"
         assert public_entry.encrypted_content is None
@@ -146,7 +145,7 @@ class TestSecretTagsCICD:
         """Test speech service secret tag methods (mocked for CI)"""
         user = User(
             email="speech_ci@example.com",
-            full_name="Speech CI User",
+            full_tag_display_tag_display_name="Speech CI User",
             hashed_password="password"
         )
         db.add(user)
@@ -191,7 +190,7 @@ class TestSecretTagsCICD:
         """Test speech service transcription with mocked dependencies"""
         user = User(
             email="transcription_ci@example.com",
-            full_name="Transcription CI User",
+            full_tag_display_tag_display_name="Transcription CI User",
             hashed_password="password"
         )
         db.add(user)
@@ -283,7 +282,7 @@ class TestSecretTagsCICD:
         
         user = User(
             email="zero_knowledge_ci@example.com",
-            full_name="Zero Knowledge CI User",
+            full_tag_display_tag_display_name="Zero Knowledge CI User",
             hashed_password="password"
         )
         db.add(user)
@@ -294,7 +293,7 @@ class TestSecretTagsCICD:
         secret_tag = SecretTag(
             id="zero-knowledge-ci-tag",
             user_id=user.id,
-            tag_hash="zero_knowledge_ci_hash",
+            tag_phrase_hash="zero_knowledge_ci_hash",
             created_at_client="2024-01-01T10:00:00Z"
         )
         db.add(secret_tag)
@@ -309,7 +308,7 @@ class TestSecretTagsCICD:
         assert secret_tag.id is not None
         assert secret_tag.user_id is not None
         assert secret_tag.color_code is not None
-        assert secret_tag.tag_hash is not None
+        assert secret_tag.phrase_hash is not None
 
         # Create encrypted journal entry
         entry = JournalEntry(
@@ -318,8 +317,8 @@ class TestSecretTagsCICD:
             entry_date=datetime.now(UTC),
             user_id=user.id,
             encrypted_content="ci_encrypted_data",
-            secret_tag_id=secret_tag.id,
-            secret_tag_hash=secret_tag.tag_hash
+            secret_phrase_hash=secret_tag.id,
+            secret_tag_phrase_hash=secret_tag.phrase_hash
         )
         db.add(entry)
         db.commit()
@@ -341,7 +340,7 @@ class TestSecretTagsCICD:
         
         user = User(
             email="perf_ci@example.com",
-            full_name="Performance CI User",
+            full_tag_display_tag_display_name="Performance CI User",
             hashed_password="password"
         )
         db.add(user)
@@ -356,7 +355,7 @@ class TestSecretTagsCICD:
             tag = SecretTag(
                 id=f"perf-ci-tag-{i}",
                 user_id=user.id,
-                tag_hash=f"perf_ci_hash_{i}",
+                tag_phrase_hash=f"perf_ci_hash_{i}",
                 created_at_client="2024-01-01T10:00:00Z"
             )
             secret_tags.append(tag)
@@ -390,7 +389,7 @@ class TestSecretTagsCICD:
         # Create a user first for valid foreign key
         user = User(
             email="error_ci@example.com",
-            full_name="Error CI User",
+            full_tag_display_tag_display_name="Error CI User",
             hashed_password="password"
         )
         db.add(user)
@@ -401,7 +400,7 @@ class TestSecretTagsCICD:
         tag1 = SecretTag(
             id="error-tag-1",
             user_id=user.id,
-            tag_hash="duplicate_hash_ci",
+            tag_phrase_hash="duplicate_hash_ci",
             created_at_client="2024-01-01T10:00:00Z"
         )
         db.add(tag1)
@@ -412,7 +411,7 @@ class TestSecretTagsCICD:
             tag2 = SecretTag(
                 id="error-tag-2",
                 user_id=user.id,
-                tag_hash="duplicate_hash_ci",  # Duplicate hash
+                tag_phrase_hash="duplicate_hash_ci",  # Duplicate hash
                 created_at_client="2024-01-01T10:00:00Z"
             )
             db.add(tag2)
@@ -427,7 +426,7 @@ class TestSecretTagsCICD:
                 content="Test content",
                 entry_date=datetime.now(UTC),
                 user_id=user.id,
-                secret_tag_id="non-existent-tag-id"  # This should be handled gracefully
+                secret_phrase_hash="non-existent-tag-id"  # This should be handled gracefully
             )
             db.add(invalid_entry)
             db.commit()
@@ -450,7 +449,7 @@ class TestSecretTagsCICD:
         # Create user with existing journal entries (pre-secret tags)
         user = User(
             email="migration_ci@example.com",
-            full_name="Migration CI User",
+            full_tag_display_tag_display_name="Migration CI User",
             hashed_password="password"
         )
         db.add(user)
@@ -470,7 +469,7 @@ class TestSecretTagsCICD:
         db.refresh(legacy_entry)
 
         # Verify legacy entry works
-        assert legacy_entry.secret_tag_id is None
+        assert legacy_entry.id is None
         assert legacy_entry.secret_tag_hash is None
         assert legacy_entry.content == "Legacy content"
 
@@ -478,7 +477,7 @@ class TestSecretTagsCICD:
         secret_tag = SecretTag(
             id="migration-ci-tag",
             user_id=user.id,
-            tag_hash="migration_ci_hash",
+            tag_phrase_hash="migration_ci_hash",
             created_at_client="2024-01-01T10:00:00Z"
         )
         db.add(secret_tag)
@@ -490,8 +489,8 @@ class TestSecretTagsCICD:
             entry_date=datetime.now(UTC),
             user_id=user.id,
             encrypted_content="new_encrypted_content",
-            secret_tag_id=secret_tag.id,
-            secret_tag_hash=secret_tag.tag_hash
+            secret_phrase_hash=secret_tag.id,
+            secret_tag_phrase_hash=secret_tag.phrase_hash
         )
         db.add(new_entry)
         db.commit()
@@ -503,8 +502,8 @@ class TestSecretTagsCICD:
         legacy = next(e for e in all_entries if e.title == "Legacy Entry")
         new = next(e for e in all_entries if e.title == "New Secret Entry")
 
-        assert legacy.secret_tag_id is None
-        assert new.secret_tag_id == secret_tag.id
+        assert legacy.id is None
+        assert new.secret_phrase_hash== secret_tag.id
 
         # Clean up
         db.delete(legacy_entry)
@@ -522,7 +521,7 @@ class TestSecretTagsCICoverage:
         
         user = User(
             email="coverage@example.com",
-            full_name="Coverage User",
+            full_tag_display_tag_display_name="Coverage User",
             hashed_password="password"
         )
         db.add(user)
@@ -533,7 +532,7 @@ class TestSecretTagsCICoverage:
         secret_tag = SecretTag(
             id="coverage-tag",
             user_id=user.id,
-            tag_hash="coverage_hash",
+            tag_phrase_hash="coverage_hash",
             created_at_client="2024-01-01T10:00:00Z"
         )
         db.add(secret_tag)
@@ -551,8 +550,8 @@ class TestSecretTagsCICoverage:
             content="",
             entry_date=datetime.now(UTC),
             user_id=user.id,
-            secret_tag_id=secret_tag.id,
-            secret_tag_hash=secret_tag.tag_hash
+            secret_phrase_hash=secret_tag.id,
+            secret_tag_phrase_hash=secret_tag.phrase_hash
         )
         db.add(entry)
         db.commit()
@@ -574,7 +573,7 @@ class TestSecretTagsCICoverage:
         
         user = User(
             email="fields@example.com",
-            full_name="Fields User",
+            full_tag_display_tag_display_name="Fields User",
             hashed_password="password"
         )
         db.add(user)
@@ -588,7 +587,7 @@ class TestSecretTagsCICoverage:
             color_code="#123456",
             created_at_client="2024-01-01T10:00:00Z",
             is_active=False,  # Test non-default value
-            tag_hash="fields_test_hash"
+            tag_phrase_hash="fields_test_hash"
         )
         db.add(secret_tag)
         db.commit()
@@ -600,7 +599,7 @@ class TestSecretTagsCICoverage:
         assert secret_tag.color_code == "#123456"
         assert secret_tag.created_at_client == "2024-01-01T10:00:00Z"
         assert secret_tag.is_active is False
-        assert secret_tag.tag_hash == "fields_test_hash"
+        assert secret_tag.tag_phrase_hash== "fields_test_hash"
         assert secret_tag.created_at is not None
         assert secret_tag.updated_at is not None
 

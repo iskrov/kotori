@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, UTC
 
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,7 @@ def test_create_user(db: Session, test_assertions: TestAssertions):
     """Test creating a user with proper UUID handling"""
     user_data = UserCreate(
         email="service_test@example.com",
-        full_name="Service Test",
+        full_tag_display_tag_display_name="Service Test",
         password="testpassword123",
     )
 
@@ -27,7 +27,7 @@ def test_create_user(db: Session, test_assertions: TestAssertions):
     # Assertions with UUID validation
     test_assertions.assert_uuid_field(user, 'id')
     assert user.email == "service_test@example.com"
-    assert user.full_name == "Service Test"
+    assert user.full_tag_display_tag_display_name== "Service Test"
     # Password should be hashed
     assert user.hashed_password != "testpassword123"
     assert verify_password("testpassword123", user.hashed_password)
@@ -41,7 +41,7 @@ def test_authenticate_user(db: Session, test_assertions: TestAssertions):
     """Test user authentication with UUID handling"""
     # First create a user
     user_data = UserCreate(
-        email="auth_test@example.com", full_name="Auth Test", password="authpassword123"
+        email="auth_test@example.com", full_tag_display_tag_display_name="Auth Test", password="authpassword123"
     )
     user = user_service.create(db, obj_in=user_data)
 
@@ -93,9 +93,9 @@ def test_journal_service(db: Session, test_user, test_factory: TestDataFactory, 
 
     # Test creating tags
     from app.schemas.journal import TagCreate
-    tag_data = TagCreate(name="ServiceTestTag", color="#FF0000")
+    tag_data = TagCreate(tag_display_tag_display_name="ServiceTestTag", color="#FF0000")
     tag = journal_service.create_tag(db, tag_in=tag_data, user_id=test_user.id)
-    assert tag.name == "ServiceTestTag"
+    assert tag.tag_name== "ServiceTestTag"
 
     # Test getting tags by user
     tags = journal_service.get_tags_by_user(db, user_id=test_user.id)
@@ -109,7 +109,7 @@ def test_reminder_service(db: Session, test_user, test_factory: TestDataFactory,
         title="Service Test Reminder",
         message="This is a test reminder",
         frequency="daily",
-        time=datetime.now(),
+        time=datetime.now(UTC),
         is_active=True
     )
 
@@ -176,7 +176,7 @@ def test_service_integration(db: Session, test_factory: TestDataFactory, test_as
     # Create user through service
     user_data = UserCreate(
         email="integration_test@example.com",
-        full_name="Integration Test",
+        full_tag_display_tag_display_name="Integration Test",
         password="integrationpass123",
     )
     user = user_service.create(db, obj_in=user_data)
@@ -198,7 +198,7 @@ def test_service_integration(db: Session, test_factory: TestDataFactory, test_as
         title="Integration Test Reminder",
         message="Integration test message",
         frequency="weekly",
-        time=datetime.now(),
+        time=datetime.now(UTC),
         is_active=True
     )
     reminder = reminder_service.create_with_user(

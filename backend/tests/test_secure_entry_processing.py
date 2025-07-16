@@ -223,7 +223,7 @@ class TestSecurityMeasures:
         
         # Create mock secret tag
         secret_tag = SecretTag(
-            tag_id=b'\x01' * 16,
+            phrase_hash=b'\x01' * 16,
             user_id=1,
             salt=b'\x01' * 16,
             verifier_kv=b'\x01' * 32,

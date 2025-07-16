@@ -18,8 +18,12 @@ import psycopg2
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 
-from app.database.database import get_db_url
-from app.database.models import User, JournalEntry, Tag, Reminder, SecretTag
+from app.core.config import settings
+from app.models.user import User
+from app.models.journal_entry import JournalEntry
+from app.models.tag import Tag
+from app.models.reminder import Reminder
+from app.models.secret_tag_opaque import SecretTag
 
 
 class PerformanceTimer:
@@ -48,7 +52,7 @@ class PerformanceMetrics:
     
     def __init__(self):
         self.measurements: List[float] = []
-        self.operation_name = ""
+        self.operation_tag_display_tag_display_name= ""
     
     def add_measurement(self, duration: float):
         """Add a single measurement."""
@@ -120,7 +124,7 @@ class DatabasePerformanceTester:
     """Provides database performance testing utilities."""
     
     def __init__(self, db_url: str = None):
-        self.db_url = db_url or get_db_url()
+        self.db_url = db_url or settings.DATABASE_URL
         self.engine = create_engine(self.db_url)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
     

@@ -23,7 +23,7 @@ def test_user_model(db: Session, test_factory: TestDataFactory, test_assertions:
     # Assert values with UUID validation
     test_assertions.assert_uuid_field(user, 'id')
     assert user.email == "model_test@example.com"
-    assert user.full_name == "Test User Model_Test"
+    assert user.full_tag_display_tag_display_name== "Test User Model_Test"
     assert user.hashed_password == "hashed_password"
     assert user.is_active is True
     assert user.created_at is not None
@@ -72,7 +72,7 @@ def test_journal_entry_model(db: Session, test_factory: TestDataFactory, test_as
 def test_tag_model(db: Session):
     """Test the Tag model"""
     # Create a tag
-    tag = Tag(name="TestTag")
+    tag = Tag(tag_display_tag_display_name="TestTag")
 
     # Add to DB and commit
     db.add(tag)
@@ -81,7 +81,7 @@ def test_tag_model(db: Session):
 
     # Assert values
     assert tag.id is not None
-    assert tag.name == "TestTag"
+    assert tag.tag_name== "TestTag"
     assert tag.created_at is not None
     assert tag.updated_at is not None
 
@@ -143,20 +143,20 @@ def test_relationships(db: Session, test_factory: TestDataFactory, test_assertio
     db.refresh(entry)
 
     # Create tag
-    tag = Tag(name="RelationshipTag")
+    tag = Tag(tag_display_tag_display_name="RelationshipTag")
     db.add(tag)
     db.commit()
     db.refresh(tag)
 
     # Create journal entry tag association
-    entry_tag = JournalEntryTag(journal_entry_id=entry.id, tag_id=tag.id)
+    entry_tag = JournalEntryTag(journal_entry_id=entry.id, phrase_hash=tag.id)
     db.add(entry_tag)
     db.commit()
     db.refresh(entry_tag)
 
     # Test relationships
     assert entry_tag.journal_entry_id == entry.id
-    assert entry_tag.tag_id == tag.id
+    assert entry_tag.phrase_hash== tag.id
     test_assertions.assert_foreign_key_relationship(entry, user)
 
     # Test querying through relationships

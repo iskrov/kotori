@@ -237,8 +237,8 @@ class TestTimingResistance:
     
     def test_authenticate_with_timing_protection(self):
         """Test authentication with timing protection."""
-        correct_hash = secure_random_bytes(32)
-        wrong_hash = secure_random_bytes(32)
+        correct_phrase_hash= secure_random_bytes(32)
+        wrong_phrase_hash= secure_random_bytes(32)
         
         # Correct authentication
         start_time = time.perf_counter()
@@ -266,8 +266,8 @@ class TestTimingResistance:
     
     def test_authenticate_different_lengths(self):
         """Test authentication with different length hashes."""
-        correct_hash = secure_random_bytes(32)
-        wrong_length_hash = secure_random_bytes(16)
+        correct_phrase_hash= secure_random_bytes(32)
+        wrong_length_phrase_hash= secure_random_bytes(16)
         
         result = TimingResistance.authenticate_with_timing_protection(
             wrong_length_hash, correct_hash, base_delay_ms=10.0
@@ -470,8 +470,8 @@ class TestConvenienceFunctions:
     
     def test_timed_authentication_function(self):
         """Test global timed_authentication function."""
-        correct_hash = secure_random_bytes(32)
-        wrong_hash = secure_random_bytes(32)
+        correct_phrase_hash= secure_random_bytes(32)
+        wrong_phrase_hash= secure_random_bytes(32)
         
         # Test correct authentication
         start_time = time.perf_counter()

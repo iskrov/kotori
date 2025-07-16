@@ -23,7 +23,7 @@ import argparse
 import logging
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, List, Optional, Tuple, Any
 from contextlib import contextmanager
 from pathlib import Path
@@ -561,7 +561,7 @@ class DataMigrationManager:
         """Get current migration status."""
         return {
             'state': self.migration_state,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(UTC).isoformat()
         }
 
 

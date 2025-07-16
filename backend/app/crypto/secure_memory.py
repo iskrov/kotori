@@ -413,7 +413,11 @@ class SecureMemoryManager:
         
         This is called on process exit or signal reception.
         """
-        logger.info("Performing emergency secure memory cleanup")
+        try:
+            logger.info("Performing emergency secure memory cleanup")
+        except (ValueError, OSError):
+            # Logging system may be shut down, continue silently
+            pass
         
         with self._lock:
             # Clean up all pools
@@ -421,7 +425,11 @@ class SecureMemoryManager:
                 try:
                     pool.cleanup()
                 except Exception as e:
-                    logger.error(f"Error cleaning up memory pool: {e}")
+                    try:
+                        logger.error(f"Error cleaning up memory pool: {e}")
+                    except (ValueError, OSError):
+                        # Logging system may be shut down, continue silently
+                        pass
             
             # Clean up active buffers
             for buffer_ref in list(self._active_buffers):
@@ -430,14 +438,22 @@ class SecureMemoryManager:
                     if buffer is not None:
                         secure_zero(buffer)
                 except Exception as e:
-                    logger.error(f"Error cleaning up buffer: {e}")
+                    try:
+                        logger.error(f"Error cleaning up buffer: {e}")
+                    except (ValueError, OSError):
+                        # Logging system may be shut down, continue silently
+                        pass
             
             # Call registered cleanup handlers
             for handler in self._cleanup_handlers:
                 try:
                     handler()
                 except Exception as e:
-                    logger.error(f"Error in cleanup handler: {e}")
+                    try:
+                        logger.error(f"Error in cleanup handler: {e}")
+                    except (ValueError, OSError):
+                        # Logging system may be shut down, continue silently
+                        pass
     
     def _register_emergency_cleanup(self):
         """Register emergency cleanup handlers."""

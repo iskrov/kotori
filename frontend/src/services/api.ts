@@ -304,7 +304,7 @@ export const UserAPI = {
   updateProfile: (data: {
     full_name?: string;
     email?: string;
-    profile_picture?: string;
+    avatar_url?: string;
   }) => api.put('/api/users/me', data),
   
   // Update user password
@@ -313,12 +313,12 @@ export const UserAPI = {
     new_password: string;
   }) => api.put('/api/users/me/password', data),
   
-  // Upload profile picture
-  uploadProfilePicture: (imageFile: any) => {
+  // Upload avatar
+  uploadAvatar: (imageFile: any) => {
     const formData = new FormData();
-    formData.append('profile_picture', imageFile);
+    formData.append('avatar', imageFile);
     
-    return api.post('/api/users/me/profile-picture', formData, {
+    return api.post('/api/users/me/avatar', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

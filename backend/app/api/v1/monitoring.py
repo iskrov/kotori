@@ -20,6 +20,16 @@ from app.services.alert_manager import AlertManager
 from app.services.security_analytics import SecurityAnalytics
 from app.services.performance_analytics import PerformanceAnalytics
 from app.models.user import User
+from app.schemas.monitoring import (
+    HealthHistoryResponse,
+    MonitoringConfigResponse,
+    ServiceHealthCheckResponse,
+    MonitoringDashboardResponse,
+    HealthCheckTriggerResponse,
+    MonitoringStatusResponse,
+    AlertCreateResponse,
+    AlertUpdateResponse
+)
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 logger = logging.getLogger(__name__)
@@ -177,7 +187,7 @@ async def get_service_health(
         raise HTTPException(status_code=500, detail="Failed to get service health")
 
 
-@router.get("/health/history")
+@router.get("/health/history", response_model=HealthHistoryResponse)
 async def get_health_history(
     hours: int = Query(1, description="Number of hours of history to retrieve"),
     db: Session = Depends(get_db),
@@ -192,7 +202,7 @@ async def get_health_history(
         monitoring_service = get_monitoring_service(db)
         health_history = monitoring_service.get_health_history(hours=hours)
         
-        return {"health_history": health_history}
+        return HealthHistoryResponse(health_history=health_history)
         
     except Exception as e:
         logger.error(f"Error getting health history: {e}")
@@ -297,7 +307,7 @@ async def get_alerts(
         raise HTTPException(status_code=500, detail="Failed to get alerts")
 
 
-@router.post("/alerts", response_model=Dict[str, str])
+@router.post("/alerts", response_model=AlertCreateResponse)
 async def create_alert(
     alert_request: AlertCreateRequest,
     db: Session = Depends(get_db),
@@ -321,7 +331,7 @@ async def create_alert(
         )
         
         if alert_id:
-            return {"alert_id": alert_id, "status": "created"}
+            return AlertCreateResponse(alert_id=alert_id, status="created")
         else:
             raise HTTPException(status_code=400, detail="Failed to create alert")
         
@@ -330,7 +340,7 @@ async def create_alert(
         raise HTTPException(status_code=500, detail="Failed to create alert")
 
 
-@router.put("/alerts/{alert_id}", response_model=Dict[str, str])
+@router.put("/alerts/{alert_id}", response_model=AlertUpdateResponse)
 async def update_alert(
     alert_id: str = Path(..., description="Alert ID"),
     alert_update: AlertUpdateRequest = None,
@@ -360,7 +370,7 @@ async def update_alert(
             raise HTTPException(status_code=400, detail="Invalid action")
         
         if success:
-            return {"alert_id": alert_id, "status": f"{action}d"}
+            return AlertUpdateResponse(alert_id=alert_id, status=f"{action}d")
         else:
             raise HTTPException(status_code=404, detail="Alert not found or action failed")
         
@@ -437,7 +447,7 @@ async def get_bottleneck_analysis(
 
 
 # Configuration Endpoints
-@router.get("/config")
+@router.get("/config", response_model=MonitoringConfigResponse)
 async def get_monitoring_config(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional)
@@ -451,7 +461,7 @@ async def get_monitoring_config(
         monitoring_service = get_monitoring_service(db)
         config = monitoring_service.health_check()
         
-        return config
+        return MonitoringConfigResponse(**config)
         
     except Exception as e:
         logger.error(f"Error getting monitoring config: {e}")
@@ -459,7 +469,7 @@ async def get_monitoring_config(
 
 
 # Health Check Endpoints for Individual Services
-@router.get("/services/monitoring")
+@router.get("/services/monitoring", response_model=ServiceHealthCheckResponse)
 async def monitoring_service_health(
     db: Session = Depends(get_db)
 ):
@@ -472,14 +482,14 @@ async def monitoring_service_health(
         monitoring_service = get_monitoring_service(db)
         health = monitoring_service.health_check()
         
-        return health
+        return ServiceHealthCheckResponse(**health)
         
     except Exception as e:
         logger.error(f"Error getting monitoring service health: {e}")
         raise HTTPException(status_code=500, detail="Failed to get monitoring service health")
 
 
-@router.get("/services/alerts")
+@router.get("/services/alerts", response_model=ServiceHealthCheckResponse)
 async def alert_manager_health(
     db: Session = Depends(get_db)
 ):
@@ -492,14 +502,14 @@ async def alert_manager_health(
         alert_manager = AlertManager(db)
         health = alert_manager.health_check()
         
-        return health
+        return ServiceHealthCheckResponse(**health)
         
     except Exception as e:
         logger.error(f"Error getting alert manager health: {e}")
         raise HTTPException(status_code=500, detail="Failed to get alert manager health")
 
 
-@router.get("/services/security-analytics")
+@router.get("/services/security-analytics", response_model=ServiceHealthCheckResponse)
 async def security_analytics_health(
     db: Session = Depends(get_db)
 ):
@@ -512,14 +522,14 @@ async def security_analytics_health(
         security_analytics = SecurityAnalytics(db)
         health = security_analytics.health_check()
         
-        return health
+        return ServiceHealthCheckResponse(**health)
         
     except Exception as e:
         logger.error(f"Error getting security analytics health: {e}")
         raise HTTPException(status_code=500, detail="Failed to get security analytics health")
 
 
-@router.get("/services/performance-analytics")
+@router.get("/services/performance-analytics", response_model=ServiceHealthCheckResponse)
 async def performance_analytics_health(
     db: Session = Depends(get_db)
 ):
@@ -532,7 +542,7 @@ async def performance_analytics_health(
         performance_analytics = PerformanceAnalytics(db)
         health = performance_analytics.health_check()
         
-        return health
+        return ServiceHealthCheckResponse(**health)
         
     except Exception as e:
         logger.error(f"Error getting performance analytics health: {e}")
@@ -540,7 +550,7 @@ async def performance_analytics_health(
 
 
 # Dashboard Endpoints
-@router.get("/dashboard")
+@router.get("/dashboard", response_model=MonitoringDashboardResponse)
 async def get_monitoring_dashboard(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional)
@@ -561,18 +571,18 @@ async def get_monitoring_dashboard(
         performance_summary = performance_analytics.get_performance_summary()
         recent_alerts = monitoring_service.get_recent_alerts(limit=5)
         
-        dashboard_data = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "system_status": system_status,
-            "security_metrics": security_metrics,
-            "performance_summary": performance_summary,
-            "recent_alerts": recent_alerts,
-            "dashboard_metadata": {
+        dashboard_data = MonitoringDashboardResponse(
+            timestamp=datetime.now(UTC).isoformat(),
+            system_status=system_status,
+            security_metrics=security_metrics,
+            performance_summary=performance_summary,
+            recent_alerts=recent_alerts,
+            dashboard_metadata={
                 "version": "1.0",
                 "refresh_interval": 60,
                 "last_updated": datetime.now(UTC).isoformat()
             }
-        }
+        )
         
         return dashboard_data
         
@@ -582,7 +592,7 @@ async def get_monitoring_dashboard(
 
 
 # Utility Endpoints
-@router.post("/trigger-health-check")
+@router.post("/trigger-health-check", response_model=HealthCheckTriggerResponse)
 async def trigger_health_check(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -599,14 +609,14 @@ async def trigger_health_check(
         # Trigger health check in background
         background_tasks.add_task(monitoring_service._perform_health_checks)
         
-        return {"status": "health_check_triggered", "timestamp": datetime.now(UTC).isoformat()}
+        return HealthCheckTriggerResponse(status="health_check_triggered", timestamp=datetime.now(UTC).isoformat())
         
     except Exception as e:
         logger.error(f"Error triggering health check: {e}")
         raise HTTPException(status_code=500, detail="Failed to trigger health check")
 
 
-@router.get("/status")
+@router.get("/status", response_model=MonitoringStatusResponse)
 async def get_monitoring_status():
     """
     Get basic monitoring status
@@ -614,12 +624,12 @@ async def get_monitoring_status():
     Returns basic status information without authentication
     """
     try:
-        return {
-            "status": "operational",
-            "timestamp": datetime.now(UTC).isoformat(),
-            "version": "1.0",
-            "uptime": "monitoring_active"
-        }
+        return MonitoringStatusResponse(
+            status="operational",
+            timestamp=datetime.now(UTC).isoformat(),
+            version="1.0",
+            uptime="monitoring_active"
+        )
         
     except Exception as e:
         logger.error(f"Error getting monitoring status: {e}")

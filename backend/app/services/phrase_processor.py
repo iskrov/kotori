@@ -405,7 +405,7 @@ class SecretPhraseProcessor:
             # Look up secret tag by TagID
             secret_tag = self.db.query(SecretTag).filter(
                 SecretTag.user_id == user_id,
-                SecretTag.tag_id == tag_id
+                SecretTag.phrase_hash == tag_id
             ).first()
             
             return secret_tag
@@ -432,7 +432,7 @@ class SecretPhraseProcessor:
             
             # Convert database SecretTag to opaque_keys SecretTag format
             opaque_tag = OpaqueSecretTag(
-                tag_id_b64=base64.b64encode(secret_tag.tag_id).decode('ascii'),
+                tag_id_b64=base64.b64encode(secret_tag.phrase_hash).decode('ascii'),
                 salt_b64=base64.b64encode(secret_tag.salt).decode('ascii'),
                 verifier_b64=base64.b64encode(secret_tag.verifier_kv).decode('ascii')  # Use verifier_kv field
             )
@@ -459,11 +459,11 @@ class SecretPhraseProcessor:
             List of journal entries associated with this tag
         """
         try:
-            logger.info(f"Retrieving encrypted entries for secret tag: {secret_tag.tag_id.hex()}")
+            logger.info(f"Retrieving encrypted entries for secret tag: {secret_tag.phrase_hash.hex()}")
             
             # Query journal entries that are associated with this secret tag
             entries = self.db.query(JournalEntryModel).filter(
-                JournalEntryModel.secret_tag_id == secret_tag.tag_id,
+                JournalEntryModel.secret_tag_id == secret_tag.id,
                 JournalEntryModel.encrypted_content.isnot(None)  # Only encrypted entries
             ).order_by(JournalEntryModel.entry_date.desc()).all()
             
@@ -578,13 +578,13 @@ class SecretPhraseProcessor:
                 secret_tag = self.find_matching_secret_tag(user_id, normalized_phrase)
                 
                 if secret_tag:
-                    logger.info(f"Found matching secret tag for phrase: {secret_tag.tag_id.hex()}")
+                    logger.info(f"Found matching secret tag for phrase: {secret_tag.phrase_hash.hex()}")
                     
                     # Authenticate the phrase with timing protection
                     encryption_key = self._secure_authenticate_phrase(normalized_phrase, secret_tag)
                     
                     if encryption_key:
-                        logger.info(f"OPAQUE authentication successful for tag: {secret_tag.tag_id.hex()}")
+                        logger.info(f"OPAQUE authentication successful for tag: {secret_tag.phrase_hash.hex()}")
                         auth_success = True
                         
                         # Get encrypted entries for this tag
@@ -595,7 +595,7 @@ class SecretPhraseProcessor:
                         
                         return True, secret_tag, encrypted_entries, encryption_key
                     else:
-                        logger.warning(f"OPAQUE authentication failed for tag: {secret_tag.tag_id.hex()}")
+                        logger.warning(f"OPAQUE authentication failed for tag: {secret_tag.phrase_hash.hex()}")
                 else:
                     logger.debug(f"No matching secret tag found for phrase")
             
@@ -669,7 +669,7 @@ class SecretPhraseProcessor:
             
             # Convert database SecretTag to opaque_keys SecretTag format
             opaque_tag = OpaqueSecretTag(
-                tag_id_b64=base64.b64encode(secret_tag.tag_id).decode('ascii'),
+                tag_id_b64=base64.b64encode(secret_tag.phrase_hash).decode('ascii'),
                 salt_b64=base64.b64encode(secret_tag.salt).decode('ascii'),
                 verifier_b64=base64.b64encode(secret_tag.verifier_kv).decode('ascii')  # Use verifier_kv field
             )

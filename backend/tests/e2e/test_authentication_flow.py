@@ -9,7 +9,7 @@ import pytest
 import asyncio
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List
 from unittest.mock import Mock, patch
 
@@ -40,7 +40,7 @@ from app.services.session_service import SessionService
 from app.services.audit_service import SecurityAuditService
 from app.utils.secure_utils import SecureTokenGenerator, SecureHasher
 from app.security.constant_time import ConstantTimeOperations
-from app.security.rate_limiter import RateLimitStrategy
+from app.security.rate_limiter import RateLimitConfig, RateLimiterService
 from app.security.memory_protection import SecureMemoryManager
 
 # Test configuration
@@ -113,7 +113,8 @@ class TestOpaqueAuthenticationFlow:
         self.audit_service = SecurityAuditService()
         
         # Set up rate limiter for testing
-        self.rate_limiter = RateLimitStrategy(max_attempts=5, window_seconds=60)
+        rate_config = RateLimitConfig(max_requests=5, window_size=60)
+        self.rate_limiter = RateLimiterService(rate_config)
 
     def teardown_method(self):
         """Clean up after each test method."""
@@ -136,7 +137,7 @@ class TestOpaqueAuthenticationFlow:
             self.db.commit()
             
         user = User(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             email=TEST_USER_EMAIL,
             hashed_password=self.hasher.hash_password(TEST_USER_PASSWORD),
             full_name="Authentication Test User"
@@ -161,13 +162,13 @@ class TestOpaqueAuthenticationFlow:
                 self.db.delete(existing_tag)
             
             # Create new tag
-            tag_id = uuid.uuid4().bytes
+            phrase_hash= uuid.uuid4().bytes
             salt = uuid.uuid4().bytes
             verifier_kv = uuid.uuid4().bytes
             opaque_envelope = uuid.uuid4().bytes
             
             tag = SecretTag(
-                tag_id=tag_id,
+                phrase_hash=phrase_hash,
                 user_id=self.test_user.id,
                 salt=salt,
                 verifier_kv=verifier_kv,
@@ -226,12 +227,12 @@ class TestOpaqueAuthenticationFlow:
         # 2. Get test tag data
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # 3. Initialize authentication
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -295,13 +296,13 @@ class TestOpaqueAuthenticationFlow:
         
         # Use wrong phrase for existing tag
         test_tag_data = self.test_secret_tags[0]
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         wrong_phrase = WRONG_PHRASES[0]
         
         # Initialize authentication with wrong phrase
         init_request = {
             "phrase": wrong_phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -321,12 +322,12 @@ class TestOpaqueAuthenticationFlow:
         headers = {"Authorization": f"Bearer {access_token}"}
         
         # Use non-existent tag ID
-        fake_tag_id = "0" * 32
+        fake_phrase_hash= "0" * 32
         phrase = TEST_PHRASES[0]
         
         init_request = {
             "phrase": phrase,
-            "tag_id": fake_tag_id
+            "tag_id": "fake-tag-id" # Use a non-existent ID
         }
         
         init_response = self.client.post(
@@ -348,13 +349,13 @@ class TestOpaqueAuthenticationFlow:
         # Test with correct phrase
         test_tag_data = self.test_secret_tags[0]
         correct_phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Measure correct authentication timing
         start_time = time.time()
         init_request = {
             "phrase": correct_phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         correct_response = self.client.post(
@@ -370,7 +371,7 @@ class TestOpaqueAuthenticationFlow:
         start_time = time.time()
         init_request = {
             "phrase": wrong_phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         wrong_response = self.client.post(
@@ -396,12 +397,12 @@ class TestOpaqueAuthenticationFlow:
         
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Initialize authentication
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -422,7 +423,7 @@ class TestOpaqueAuthenticationFlow:
         assert session.user_id == str(self.test_user.id)
         
         # Verify session expiration
-        assert session.expires_at > datetime.utcnow()
+        assert session.expires_at > datetime.now(UTC)
         
         # Finalize authentication
         finalize_request = {
@@ -452,12 +453,12 @@ class TestOpaqueAuthenticationFlow:
         
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Initialize authentication
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -473,7 +474,7 @@ class TestOpaqueAuthenticationFlow:
         session = self.db.query(OpaqueSession).filter(
             OpaqueSession.session_id == session_id
         ).first()
-        session.expires_at = datetime.utcnow() - timedelta(minutes=1)
+        session.expires_at = datetime.now(UTC) - timedelta(minutes=1)
         self.db.commit()
         
         # Attempt to finalize expired session
@@ -500,14 +501,14 @@ class TestOpaqueAuthenticationFlow:
         
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Initialize multiple authentication sessions
         sessions = []
         for i in range(3):
             init_request = {
                 "phrase": phrase,
-                "tag_id": tag_id
+                "tag_id": str(test_tag_data.id)
             }
             
             init_response = self.client.post(
@@ -553,14 +554,14 @@ class TestOpaqueAuthenticationFlow:
         headers = {"Authorization": f"Bearer {access_token}"}
         
         test_tag_data = self.test_secret_tags[0]
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Send many authentication requests quickly
         responses = []
         for i in range(25):  # Exceed rate limit
             init_request = {
                 "phrase": WRONG_PHRASES[0],  # Use wrong phrase
-                "tag_id": tag_id
+                "tag_id": str(test_tag_data.id)
             }
             
             response = self.client.post(
@@ -587,12 +588,12 @@ class TestOpaqueAuthenticationFlow:
         # Test authentication with each tag
         for i, test_tag_data in enumerate(self.test_secret_tags):
             phrase = TEST_PHRASES[i] # Use the phrase from TEST_PHRASES
-            tag_id = test_tag_data.tag_id.hex()
+            phrase_hash= test_tag_data.phrase_hash.hex()
             
             # Initialize authentication
             init_request = {
                 "phrase": phrase,
-                "tag_id": tag_id
+                "tag_id": str(test_tag_data.id)
             }
             
             init_response = self.client.post(
@@ -629,12 +630,12 @@ class TestOpaqueAuthenticationFlow:
         
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Complete authentication flow
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -677,7 +678,7 @@ class TestOpaqueAuthenticationFlow:
         
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Get initial audit log count
         initial_log_count = self.db.execute(
@@ -688,7 +689,7 @@ class TestOpaqueAuthenticationFlow:
         # Complete authentication flow
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -728,7 +729,7 @@ class TestOpaqueAuthenticationFlow:
         
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Monitor memory allocations
         initial_allocations = len(self.memory_manager.tracked_allocations)
@@ -736,7 +737,7 @@ class TestOpaqueAuthenticationFlow:
         # Complete authentication flow
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -783,11 +784,11 @@ class TestOpaqueAuthenticationFlow:
         # Test missing authentication
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         response = self.client.post(
@@ -818,12 +819,12 @@ class TestOpaqueAuthenticationFlow:
         
         test_tag_data = self.test_secret_tags[0]
         phrase = TEST_PHRASES[0] # Use the phrase from TEST_PHRASES
-        tag_id = test_tag_data.tag_id.hex()
+        phrase_hash= test_tag_data.phrase_hash.hex()
         
         # Complete authentication flow
         init_request = {
             "phrase": phrase,
-            "tag_id": tag_id
+            "tag_id": str(test_tag_data.id)
         }
         
         init_response = self.client.post(
@@ -866,7 +867,7 @@ class TestOpaqueAuthenticationFlow:
         orphaned_sessions = self.db.query(OpaqueSession).filter(
             OpaqueSession.user_id == str(self.test_user.id),
             OpaqueSession.session_state == "authentication_initialized",
-            OpaqueSession.expires_at < datetime.utcnow()
+            OpaqueSession.expires_at < datetime.now(UTC)
         ).all()
         # Note: In a real implementation, there might be cleanup processes
         # that remove orphaned sessions 

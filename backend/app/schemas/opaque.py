@@ -7,6 +7,7 @@ including registration, authentication, and session management.
 
 from datetime import datetime
 from typing import Optional, Dict, Any
+from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 import base64
 
@@ -96,7 +97,7 @@ class OpaqueRegistrationResponse(BaseModel):
     
     tag_id: str = Field(
         ...,
-        description="Hex-encoded 16-byte tag ID for the registered secret tag"
+        description="UUID of the registered secret tag"
     )
     
     tag_name: str = Field(
@@ -135,9 +136,7 @@ class OpaqueAuthInitRequest(BaseModel):
     
     tag_id: str = Field(
         ...,
-        description="Hex-encoded 16-byte tag ID to authenticate",
-        min_length=32,
-        max_length=32
+        description="UUID of the secret tag to authenticate"
     )
     
     client_message: str = Field(
@@ -147,17 +146,17 @@ class OpaqueAuthInitRequest(BaseModel):
     )
     
     @field_validator('tag_id')
-    def validate_tag_id_hex(cls, v):
-        """Validate that tag_id is valid hex encoding."""
+    @classmethod
+    def validate_tag_id_uuid(cls, v):
+        """Validate that tag_id is a valid UUID string."""
         try:
-            decoded = bytes.fromhex(v)
-            if len(decoded) != 16:
-                raise ValueError("Tag ID must be 16 bytes when decoded")
+            UUID(v)
             return v
         except ValueError:
-            raise ValueError("Invalid hex encoding for tag_id")
+            raise ValueError("Invalid UUID format for tag_id")
     
     @field_validator('client_message')
+    @classmethod
     def validate_client_message_base64(cls, v):
         """Validate that client_message is proper base64."""
         try:
@@ -233,7 +232,7 @@ class OpaqueAuthFinalizeResponse(BaseModel):
     
     tag_id: str = Field(
         ...,
-        description="Hex-encoded tag ID that was authenticated"
+        description="UUID of the secret tag that was authenticated"
     )
     
     vault_id: str = Field(
@@ -300,7 +299,7 @@ class SecretTagInfo(BaseModel):
     
     tag_id: str = Field(
         ...,
-        description="Hex-encoded tag ID"
+        description="UUID of the secret tag"
     )
     
     tag_name: str = Field(

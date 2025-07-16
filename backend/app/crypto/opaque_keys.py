@@ -150,7 +150,7 @@ def authenticate_secret_phrase(
     """
     try:
         # First check if TagID matches (fast check)
-        if not verify_tag_id_matches_phrase(secret_tag.tag_id, password_phrase):
+        if not verify_tag_id_matches_phrase(secret_tag.phrase_hash, password_phrase):
             return None
         
         # TagID matches, now derive keys with stored salt
@@ -211,7 +211,7 @@ def find_matching_tag_id(
             if not isinstance(secret_tag, SecretTag):
                 continue
                 
-            if secret_tag.tag_id == target_tag_id:
+            if secret_tag.phrase_hash == target_tag_id:
                 return secret_tag
         
         return None
@@ -235,7 +235,7 @@ def validate_secret_tag(secret_tag: SecretTag) -> None:
     
     # Validate base64 encoding and lengths
     try:
-        tag_id = secret_tag.tag_id
+        tag_id = secret_tag.phrase_hash
         if len(tag_id) != 16:
             raise InvalidInputError("TagID must be 16 bytes", "tag_id")
         
@@ -268,7 +268,7 @@ def export_secret_tag_for_backup(secret_tag: SecretTag) -> dict:
     validate_secret_tag(secret_tag)
     
     return {
-        'tag_id': secret_tag.tag_id_b64,
+                    'tag_id': base64.b64encode(secret_tag.phrase_hash).decode('ascii'),
         'salt': secret_tag.salt_b64,
         'verifier': secret_tag.verifier_b64,
         'version': '1.0',  # For future compatibility

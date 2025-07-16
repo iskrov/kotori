@@ -17,8 +17,6 @@ from ..models.user import User
 from ..schemas.journal import JournalEntry
 from ..schemas.journal import JournalEntryCreate
 from ..schemas.journal import JournalEntryUpdate
-from ..schemas.journal import Tag
-from ..schemas.journal import TagCreate
 from ..schemas.journal import SecretPhraseAuthResponse
 from ..schemas.journal import SecretTagJournalEntry
 from ..schemas.journal import JournalEntryCreateResponse
@@ -224,7 +222,7 @@ async def create_journal_entry(
         )
         
         if auth_success and authenticated_tag and encryption_key:
-            logger.info(f"Secret phrase authentication successful for tag: {authenticated_tag.tag_id.hex()}")
+            logger.info(f"Secret phrase authentication successful for tag: {authenticated_tag.phrase_hash.hex()}")
             
             # Decrypt entries for response
             decrypted_entries = []
@@ -244,7 +242,7 @@ async def create_journal_entry(
                             user_id=encrypted_entry.user_id,
                             created_at=encrypted_entry.created_at,
                             updated_at=encrypted_entry.updated_at,
-                            secret_tag_id=authenticated_tag.tag_id.hex(),
+                            secret_tag_id=authenticated_tag.phrase_hash.hex(),
                             tag_name=authenticated_tag.tag_name
                         )
                         decrypted_entries.append(decrypted_entry)
@@ -258,7 +256,7 @@ async def create_journal_entry(
             # Return secret phrase authentication response
             return SecretPhraseAuthResponse(
                 authentication_successful=True,
-                secret_tag_id=authenticated_tag.tag_id.hex(),
+                secret_tag_id=authenticated_tag.phrase_hash.hex(),
                 tag_name=authenticated_tag.tag_name,
                 encrypted_entries=decrypted_entries,
                 total_entries=len(decrypted_entries),
@@ -361,77 +359,7 @@ def get_hidden_mode_status(
     }
 
 
-@router.get("/tags/", response_model=list[Tag])
-def read_tags_with_slash(
-    *, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> Any:
-    """Get all tags for the current user."""
-    return journal_service.get_tags_by_user(db=db, user_id=current_user.id)
 
-
-@router.get("/tags", response_model=list[Tag])
-def read_tags(
-    *, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> Any:
-    """Get all tags for the current user."""
-    return journal_service.get_tags_by_user(db=db, user_id=current_user.id)
-
-
-@router.post("/tags", response_model=Tag)
-def create_tag(
-    *,
-    db: Session = Depends(get_db),
-    tag_in: TagCreate,
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Create a new tag."""
-    return journal_service.create_tag(db=db, tag_in=tag_in, user_id=current_user.id)
-
-
-@router.put("/tags/{tag_id}", response_model=Tag)
-def update_tag(
-    *,
-    db: Session = Depends(get_db),
-    tag_id: UUID,
-    tag_in: Tag,
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Update a tag."""
-    return journal_service.update_tag(
-        db=db, tag_id=tag_id, tag_in=tag_in, user_id=current_user.id
-    )
-
-
-@router.delete("/tags/{tag_id}", response_model=Tag)
-def delete_tag(
-    *,
-    db: Session = Depends(get_db),
-    tag_id: UUID,
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """
-    Delete a tag.
-    """
-    try:
-        return journal_service.delete_tag(db=db, tag_id=tag_id, user_id=current_user.id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@router.get("/tags/recent", response_model=list[dict])
-def get_recent_tags(
-    *,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    limit: int = Query(5, ge=1, le=20, description="Number of recent tags to return")
-) -> Any:
-    """
-    Get recently used tags for the current user, ordered by last usage date.
-    Returns tags with usage statistics.
-    """
-    return journal_service.get_recent_tags_by_user(
-        db=db, user_id=current_user.id, limit=limit
-    )
 
 
 @router.get("/search", response_model=list[JournalEntry])
