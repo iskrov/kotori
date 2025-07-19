@@ -297,7 +297,7 @@ Public tags for categorizing journal entries.
 ```sql
 CREATE TABLE tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    journal_id UUID NOT NULL REFERENCES journals(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     color VARCHAR(7) DEFAULT '#007bff',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -305,56 +305,226 @@ CREATE TABLE tags (
     
     CONSTRAINT tags_name_length CHECK (length(name) >= 1),
     CONSTRAINT tags_color_format CHECK (color ~* '^#[0-9a-f]{6}$'),
-    UNIQUE(journal_id, name)
+    UNIQUE(user_id, name)
 );
 ```
 
 **Column Details:**
 - `id`: UUID primary key, automatically generated
-- `journal_id`: Foreign key to journals table with cascade delete
+- `user_id`: Foreign key to users table with cascade delete
 - `name`: Tag name (required, max 100 chars)
 - `color`: Hex color code for UI display
 - `created_at`: Tag creation timestamp
 - `updated_at`: Last modification timestamp
 
 **Business Rules:**
-- Must belong to a valid journal entry
-- Tag names must be unique per journal
+- Must belong to a valid user
+- Tag names must be unique per user
 - Color must be valid hex format
 - Name cannot be empty
 
 ### secret_tags
 
-Private tags for sensitive categorization.
+OPAQUE zero-knowledge secret tags for secure voice phrase activation.
 
 ```sql
 CREATE TABLE secret_tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    journal_id UUID NOT NULL REFERENCES journals(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    access_level INTEGER DEFAULT 1,
+    phrase_hash BYTEA(16) NOT NULL UNIQUE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    salt BYTEA(16) NOT NULL,
+    verifier_kv BYTEA(32) NOT NULL,
+    opaque_envelope BYTEA NOT NULL,
+    tag_name VARCHAR(100) NOT NULL,
+    color_code VARCHAR(7) NOT NULL DEFAULT '#007AFF',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
-    CONSTRAINT secret_tags_name_length CHECK (length(name) >= 1),
-    CONSTRAINT secret_tags_access_level CHECK (access_level >= 1 AND access_level <= 5),
-    UNIQUE(journal_id, name)
+    CONSTRAINT unique_user_secret_tag UNIQUE (user_id, tag_name),
+    CONSTRAINT secret_tags_phrase_hash_key UNIQUE (phrase_hash)
 );
 ```
 
 **Column Details:**
 - `id`: UUID primary key, automatically generated
-- `journal_id`: Foreign key to journals table with cascade delete
-- `name`: Secret tag name (required, max 100 chars)
-- `access_level`: Security level (1-5, higher = more restricted)
+- `phrase_hash`: BLAKE2s hash of secret phrase (16 bytes, deterministic lookup)
+- `user_id`: Foreign key to users table with cascade delete
+- `salt`: Random salt for Argon2id key derivation (16 bytes)
+- `verifier_kv`: OPAQUE server verification key (32 bytes)
+- `opaque_envelope`: OPAQUE registration envelope (variable length)
+- `tag_name`: Human-readable tag name (max 100 chars)
+- `color_code`: Hex color code for UI display
 - `created_at`: Tag creation timestamp
 - `updated_at`: Last modification timestamp
 
 **Business Rules:**
-- Must belong to a valid journal entry
-- Secret tag names must be unique per journal
-- Access level controls visibility (1=low, 5=high security)
-- Name cannot be empty
+- Must belong to a valid user
+- Secret tag names must be unique per user
+- Phrase hash must be globally unique (deterministic from phrase)
+- Implements zero-knowledge authentication via OPAQUE protocol
+- Server never stores actual secret phrases
+
+### wrapped_keys
+
+AES-KW wrapped data encryption keys for vault access control.
+
+```sql
+CREATE TABLE wrapped_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tag_id UUID NOT NULL REFERENCES secret_tags(id) ON DELETE CASCADE,
+    vault_id UUID NOT NULL,
+    wrapped_key BYTEA(40) NOT NULL,
+    key_purpose VARCHAR(50) NOT NULL DEFAULT 'vault_data',
+    key_version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Column Details:**
+- `id`: UUID primary key, automatically generated
+- `tag_id`: Foreign key to secret_tags table with cascade delete
+- `vault_id`: UUID identifier for the encrypted vault
+- `wrapped_key`: AES-KW wrapped data encryption key (40 bytes)
+- `key_purpose`: Purpose of the wrapped key (default: 'vault_data')
+- `key_version`: Key version for rotation support
+- `created_at`: Key creation timestamp
+- `updated_at`: Last modification timestamp
+
+**Business Rules:**
+- Must reference a valid secret tag
+- Wrapped key provides access to encrypted vault content
+- Key wrapping uses AES Key Wrap (RFC 3394) standard
+- Supports key rotation through version tracking
+
+### vault_blobs
+
+Encrypted content blobs stored in secure vaults.
+
+```sql
+CREATE TABLE vault_blobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vault_id UUID NOT NULL,
+    object_id UUID NOT NULL,
+    wrapped_key_id UUID NOT NULL REFERENCES wrapped_keys(id) ON DELETE CASCADE,
+    iv BYTEA(12) NOT NULL,
+    ciphertext BYTEA NOT NULL,
+    auth_tag BYTEA(16) NOT NULL,
+    content_type VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
+    content_size INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT unique_vault_object UNIQUE (vault_id, object_id)
+);
+```
+
+**Column Details:**
+- `id`: UUID primary key, automatically generated
+- `vault_id`: UUID identifier for the vault containing this blob
+- `object_id`: UUID identifier for the specific object within the vault
+- `wrapped_key_id`: Foreign key to wrapped_keys table
+- `iv`: AES-GCM initialization vector (12 bytes)
+- `ciphertext`: Encrypted content (variable length)
+- `auth_tag`: AES-GCM authentication tag (16 bytes)
+- `content_type`: MIME type of the original content
+- `content_size`: Size of the original unencrypted content
+- `created_at`: Blob creation timestamp
+- `updated_at`: Last modification timestamp
+
+**Business Rules:**
+- Must reference a valid wrapped key for decryption
+- Uses AES-GCM authenticated encryption
+- Vault/object combination must be unique
+- Content type helps with proper handling after decryption
+
+### opaque_sessions
+
+OPAQUE protocol authentication session state management.
+
+```sql
+CREATE TABLE opaque_sessions (
+    session_id VARCHAR(64) PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    phrase_hash BYTEA(16),
+    session_state VARCHAR(20) NOT NULL DEFAULT 'initialized',
+    session_data BYTEA,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_activity TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Column Details:**
+- `session_id`: String primary key (required by OPAQUE protocol)
+- `user_id`: Foreign key to users table with cascade delete
+- `phrase_hash`: Optional phrase hash being authenticated (16 bytes)
+- `session_state`: Current authentication state ('initialized', 'registration_started', 'login_started', etc.)
+- `session_data`: Protocol-specific binary session data
+- `expires_at`: Session expiration timestamp
+- `last_activity`: Last activity timestamp for cleanup
+- `created_at`: Session creation timestamp
+- `updated_at`: Last modification timestamp
+
+**Business Rules:**
+- Session ID must be unique and cryptographically random
+- Sessions automatically expire for security
+- Session data contains temporary OPAQUE protocol state
+- Supports both registration and authentication flows
+
+### security_audit_logs
+
+Security audit trail for OPAQUE authentication and system events.
+
+```sql
+CREATE TABLE security_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type VARCHAR(50) NOT NULL,
+    event_category VARCHAR(30) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    user_id_hash VARCHAR(64),
+    session_id_hash VARCHAR(64),
+    correlation_id UUID,
+    request_id UUID,
+    ip_address_hash VARCHAR(64),
+    user_agent_hash VARCHAR(64),
+    event_data TEXT,
+    event_message VARCHAR(500) NOT NULL,
+    log_signature VARCHAR(128),
+    is_sensitive BOOLEAN NOT NULL DEFAULT false,
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processing_time_ms INTEGER,
+    success BOOLEAN,
+    error_code VARCHAR(50)
+);
+```
+
+**Column Details:**
+- `id`: UUID primary key, automatically generated
+- `event_type`: Type of security event (authentication, registration, etc.)
+- `event_category`: Category of event (auth, session, vault, system)
+- `severity`: Event severity level (info, warning, error, critical)
+- `user_id_hash`: SHA-256 hash of user ID (privacy protection)
+- `session_id_hash`: SHA-256 hash of session ID (privacy protection)
+- `correlation_id`: UUID for tracking related events
+- `request_id`: UUID for request tracking
+- `ip_address_hash`: Hashed IP address for privacy
+- `user_agent_hash`: Hashed user agent string
+- `event_data`: JSON event-specific data
+- `event_message`: Human-readable event description
+- `log_signature`: HMAC signature for log integrity
+- `is_sensitive`: Flag for sensitive security events
+- `timestamp`: Event timestamp
+- `processing_time_ms`: Request processing time
+- `success`: Success/failure flag for operations
+- `error_code`: Standardized error code
+
+**Business Rules:**
+- All personally identifiable information is hashed
+- Log signatures ensure audit trail integrity
+- Supports correlation across multiple events
+- Sensitive events are flagged for special handling
 
 ### reminders
 

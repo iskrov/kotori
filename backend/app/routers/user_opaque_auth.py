@@ -28,10 +28,25 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # OPAQUE server setup - this should be stored securely in production
-OPAQUE_SERVER_SETUP = os.environ.get('OPAQUE_SERVER_SETUP')
-if not OPAQUE_SERVER_SETUP:
-    # Generate a server setup for development
-    logger.warning("No OPAQUE_SERVER_SETUP found, generating one for development")
+def get_or_create_opaque_server_setup(db: Session) -> str:
+    """
+    Get or create the OPAQUE server setup from database.
+    This ensures the server setup persists across restarts.
+    """
+    from app.models.opaque_server_config import OpaqueServerConfig
+    
+    # Try to get existing server setup
+    config = db.query(OpaqueServerConfig).filter(
+        OpaqueServerConfig.id == "default",
+        OpaqueServerConfig.is_active == True
+    ).first()
+    
+    if config and config.server_setup:
+        logger.info("Using existing OPAQUE server setup from database")
+        return config.server_setup
+    
+    # Generate a new server setup
+    logger.warning("No OPAQUE server setup found, generating and storing new one")
     try:
         result = subprocess.run([
             'node', '-e', 
@@ -54,15 +69,40 @@ async function createSetup() {
 createSetup();
             '''
         ], capture_output=True, text=True, cwd='/home/ai/src/vibes/backend')
+        
         if result.returncode == 0:
-            OPAQUE_SERVER_SETUP = result.stdout.strip()
-            logger.info("Generated OPAQUE server setup for development")
+            server_setup = result.stdout.strip()
+            
+            # Store in database
+            if config:
+                # Update existing config
+                config.server_setup = server_setup
+                config.updated_at = datetime.now(UTC)
+                config.is_active = True
+            else:
+                # Create new config
+                config = OpaqueServerConfig(
+                    id="default",
+                    server_setup=server_setup,
+                    is_active=True,
+                    description="Default OPAQUE server configuration"
+                )
+                db.add(config)
+            
+            db.commit()
+            logger.info("Generated and stored new OPAQUE server setup in database")
+            return server_setup
         else:
             logger.error(f"Failed to generate OPAQUE server setup: {result.stderr}")
-            OPAQUE_SERVER_SETUP = None
+            raise Exception(f"Failed to generate OPAQUE server setup: {result.stderr}")
     except Exception as e:
         logger.error(f"Error generating OPAQUE server setup: {e}")
-        OPAQUE_SERVER_SETUP = None
+        raise Exception(f"Error generating OPAQUE server setup: {e}")
+
+# Legacy environment variable support (deprecated)
+OPAQUE_SERVER_SETUP = os.environ.get('OPAQUE_SERVER_SETUP')
+if OPAQUE_SERVER_SETUP:
+    logger.warning("Using OPAQUE_SERVER_SETUP from environment (deprecated). Consider migrating to database storage.")
 
 # Request/Response Models
 class UserRegistrationStartRequest(BaseModel):
@@ -123,14 +163,14 @@ class UserLoginFinishResponse(BaseModel):
     exportKey: Optional[str] = Field(None, description="OPAQUE export key (only available client-side)")
     message: str = Field(..., description="Login status message")
 
-def call_opaque_server(operation: str, data: Dict[str, Any]) -> Dict[str, Any]:
+def call_opaque_server(operation: str, data: Dict[str, Any], server_setup: str) -> Dict[str, Any]:
     """Call the OPAQUE server implementation via Node.js"""
     try:
         # Create the Node.js script
         script = f"""
 const opaque = require('@serenity-kit/opaque');
 
-const serverSetup = '{OPAQUE_SERVER_SETUP}';
+const serverSetup = '{server_setup}';
 const operation = '{operation}';
 const data = {json.dumps(data)};
 
@@ -205,14 +245,24 @@ performOperation();
         raise
 
 @router.get("/status", response_model=OpaqueStatusResponse)
-async def get_opaque_status():
+async def get_opaque_status(db: Session = Depends(get_db)):
     """Get OPAQUE server status and capabilities"""
-    if not OPAQUE_SERVER_SETUP:
+    try:
+        server_setup = get_or_create_opaque_server_setup(db)
+        if not server_setup:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OPAQUE server not properly configured"
+            )
+        return OpaqueStatusResponse()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting OPAQUE status: {e}")
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OPAQUE server not properly configured"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get OPAQUE status: {e}"
         )
-    return OpaqueStatusResponse()
 
 @router.post("/register/start", response_model=UserRegistrationStartResponse)
 async def start_user_registration(
@@ -233,7 +283,8 @@ async def start_user_registration(
                 detail="User already exists"
             )
         
-        if not OPAQUE_SERVER_SETUP:
+        server_setup = get_or_create_opaque_server_setup(db)
+        if not server_setup:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="OPAQUE server not properly configured"
@@ -243,7 +294,7 @@ async def start_user_registration(
         result = call_opaque_server('createRegistrationResponse', {
             'userIdentifier': request.userIdentifier,
             'registrationRequest': request.registrationRequest
-        })
+        }, server_setup)
         
         # Store the user's name temporarily for the finish phase
         session_id = secrets.token_urlsafe(32)
@@ -398,7 +449,8 @@ async def start_user_login(
             dummy_response = base64.b64encode(f"login_response_for_unknown_user".encode()).decode('utf-8')
             return UserLoginStartResponse(loginResponse=dummy_response)
         
-        if not OPAQUE_SERVER_SETUP:
+        server_setup = get_or_create_opaque_server_setup(db)
+        if not server_setup:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="OPAQUE server not properly configured"
@@ -409,7 +461,7 @@ async def start_user_login(
             'userIdentifier': request.userIdentifier,
             'registrationRecord': user.hashed_password,  # The stored OPAQUE registration record
             'startLoginRequest': request.loginRequest
-        })
+        }, server_setup)
         
         # Store the server login state in the database using OpaqueSession
         session_id = secrets.token_urlsafe(32)
@@ -480,11 +532,14 @@ async def finish_user_login(
         
         server_login_state = opaque_session.session_data.decode('utf-8')
         
+        # Get server setup for login finish
+        server_setup = get_or_create_opaque_server_setup(db)
+        
         # Call the proper OPAQUE server to finish login
         result = call_opaque_server('finishLogin', {
             'finishLoginRequest': request.finishLoginRequest,
             'serverLoginState': server_login_state
-        })
+        }, server_setup)
         
         # Ensure we got a sessionKey from the server
         if not result.get('sessionKey'):

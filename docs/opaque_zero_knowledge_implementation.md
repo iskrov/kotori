@@ -17,8 +17,8 @@ This document outlines the implementation of a cryptographically secure secret t
 | Concept | Fields | Purpose |
 |---------|--------|---------|
 | **User** | `user_id` (UUID) | Stable user identifier |
-| **Secret Tag** | `tag_id` (16 bytes), `salt` (16 bytes), `verifier_kv` (32 bytes) | One per secret phrase, stores OPAQUE verifier |
-| **Wrapped Key** | `tag_id`, `vault_id`, `wrapped_key` (40 bytes) | Maps secret tags to encrypted data vaults |
+| **Secret Tag** | `id` (UUID), `salt` (16 bytes), `verifier_kv` (32 bytes) | One per secret phrase, stores OPAQUE verifier |
+| **Wrapped Key** | `id` (UUID), `vault_id` (UUID), `wrapped_key` (40 bytes) | Maps secret tags to encrypted data vaults |
 | **Vault Blob** | `vault_id`, `object_id`, `iv`, `ciphertext` | Encrypted journal entries and metadata |
 
 ### 1.2 Database Schema
@@ -32,25 +32,32 @@ CREATE TABLE users (
 );
 
 -- Secret tags with OPAQUE verifiers
-CREATE TABLE secret_tags_v3 (
-    tag_id BYTEA(16) PRIMARY KEY,           -- Deterministic from Hash(phrase)
+CREATE TABLE secret_tags (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    phrase_hash BYTEA(16) NOT NULL UNIQUE,  -- Deterministic from Hash(phrase)
     user_id UUID NOT NULL REFERENCES users(id),
     salt BYTEA(16) NOT NULL,                -- Random salt for Argon2id
     verifier_kv BYTEA(32) NOT NULL,         -- OPAQUE verifier (server-side)
     opaque_envelope BYTEA NOT NULL,         -- OPAQUE registration envelope
+    tag_name VARCHAR(100) NOT NULL,
+    color_code VARCHAR(7) DEFAULT '#007AFF',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     INDEX idx_user_tags (user_id),
-    INDEX idx_tag_lookup (tag_id)
+    INDEX idx_phrase_hash_lookup (phrase_hash),
+    CONSTRAINT unique_user_secret_tag UNIQUE (user_id, tag_name)
 );
 
 -- Wrapped keys mapping tags to vaults
 CREATE TABLE wrapped_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tag_id BYTEA(16) NOT NULL REFERENCES secret_tags_v3(tag_id),
+    tag_id UUID NOT NULL REFERENCES secret_tags(id) ON DELETE CASCADE,
     vault_id UUID NOT NULL,
     wrapped_key BYTEA(40) NOT NULL,         -- AES-KW wrapped data key
+    key_purpose VARCHAR(50) DEFAULT 'vault_data',
+    key_version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
     INDEX idx_tag_keys (tag_id),
     INDEX idx_vault_keys (vault_id)
 );
@@ -97,10 +104,10 @@ function deriveKeys(phrase: string, salt: Uint8Array): KeyMaterial {
   const Kv = hkdf(S, "OPAQUE-VERIFY", 32);   // Server verifier key
   const Ke = hkdf(S, "VAULT-ENCRYPT", 32);   // Client encryption key
   
-  // Step 3: Deterministic tag identifier
-  const tagId = blake2s(phrase, 16);         // 128-bit, salt-free
+  // Step 3: Deterministic phrase hash
+  const phraseHash = blake2s(phrase, 16);         // 128-bit, salt-free
   
-  return { Kv, Ke, tagId, S };
+  return { Kv, Ke, phraseHash, S };
 }
 ```
 
@@ -112,14 +119,17 @@ function deriveKeys(phrase: string, salt: Uint8Array): KeyMaterial {
 // POST /api/v3/secret-tags/register
 interface RegisterSecretTagRequest {
   user_id: string;
-  tag_id: Uint8Array;           // 16 bytes from Hash(phrase)
+  phrase_hash: Uint8Array;      // 16 bytes from Hash(phrase)
   salt: Uint8Array;             // 16 bytes random
   opaque_envelope: Uint8Array;  // OPAQUE registration data
+  tag_name: string;             // Human-readable tag name
+  color_code?: string;          // Optional hex color code
 }
 
 interface RegisterSecretTagResponse {
   success: boolean;
-  tag_id: string;               // Hex-encoded for client reference
+  tag_id: string;               // UUID of created secret tag
+  phrase_hash: string;          // Hex-encoded phrase hash for client reference
 }
 ```
 
@@ -129,7 +139,7 @@ interface RegisterSecretTagResponse {
 // POST /api/v3/secret-tags/auth/init
 interface OpaqueAuthInitRequest {
   user_id: string;
-  tag_id: Uint8Array;           // 16 bytes
+  phrase_hash: Uint8Array;      // 16 bytes derived from phrase
   client_msg1: Uint8Array;      // OPAQUE CredentialRequest
 }
 
@@ -183,7 +193,7 @@ interface VaultObject {
 async function createSecretTag(phrase: string, tagName: string): Promise<string> {
   // 1. Generate cryptographic material
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const { Kv, Ke, tagId } = deriveKeys(phrase, salt);
+  const { Kv, Ke, phraseHash } = deriveKeys(phrase, salt);
   
   // 2. OPAQUE registration
   const opaque = new OpaqueClient();
@@ -194,11 +204,13 @@ async function createSecretTag(phrase: string, tagName: string): Promise<string>
   const envelope = opaque.finalizeRegistration(registrationResponse);
   
   // 3. Register tag on server
-  await api.post('/api/v3/secret-tags/register', {
+  const response = await api.post('/api/v3/secret-tags/register', {
     user_id: getCurrentUserId(),
-    tag_id: tagId,
+    phrase_hash: phraseHash,
     salt: salt,
-    opaque_envelope: envelope
+    opaque_envelope: envelope,
+    tag_name: tagName,
+    color_code: '#007AFF'
   });
   
   // 4. Create first vault and wrapped key
@@ -207,7 +219,7 @@ async function createSecretTag(phrase: string, tagName: string): Promise<string>
   const wrappedKey = aesKeyWrap(Ke, dataKey);
   
   await api.post('/api/v3/wrapped-keys', {
-    tag_id: tagId,
+    tag_id: response.tag_id,  // Use the UUID returned from registration
     vault_id: vaultId,
     wrapped_key: wrappedKey
   });
@@ -225,8 +237,8 @@ async function createSecretTag(phrase: string, tagName: string): Promise<string>
 ```typescript
 async function authenticateSecretPhrase(phrase: string): Promise<AuthResult> {
   try {
-    // 1. Derive tag ID deterministically
-    const tagId = blake2s(phrase, 16);
+    // 1. Derive phrase hash deterministically
+    const phraseHash = blake2s(phrase, 16);
     
     // 2. Start OPAQUE authentication
     const opaque = new OpaqueClient();
@@ -234,7 +246,7 @@ async function authenticateSecretPhrase(phrase: string): Promise<AuthResult> {
     
     const initResponse = await api.post('/api/v3/secret-tags/auth/init', {
       user_id: getCurrentUserId(),
-      tag_id: tagId,
+      phrase_hash: phraseHash,
       client_msg1: credentialRequest
     });
     

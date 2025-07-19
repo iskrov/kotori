@@ -112,7 +112,7 @@ The Vibes application implements a **dual-tag system** combining traditional reg
 
 #### Database Schema
 - **tags**: Regular tags (id, name, color)
-- **secret_tags**: OPAQUE secret tags (tag_id, salt, verifier_kv, opaque_envelope)
+- **secret_tags**: OPAQUE secret tags (id, phrase_hash, salt, verifier_kv, opaque_envelope)
 - **wrapped_keys**: AES-KW wrapped vault keys
 - **vault_blobs**: Encrypted journal entry storage
 - **opaque_sessions**: Authentication session management
@@ -127,48 +127,56 @@ The Vibes application implements a **dual-tag system** combining traditional reg
 ```sql
 -- Secret tags with OPAQUE verifiers (COMPLETE)
 CREATE TABLE secret_tags (
-    tag_id BYTEA(16) PRIMARY KEY,           -- Deterministic from Hash(phrase)
-    user_id UUID NOT NULL,
-    salt BYTEA(16) NOT NULL,                -- Random salt for Argon2id
-    verifier_kv BYTEA(32) NOT NULL,         -- OPAQUE verifier
-    opaque_envelope BYTEA NOT NULL,         -- OPAQUE registration envelope
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),     -- UUID primary key
+    phrase_hash BYTEA(16) NOT NULL UNIQUE,             -- Deterministic from Hash(phrase)
+    user_id UUID NOT NULL REFERENCES users(id),
+    salt BYTEA(16) NOT NULL,                           -- Random salt for Argon2id
+    verifier_kv BYTEA(32) NOT NULL,                    -- OPAQUE verifier
+    opaque_envelope BYTEA NOT NULL,                    -- OPAQUE registration envelope
     tag_name VARCHAR(100) NOT NULL,
     color_code VARCHAR(7) DEFAULT '#007AFF',
     created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT unique_user_secret_tag UNIQUE (user_id, tag_name)
 );
 
 -- Wrapped keys mapping tags to vaults (COMPLETE)
 CREATE TABLE wrapped_keys (
-    id UUID PRIMARY KEY,
-    tag_id BYTEA(16) REFERENCES secret_tags(tag_id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tag_id UUID NOT NULL REFERENCES secret_tags(id) ON DELETE CASCADE,
     vault_id UUID NOT NULL,
     wrapped_key BYTEA(40) NOT NULL,         -- AES-KW wrapped data key
     key_purpose VARCHAR(50) DEFAULT 'vault_data',
-    created_at TIMESTAMP DEFAULT NOW()
+    key_version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Encrypted vault storage (COMPLETE)
 CREATE TABLE vault_blobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vault_id UUID NOT NULL,
     object_id UUID NOT NULL,
+    wrapped_key_id UUID NOT NULL REFERENCES wrapped_keys(id) ON DELETE CASCADE,
     iv BYTEA(12) NOT NULL,                  -- AES-GCM IV
     ciphertext BYTEA NOT NULL,              -- Encrypted content
     auth_tag BYTEA(16) NOT NULL,            -- AES-GCM authentication tag
+    content_type VARCHAR(100) DEFAULT 'application/octet-stream',
     content_size INTEGER NOT NULL,
-    content_type VARCHAR(100),
     created_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (vault_id, object_id)
+    updated_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT unique_vault_object UNIQUE (vault_id, object_id)
 );
 
 -- OPAQUE authentication sessions (COMPLETE)
 CREATE TABLE opaque_sessions (
-    session_id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    tag_id BYTEA(16),
-    session_state VARCHAR(50) NOT NULL,
+    session_id VARCHAR(64) PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    phrase_hash BYTEA(16),
+    session_state VARCHAR(20) NOT NULL DEFAULT 'initialized',
     session_data BYTEA,
     created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
     expires_at TIMESTAMP NOT NULL,
     last_activity TIMESTAMP DEFAULT NOW()
 );
@@ -293,7 +301,7 @@ class VaultService:
 # OPAQUE Key Derivation Schedule (COMPLETE)
 @dataclass(frozen=True)
 class OpaqueKeys:
-    tag_id: bytes          # 16-byte deterministic identifier
+    phrase_hash: bytes     # 16-byte deterministic identifier (BLAKE2s of phrase)
     verification_key: bytes # 32-byte verification key for OPAQUE
     encryption_key: bytes   # 32-byte encryption key for vault
     salt: bytes            # 16-byte salt used for Argon2id
@@ -597,7 +605,7 @@ export class OpaqueClient {
 # backend/app/crypto/key_derivation.py - FULLY IMPLEMENTED
 @dataclass(frozen=True)
 class OpaqueKeys:
-    tag_id: bytes          # 16-byte deterministic identifier (salt-free)
+    phrase_hash: bytes     # 16-byte deterministic identifier (salt-free, BLAKE2s of phrase)
     verification_key: bytes # 32-byte verification key for OPAQUE protocol
     encryption_key: bytes   # 32-byte encryption key for vault operations
     salt: bytes            # 16-byte salt used for Argon2id
@@ -630,7 +638,8 @@ def derive_opaque_keys_from_phrase(password_phrase: str, salt: bytes = None) -> 
 
 -- Secret tags with OPAQUE verifiers
 CREATE TABLE secret_tags (
-    tag_id BYTEA(16) PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    phrase_hash BYTEA(16) NOT NULL UNIQUE,
     user_id UUID NOT NULL REFERENCES users(id),
     salt BYTEA(16) NOT NULL,
     verifier_kv BYTEA(32) NOT NULL,
@@ -638,17 +647,20 @@ CREATE TABLE secret_tags (
     tag_name VARCHAR(100) NOT NULL,
     color_code VARCHAR(7) DEFAULT '#007AFF',
     created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT unique_user_secret_tag UNIQUE (user_id, tag_name)
 );
 
 -- Wrapped keys for vault access
 CREATE TABLE wrapped_keys (
-    id UUID PRIMARY KEY,
-    tag_id BYTEA(16) REFERENCES secret_tags(tag_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tag_id UUID NOT NULL REFERENCES secret_tags(id) ON DELETE CASCADE,
     vault_id UUID NOT NULL,
     wrapped_key BYTEA(40) NOT NULL,
     key_purpose VARCHAR(50) DEFAULT 'vault_data',
-    created_at TIMESTAMP DEFAULT NOW()
+    key_version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Encrypted vault storage
@@ -667,24 +679,27 @@ CREATE TABLE vault_blobs (
 
 -- OPAQUE authentication sessions
 CREATE TABLE opaque_sessions (
-    session_id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    tag_id BYTEA(16),
-    session_state VARCHAR(50) NOT NULL,
+    session_id VARCHAR(64) PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    phrase_hash BYTEA(16),
+    session_state VARCHAR(20) NOT NULL DEFAULT 'initialized',
     session_data BYTEA,
     created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
     expires_at TIMESTAMP NOT NULL,
     last_activity TIMESTAMP DEFAULT NOW()
 );
 
 -- Performance indexes
 CREATE INDEX idx_secret_tags_user_id ON secret_tags(user_id);
-CREATE INDEX idx_secret_tags_tag_lookup ON secret_tags(tag_id);
+CREATE INDEX idx_secret_tags_phrase_hash ON secret_tags(phrase_hash);
 CREATE INDEX idx_wrapped_keys_tag_id ON wrapped_keys(tag_id);
 CREATE INDEX idx_wrapped_keys_vault_id ON wrapped_keys(vault_id);
 CREATE INDEX idx_vault_blobs_vault_id ON vault_blobs(vault_id);
+CREATE INDEX idx_vault_blobs_wrapped_key_id ON vault_blobs(wrapped_key_id);
 CREATE INDEX idx_opaque_sessions_user_id ON opaque_sessions(user_id);
 CREATE INDEX idx_opaque_sessions_expires ON opaque_sessions(expires_at);
+CREATE INDEX idx_opaque_sessions_phrase_hash ON opaque_sessions(phrase_hash);
 ```
 
 ---
