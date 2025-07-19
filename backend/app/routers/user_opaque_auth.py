@@ -11,12 +11,13 @@ import secrets
 import subprocess
 import json
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timedelta, UTC
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+import uuid
 
 from app.dependencies import get_db
 from app.models import User
@@ -118,8 +119,8 @@ class UserLoginFinishResponse(BaseModel):
     user: Dict[str, Any] = Field(..., description="User information")
     token: str = Field(..., description="JWT access token")
     token_type: str = Field(..., description="Token type (bearer)")
-    sessionKey: str = Field(..., description="OPAQUE session key for client-side key derivation")
-    exportKey: str = Field(..., description="OPAQUE export key for client-side key derivation")
+    sessionKey: str = Field(..., description="OPAQUE session key derived by server")
+    exportKey: Optional[str] = Field(None, description="OPAQUE export key (only available client-side)")
     message: str = Field(..., description="Login status message")
 
 def call_opaque_server(operation: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -248,18 +249,37 @@ async def start_user_registration(
         session_id = secrets.token_urlsafe(32)
         expires_at = datetime.now(UTC) + timedelta(minutes=10)  # 10 minute expiration
         
-        # Clean up any existing registration sessions for this user
-        db.query(OpaqueSession).filter(
-            OpaqueSession.user_id == request.userIdentifier,  # Use email as temp user_id
+        # Clean up any existing registration sessions for this user email
+        # Since we don't have a user_id yet, we'll clean up by session_data containing the email
+        existing_sessions = db.query(OpaqueSession).filter(
             OpaqueSession.session_state == 'registration_started'
-        ).delete()
+        ).all()
         
-        # Create new registration session to store the name
+        # Remove sessions where the session_data contains this email
+        for session in existing_sessions:
+            try:
+                if session.session_data:
+                    session_data = json.loads(session.session_data.decode('utf-8'))
+                    if session_data.get('email') == request.userIdentifier:
+                        db.delete(session)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # Skip invalid session data
+                continue
+        
+        # Create new registration session to store the registration data
+        # We'll use a placeholder UUID for user_id during registration
+        temp_user_id = uuid.uuid4()
+        session_data = {
+            'email': request.userIdentifier,
+            'name': request.name,
+            'temp_user_id': str(temp_user_id)
+        }
+        
         opaque_session = OpaqueSession(
             session_id=session_id,
-            user_id=request.userIdentifier,  # Use email as temp user_id
+            user_id=temp_user_id,  # Use temporary UUID
             session_state='registration_started',
-            session_data=request.name.encode('utf-8'),  # Store the name
+            session_data=json.dumps(session_data).encode('utf-8'),
             expires_at=expires_at
         )
         db.add(opaque_session)
@@ -300,15 +320,27 @@ async def finish_user_registration(
             )
         
         # Retrieve the stored name from the registration session
-        opaque_session = db.query(OpaqueSession).filter(
-            OpaqueSession.user_id == request.userIdentifier,
+        # Since we used a temporary UUID during registration, we need to find the session by email in session_data
+        registration_sessions = db.query(OpaqueSession).filter(
             OpaqueSession.session_state == 'registration_started',
             OpaqueSession.expires_at > datetime.now(UTC)
-        ).first()
+        ).all()
+        
+        opaque_session = None
+        for session in registration_sessions:
+            try:
+                if session.session_data:
+                    session_data = json.loads(session.session_data.decode('utf-8'))
+                    if session_data.get('email') == request.userIdentifier:
+                        opaque_session = session
+                        break
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
         
         # Use stored name if available, otherwise fall back to email prefix
         if opaque_session and opaque_session.session_data:
-            full_name = opaque_session.session_data.decode('utf-8')
+            session_data = json.loads(opaque_session.session_data.decode('utf-8'))
+            full_name = session_data.get('name', request.userIdentifier.split('@')[0])
         else:
             full_name = request.userIdentifier.split('@')[0]  # Fallback to email prefix
         
@@ -454,6 +486,13 @@ async def finish_user_login(
             'serverLoginState': server_login_state
         })
         
+        # Ensure we got a sessionKey from the server
+        if not result.get('sessionKey'):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="OPAQUE server did not return sessionKey"
+            )
+        
         # Clean up the temporary login state
         db.delete(opaque_session)
         db.commit()
@@ -477,8 +516,8 @@ async def finish_user_login(
             },
             token=access_token,  # JWT token for API authentication
             token_type="bearer",
-            sessionKey=result.get('sessionKey'),  # The OPAQUE session key for client-side key derivation
-            exportKey=result.get('exportKey'),  # The OPAQUE export key for client-side key derivation
+            sessionKey=result['sessionKey'],  # The OPAQUE session key derived by the server
+            exportKey=None,  # Export key is only available on the client side
             message="Login successful"
         )
         

@@ -12,7 +12,7 @@ class User(Base, TimestampMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=True)  # Nullable for OAuth users
+    hashed_password = Column(String(500), nullable=True)  # Nullable for OAuth users, longer for OPAQUE records
     
     # Personal Information Fields
     first_name = Column(String(100), nullable=True)

@@ -29,8 +29,8 @@ def get_db() -> Generator:
     This function now uses the session factory pattern for proper
     test isolation while maintaining backward compatibility.
     """
-    # Use the factory-based get_db function
-    return factory_get_db()
+    # Use the factory-based get_db function - yield from the generator
+    yield from factory_get_db()
 
 
 # Backward compatibility functions
