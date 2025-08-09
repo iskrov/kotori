@@ -1,5 +1,5 @@
 """
-Authentication routes for the Vibes application.
+Authentication routes for the Kotori application.
 
 This module provides endpoints for user authentication, registration, and session management.
 It includes support for both traditional email/password authentication and OPAQUE protocol

@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import MainTabNavigator from './MainTabNavigator';
 import RecordScreen from '../screens/main/RecordScreen';
 import TagManagementScreen from '../screens/main/TagManagementScreen';
+import { areSecretTagsEnabled } from '../config/featureFlags';
 import TagDeleteConfirmationScreen from '../screens/main/TagDeleteConfirmationScreen';
 import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
 
@@ -32,14 +33,16 @@ const MainNavigator = () => {
           headerShown: false,
         }}
       />
-      <Stack.Screen
-        name="TagManagement"
-        component={TagManagementScreen}
-        options={{
-          presentation: 'modal',
-          headerShown: false,
-        }}
-      />
+      {areSecretTagsEnabled() && (
+        <Stack.Screen
+          name="TagManagement"
+          component={TagManagementScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+          }}
+        />
+      )}
       <Stack.Screen
         name="TagDeleteConfirmation"
         component={TagDeleteConfirmationScreen}

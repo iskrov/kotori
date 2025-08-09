@@ -9,9 +9,9 @@ const getApiUrl = () => {
   const ENV = process.env.NODE_ENV || 'development';
   
   if (ENV === 'production') {
-    return 'https://vibes-api.example.com';
+    return 'https://api.kotori.io';
   } else if (ENV === 'staging') {
-    return 'https://staging-vibes-api.example.com';
+    return 'https://staging.api.kotori.io';
   } else {
     // Local development - use local IP for the backend
     const apiUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8001';
@@ -31,12 +31,16 @@ export const api = axios.create({
   withCredentials: true, 
 });
 
-// Debug axios configuration
-console.log('API Config:', {
-  baseURL: getApiUrl(),
-  withCredentials: true,
-  defaultHeaders: api.defaults.headers
-});
+// Debug axios configuration (guarded to avoid test-time undefined access)
+try {
+  console.log('API Config:', {
+    baseURL: getApiUrl(),
+    withCredentials: true,
+    defaultHeaders: (api && api.defaults && api.defaults.headers) ? api.defaults.headers : undefined
+  });
+} catch (e) {
+  // Ignore logging failures in non-browser test environments
+}
 
 // Add specific debug configuration for handling PUT requests
 api.interceptors.request.use(
@@ -165,8 +169,8 @@ api.interceptors.response.use(
         
         // Traditional authentication - attempt token refresh
         logger.info('Attempting token refresh');
-        logger.info(`Calling /api/auth/refresh with refresh token: ${refreshToken ? refreshToken.substring(0, 10) + '...' : 'null'}`);
-        const response = await axios.post(`${getApiUrl()}/api/auth/refresh`, {
+        logger.info(`Calling /api/v1/auth/refresh with refresh token: ${refreshToken ? refreshToken.substring(0, 10) + '...' : 'null'}`);
+        const response = await axios.post(`${getApiUrl()}/api/v1/auth/refresh`, {
           refresh_token: refreshToken,
         });
         
@@ -281,18 +285,22 @@ const logout = async () => {
 
 // API endpoint functions
 
-// Auth
+// Auth - Dual Authentication System (OAuth + OPAQUE)
 export const AuthAPI = {
+  // Legacy password login - deprecated, use OPAQUE instead
   login: (email: string, password: string) => 
     api.post('/api/auth/login/json', { email, password }),
   
+  // Legacy password register - deprecated, use OPAQUE instead  
   register: (name: string, email: string, password: string) => 
     api.post('/api/auth/register', { name, email, password }),
   
+  // OAuth Google Authentication (V1)
   googleAuth: (idToken: string) => 
-    api.post('/api/auth/google', { id_token: idToken }),
+    api.post('/api/v1/auth/google', { id_token: idToken }),
   
-  logout: () => api.post('/api/auth/logout'),
+  // Logout (V1)
+  logout: () => api.post('/api/v1/auth/logout'),
 };
 
 // User profile
@@ -332,15 +340,16 @@ export const UserAPI = {
 // Journal entries
 export const JournalAPI = {
   getEntries: (params: any) => 
-    api.get('/api/journals', { params }),
+    api.get('/api/v1/journals', { params }),
   
-  getEntry: (id: number) => 
-    api.get(`/api/journals/${id}`),
+  getEntry: (id: string) => 
+    api.get(`/api/v1/journals/${id}`),
   
+  // Use trailing slash for POST to avoid 405 due to strict slash matching
   createEntry: (data: JournalEntryCreate) => 
-    api.post('/api/journals', data),
+    api.post('/api/v1/journals/', data),
 
-  // Enhanced method for creating encrypted secret tag entries
+  // Enhanced method for creating encrypted secret tag entries (legacy secret tags)
   createEncryptedEntry: (data: {
     title?: string;
     encrypted_content: string;    // Base64 encrypted content
@@ -354,14 +363,14 @@ export const JournalAPI = {
     tags?: string[];
     secret_tag_id?: string;       // Secret tag ID
     secret_tag_hash?: string;     // Secret tag hash for server filtering
-  }) => api.post('/api/journals/', {
+  }) => api.post('/api/journals', {
     title: data.title || '',
     content: "",  // No plaintext content for secret tag entries
     encrypted_content: data.encrypted_content,
     encryption_iv: data.iv,
     encryption_salt: data.salt,
     encrypted_key: data.encrypted_key,
-    key_derivation_iterations: 100000,  // Default iterations
+    key_derivation_iterations: 100000,  // Default iterations (legacy)
     encryption_algorithm: data.algorithm,
     encryption_wrap_iv: data.wrapIv,
     entry_date: data.entry_date || new Date().toISOString(),
@@ -371,14 +380,14 @@ export const JournalAPI = {
     secret_tag_hash: data.secret_tag_hash,
   }),
   
-  updateEntry: (id: number, data: JournalEntryUpdate) => 
-    api.put(`/api/journals/${id}`, data),
+  updateEntry: (id: string, data: JournalEntryUpdate) => 
+    api.put(`/api/v1/journals/${id}`, data),
   
-  deleteEntry: (id: number) => 
-    api.delete(`/api/journals/${id}`),
+  deleteEntry: (id: string) => 
+    api.delete(`/api/v1/journals/${id}`),
   
   searchEntries: (query: string) => 
-    api.get('/api/journals/search', { params: { q: query } }),
+    api.get('/api/v1/journals/search', { params: { q: query } }),
 
   // Get entries by secret tag (for specific tag filtering)
   getEntriesBySecretTag: (secretTagHash: string, params?: { skip?: number, limit?: number }) =>
@@ -405,26 +414,26 @@ export const ReminderAPI = {
 
 // Tags
 export const TagsAPI = {
-  getTags: () => api.get('/api/journals/tags'),
+  getTags: () => api.get('/api/tags'),
   
-  getRecentTags: (limit: number = 5) => api.get('/api/journals/tags/recent', { params: { limit } }),
+  getRecentTags: (limit: number = 5) => api.get('/api/tags/recent', { params: { limit } }),
   
-  getEntriesByTag: (tagName: string) => api.get(`/api/journals/tags/${tagName}/entries`),
+  getEntriesByTag: (tagName: string) => api.get(`/api/tags/${tagName}/entries`),
   
   createTag: async (tag: { name: string; color?: string }) => {
-    const response = await api.post('/api/journals/tags', tag);
+    const response = await api.post('/api/tags', tag);
     return response.data;
   },
   
   updateTag: async (id: string, updates: Partial<Tag>) => {
-    const response = await api.put(`/api/journals/tags/${id}`, updates);
+    const response = await api.put(`/api/tags/${id}`, updates);
     return response.data;
   },
   
   deleteTag: async (id: string) => {
     logger.info(`API: Attempting to delete tag with ID: ${id}`);
-    logger.info(`API: DELETE request to: /api/journals/tags/${id}`);
-    const response = await api.delete(`/api/journals/tags/${id}`);
+    logger.info(`API: DELETE request to: /api/tags/${id}`);
+    const response = await api.delete(`/api/tags/${id}`);
     logger.info(`API: Delete tag response:`, response.data);
     return response.data;
   },
@@ -448,7 +457,7 @@ export const TranscriptionAPI = {
 export const SecretTagAPI = {
   delete: (tagId: string) => {
     logger.info(`Sending API request to delete secret tag: ${tagId}`);
-    return api.delete(`/api/secret-tags/${tagId}`);
+    return api.delete(`/api/v1/secret-tags/${tagId}`);
   },
 };
 

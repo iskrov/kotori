@@ -17,13 +17,31 @@ export class OpaqueKeyManager {
   private exportKey: Uint8Array | null = null;
   private derivedKeys: Map<string, Uint8Array> = new Map();
 
+  private decodeBase64ToBytes(data: string): Uint8Array {
+    // Accept both base64 and base64url encodings
+    const normalized = data.replace(/-/g, '+').replace(/_/g, '/');
+    const padLen = normalized.length % 4 === 0 ? 0 : 4 - (normalized.length % 4);
+    const padded = normalized + '='.repeat(padLen);
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
   /**
    * Initialize the key manager with OPAQUE session result
    * @param sessionResult Result from successful OPAQUE login
    */
   public initialize(sessionResult: OpaqueSessionResult): void {
-    this.sessionKey = sessionResult.sessionKey;
-    this.exportKey = sessionResult.exportKey;
+    // sessionKey/exportKey may arrive as base64(url)-encoded strings from the OPAQUE client.
+    // Normalize to Uint8Array for WebCrypto.
+    const { sessionKey, exportKey } = sessionResult as unknown as {
+      sessionKey: string | Uint8Array;
+      exportKey: string | Uint8Array;
+    };
+
+    this.sessionKey = typeof sessionKey === 'string' ? this.decodeBase64ToBytes(sessionKey) : sessionKey;
+    this.exportKey = typeof exportKey === 'string' ? this.decodeBase64ToBytes(exportKey) : exportKey;
     this.derivedKeys.clear();
     
     logger.info('OPAQUE key manager initialized', {

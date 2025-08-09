@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 from uuid import UUID
 import logging
 
-from app.api.dependencies import get_current_user, get_db
+from app.dependencies import get_current_user, get_db
 from app.models.user import User
 from app.schemas.journal import (
     JournalEntry,
@@ -19,6 +19,7 @@ from app.schemas.journal import (
     JournalEntryCountResponse
 )
 from app.services.journal_service import journal_service
+from app.core.config import settings
 from app.services.entry_processor import EntryProcessingError
 
 router = APIRouter()
@@ -39,23 +40,22 @@ async def create_journal_entry(
     - Leave content field empty (content should be encrypted client-side)
     """
     try:
-        # Validate hidden entry requirements
-        if hasattr(entry, 'is_hidden') and entry.is_hidden:
-            if not entry.encrypted_content or not entry.encryption_iv:
+        # Validate encrypted vs plaintext payload
+        if entry.encrypted_content:
+            if not entry.encryption_iv:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Hidden entries must include encrypted_content and encryption_iv"
+                    detail="Encrypted entries must include encryption_iv"
                 )
-            if entry.content:
-                logger.warning("Hidden entry contains content field - will be ignored")
-                entry.content = ""  # Clear content for hidden entries
-        
-        # Validate regular entry requirements
-        elif not entry.content:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Regular entries must include content"
-            )
+            # Ensure server never stores plaintext when encrypted payload provided
+            entry.content = ""
+        else:
+            # For plaintext entries ensure content present
+            if not entry.content:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Entry must include content or encrypted_content"
+                )
         
         db_entry = journal_service.create_with_user(
             db=db, 
@@ -99,6 +99,9 @@ async def create_journal_entry_with_phrase_detection(
         Either a regular JournalEntry or SecretPhraseAuthResponse with encrypted entries
     """
     try:
+        # If secret tags are disabled globally, bypass phrase detection regardless of query param
+        if not settings.ENABLE_SECRET_TAGS:
+            detect_phrases = False
         # Get client IP address for rate limiting
         client_ip = getattr(request.client, 'host', None) if request.client else None
         
@@ -265,20 +268,23 @@ async def get_journal_entry(
 ):
     """Get a specific journal entry by ID."""
     try:
-        entry = journal_service.get_journal_entry_by_id(
-            db=db,
-            entry_id=entry_id,
-            user_id=current_user.id
-        )
-        
-        if not entry:
+        # Load DB entry and verify ownership
+        db_entry = journal_service.get(db, id=entry_id)
+        if not db_entry or db_entry.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Journal entry not found"
             )
-        
-        return entry
-        
+
+        # Return as schema with encrypted fields encoded for client
+        entry_schema = journal_service.get_schema(db, id=entry_id)
+        if not entry_schema:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Journal entry not found"
+            )
+        return entry_schema
+
     except HTTPException:
         raise
     except Exception as e:
@@ -299,24 +305,31 @@ async def update_journal_entry(
     """
     Update a journal entry.
     
-    For hidden entries being updated with new content:
-    - Provide new encrypted_content, encryption_iv, and optionally encryption_salt
-    - Leave content field empty or None
+    For encrypted entries being updated with new content:
+    - Provide encrypted_content, encryption_iv, and optional wrapped_key/wrap_iv
+    - Leave content empty or None
     """
     try:
-        # Validate hidden entry updates
-        if entry_update.is_hidden is True:
-            if entry_update.encrypted_content and not entry_update.encryption_iv:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Hidden entries with new content must include encryption_iv"
-                )
+        # Validate encrypted entry updates
+        if entry_update.encrypted_content and not entry_update.encryption_iv:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Encrypted entries with new content must include encryption_iv"
+            )
         
-        updated_entry = journal_service.update_journal_entry(
+        # Load the existing entry and verify ownership
+        db_entry = journal_service.get(db, id=entry_id)
+        if not db_entry or db_entry.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Journal entry not found"
+            )
+
+        # Perform the update using the service's update method
+        updated_entry = journal_service.update(
             db=db,
-            entry_id=entry_id,
-            user_id=current_user.id,
-            entry_update=entry_update
+            db_obj=db_entry,
+            obj_in=entry_update
         )
         
         if not updated_entry:

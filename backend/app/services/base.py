@@ -47,15 +47,21 @@ class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db_obj: ModelType,
         obj_in: UpdateSchemaType | dict[str, Any],
     ) -> ModelType:
-        """Update a record"""
-        obj_data = jsonable_encoder(db_obj)
+        """Update a record without encoding model bytes (avoids utf-8 decode of binary fields)."""
         if isinstance(obj_in, dict):
-            update_data = obj_in
+            update_data: dict[str, Any] = obj_in
         else:
-            update_data = obj_in.dict(exclude_unset=True)
-        for field in obj_data:
-            if field in update_data:
-                setattr(db_obj, field, update_data[field])
+            # Support Pydantic v2 (model_dump) and v1 (dict)
+            update_data = (
+                obj_in.model_dump(exclude_unset=True)  # type: ignore[attr-defined]
+                if hasattr(obj_in, "model_dump")
+                else obj_in.dict(exclude_unset=True)  # type: ignore[attr-defined]
+            )
+
+        for field, value in update_data.items():
+            if hasattr(db_obj, field):
+                setattr(db_obj, field, value)
+
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)

@@ -1,5 +1,5 @@
 """
-User routes for the Vibes application.
+User routes for the Kotori application.
 
 This module provides endpoints for user management including profile management,
 user settings, user information retrieval, subscription management, security features,

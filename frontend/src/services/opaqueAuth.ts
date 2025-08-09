@@ -159,6 +159,14 @@ export class OpaqueAuthService {
 
       const { clientRegistrationState, password } = JSON.parse(storedState);
 
+      // Add detailed logging for debugging
+      logger.info('Retrieved stored registration state', { 
+        userIdentifier,
+        clientRegistrationStateLength: clientRegistrationState?.length,
+        registrationResponseLength: registrationResponse?.length,
+        passwordLength: password?.length
+      });
+
       // Complete registration
       const { registrationRecord } = opaque.client.finishRegistration({
         clientRegistrationState,
@@ -308,21 +316,28 @@ export class OpaqueAuthService {
       const { registrationRequest } = await this.startRegistration(password, email);
 
       // Step 2: Send registration request to server
-      const response = await api.post('/api/auth/opaque/register/start', {
+      const response = await api.post('/api/v1/auth/register/start', {
         userIdentifier: email,
-        registrationRequest,
+        opaque_registration_request: registrationRequest,
         name
       });
 
-      const { registrationResponse } = response.data;
+      const { opaque_registration_response: registrationResponse } = response.data;
 
       // Step 3: Finish registration
       const registrationRecord = await this.finishRegistration(email, registrationResponse);
 
       // Step 4: Send registration record to server
-      await api.post('/api/auth/opaque/register/finish', {
+      await api.post('/api/v1/auth/register/finish', {
+        session_id: response.data.session_id,
         userIdentifier: email,
-        registrationRecord
+        opaque_registration_record: registrationRecord
+      });
+
+      logger.info('Registration record sent to server', { 
+        email, 
+        registrationRecordLength: registrationRecord.length,
+        registrationRecordSample: registrationRecord.substring(0, 50) + '...'
       });
 
       logger.info('OPAQUE registration flow completed successfully');
@@ -344,25 +359,26 @@ export class OpaqueAuthService {
 
       // Start login process
       const startResult = await this.startLogin(password, email);
-      const loginResponse = await api.post('/api/auth/opaque/login/start', {
+      const loginResponse = await api.post('/api/v1/auth/login/start', {
         userIdentifier: email,
-        loginRequest: startResult.loginRequest,
+        client_credential_request: startResult.loginRequest,
       });
 
-      if (!loginResponse.data?.loginResponse) {
+      if (!loginResponse.data?.server_credential_response) {
         throw new Error('Invalid login response from server');
       }
 
       // Finish login process
-      const sessionResult = await this.finishLogin(email, loginResponse.data.loginResponse);
+      const sessionResult = await this.finishLogin(email, loginResponse.data.server_credential_response);
       
       // Send finish login request to server
-      const finishResponse = await api.post('/api/auth/opaque/login/finish', {
+      const finishResponse = await api.post('/api/v1/auth/login/finish', {
+        session_id: loginResponse.data.session_id,
         userIdentifier: email,
-        finishLoginRequest: sessionResult.finishLoginRequest,
+        client_credential_finalization: sessionResult.finishLoginRequest,
       });
 
-      if (!finishResponse.data?.token) {
+      if (!finishResponse.data?.access_token) {
         throw new Error('Invalid finish login response from server');
       }
 
@@ -371,7 +387,7 @@ export class OpaqueAuthService {
       return {
         success: true,
         user: finishResponse.data.user,
-        token: finishResponse.data.token,
+        token: finishResponse.data.access_token,
         sessionKey: sessionResult.sessionKey,
         exportKey: sessionResult.exportKey,
       };

@@ -6,7 +6,7 @@
  */
 
 import { OpaqueClient } from './crypto/OpaqueClient';
-import { sessionManager } from './SessionManager';
+// SessionManager was archived; use SessionStorageManager for initialization
 import { voicePhraseDetector } from './VoicePhraseDetector';
 import { sessionStorageManager } from './SessionStorageManager';
 import logger from '../utils/logger';
@@ -66,7 +66,7 @@ export class OpaqueTagManager {
 
       // Initialize dependencies
       await this.opaqueClient.initialize();
-      await sessionManager.initialize();
+      await sessionStorageManager.initialize();
 
       // Load existing analytics events
       await this.loadAnalyticsEvents();

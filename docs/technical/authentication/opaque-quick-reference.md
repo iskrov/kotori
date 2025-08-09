@@ -1,174 +1,301 @@
-# OPAQUE Authentication Quick Reference
+# OPAQUE Authentication Quick Reference (Dual Authentication System)
 
 ## API Endpoints
 
-### Registration
-```bash
-# Start Registration
-POST /api/auth/opaque/register/start
-{
-  "userIdentifier": "user@example.com",
-  "registrationRequest": "base64_encoded_request",
-  "name": "User Full Name"
-}
+### User Authentication (Dual Methods)
 
-# Finish Registration  
-POST /api/auth/opaque/register/finish
+#### OAuth Authentication (Google Sign-in)
+```bash
+# Google OAuth Login
+POST /api/v1/auth/google
 {
-  "userIdentifier": "user@example.com",
-  "registrationRecord": "base64_encoded_record"
+  "token": "google_id_token"
 }
 ```
 
-### Authentication
+#### OPAQUE User Authentication
 ```bash
-# Start Login
-POST /api/auth/opaque/login/start
+# Start User Registration
+POST /api/v1/auth/register/start
 {
-  "userIdentifier": "user@example.com", 
-  "loginRequest": "base64_encoded_request"
+  "email": "user@example.com",
+  "opaque_registration_request": "base64_encoded_request"
 }
 
-# Finish Login
-POST /api/auth/opaque/login/finish
+# Finish User Registration  
+POST /api/v1/auth/register/finish
 {
-  "userIdentifier": "user@example.com",
-  "finishLoginRequest": "base64_encoded_request"
+  "email": "user@example.com",
+  "opaque_registration_record": "base64_encoded_record"
+}
+
+# Start User Login
+POST /api/v1/auth/login/start
+{
+  "email": "user@example.com", 
+  "client_credential_request": "base64_encoded_request"
+}
+
+# Finish User Login
+POST /api/v1/auth/login/finish
+{
+  "session_id": "session_uuid",
+  "client_credential_response": "base64_encoded_response"
 }
 ```
 
-### Status Check
+### Secret Tag Authentication (Always OPAQUE)
 ```bash
-GET /api/auth/opaque/status
+# Start Secret Tag Registration
+POST /api/v1/secret-tags/register/start
+Authorization: Bearer ${access_token}
+{
+  "tag_handle": [1,2,3,...32 bytes],
+  "tag_name": "My Secret Tag",
+  "color": "#FF5733",
+  "opaque_registration_request": "base64_encoded_request"
+}
+
+# Finish Secret Tag Registration
+POST /api/v1/secret-tags/register/finish
+Authorization: Bearer ${access_token}
+{
+  "session_id": "session_uuid",
+  "opaque_registration_record": "base64_encoded_record"
+}
+
+# Start Secret Tag Authentication
+POST /api/v1/secret-tags/{tag_id}/auth/start
+Authorization: Bearer ${access_token}
+{
+  "client_credential_request": "base64_encoded_request"
+}
+
+# Finish Secret Tag Authentication
+POST /api/v1/secret-tags/{tag_id}/auth/finish
+Authorization: Bearer ${access_token}
+{
+  "session_id": "session_uuid",
+  "client_credential_response": "base64_encoded_response"
+}
+```
+
+### Token Management
+```bash
+# Refresh Access Token
+POST /api/v1/auth/refresh
+Authorization: Bearer ${refresh_token}
+
+# Logout
+POST /api/v1/auth/logout
+Authorization: Bearer ${access_token}
+```
+
+### Health Check
+```bash
+GET /health/opaque
 # Returns: {"opaque_enabled": true, "supported_features": {...}}
 ```
 
 ## Client-Side OPAQUE Operations
 
-### Registration Flow
+### User Registration Flow
 ```javascript
 // 1. Start registration
 const { clientRegistrationState, registrationRequest } = 
-  opaque.client.startRegistration({ password });
+  opaque.client.startRegistration({ password: userPassword });
 
-// 2. Send registrationRequest to server, get registrationResponse
-
-// 3. Finish registration
-const { registrationRecord } = opaque.client.finishRegistration({
-  clientRegistrationState,
-  registrationResponse, 
-  password
+const startResponse = await fetch('/api/v1/auth/register/start', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    email: userEmail,
+    opaque_registration_request: registrationRequest
+  })
 });
 
-// 4. Send registrationRecord to server
+// 2. Complete registration
+const { registrationRecord } = opaque.client.finishRegistration({
+  clientRegistrationState,
+  registrationResponse: startResponse.opaque_registration_response,
+  password: userPassword
+});
+
+const finishResponse = await fetch('/api/v1/auth/register/finish', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    email: userEmail,
+    opaque_registration_record: registrationRecord
+  })
+});
 ```
 
-### Login Flow
+### User Login Flow
 ```javascript
 // 1. Start login
 const { clientLoginState, startLoginRequest } = 
-  opaque.client.startLogin({ password });
+  opaque.client.startLogin({ password: userPassword });
 
-// 2. Send startLoginRequest to server, get loginResponse
-
-// 3. Finish login
-const clientResult = opaque.client.finishLogin({
-  clientLoginState,
-  loginResponse,
-  password
+const startResponse = await fetch('/api/v1/auth/login/start', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    email: userEmail,
+    client_credential_request: startLoginRequest
+  })
 });
 
-// clientResult contains:
-// - finishLoginRequest (send to server)
-// - sessionKey (86 chars, matches server)
-// - exportKey (86 chars, client-only)
-// - serverStaticPublicKey
+// 2. Complete login
+const finishLoginRequest = opaque.client.finishLogin({
+  clientLoginState,
+  loginResponse: startResponse.server_credential_response,
+  password: userPassword
+});
 
-// 4. Send finishLoginRequest to server, get JWT token
+const finishResponse = await fetch('/api/v1/auth/login/finish', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    session_id: startResponse.session_id,
+    client_credential_response: finishLoginRequest
+  })
+});
+```
+
+### Secret Tag Operations
+```javascript
+// Secret tag registration
+const tagHandle = crypto.getRandomValues(new Uint8Array(32));
+const { clientRegistrationState, registrationRequest } = 
+  opaque.client.startRegistration({ password: secretPhrase });
+
+const startResponse = await fetch('/api/v1/secret-tags/register/start', {
+  method: 'POST',
+  headers: { 
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    tag_handle: Array.from(tagHandle),
+    tag_name: "My Secret Tag",
+    color: "#FF5733",
+    opaque_registration_request: registrationRequest
+  })
+});
+
+// Secret tag authentication
+const { clientLoginState, startLoginRequest } = 
+  opaque.client.startLogin({ password: secretPhrase });
+
+const authResponse = await fetch(`/api/v1/secret-tags/${tagId}/auth/start`, {
+  method: 'POST',
+  headers: { 
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    client_credential_request: startLoginRequest
+  })
+});
 ```
 
 ## Database Schema
 
-### Users Table
+### Users Table (Dual Authentication)
 ```sql
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  full_name VARCHAR(255) NOT NULL,
-  hashed_password VARCHAR(500) NOT NULL,  -- OPAQUE registration record
-  is_active BOOLEAN DEFAULT true,
-  is_superuser BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email CITEXT UNIQUE NOT NULL,
+    
+    -- OAuth authentication
+    google_id TEXT UNIQUE NULL,
+    
+    -- OPAQUE authentication  
+    opaque_envelope BYTEA NULL,
+    
+    -- Secret tag preferences
+    show_secret_tag_names BOOLEAN NOT NULL DEFAULT TRUE,
+    
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraint: exactly one authentication method
+    CONSTRAINT user_auth_method CHECK (
+        (google_id IS NOT NULL AND opaque_envelope IS NULL) OR
+        (google_id IS NULL AND opaque_envelope IS NOT NULL)
+    )
 );
 ```
 
-### OPAQUE Sessions Table
+### Secret Tags Table
 ```sql
-CREATE TABLE opaque_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id VARCHAR(255),  -- Temporary UUID during registration
-  session_data BYTEA,    -- Encrypted session state
-  session_state VARCHAR(50) NOT NULL,  -- 'registration_started' | 'login_started'
-  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE secret_tags (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tag_handle BYTEA(32) UNIQUE NOT NULL,
+    opaque_envelope BYTEA NOT NULL,
+    tag_name TEXT NOT NULL,
+    color TEXT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-## Common Error Codes
+## Common Errors
 
 | Error | Cause | Solution |
-|-------|--------|----------|
-| `User already exists` | Email already registered | Use different email or login instead |
-| `Invalid credentials` | User doesn't exist or wrong password | Check email/password |
-| `No active login session` | Session expired or missing | Restart login flow |
-| `base64 decoding failed` | Invalid OPAQUE data format | Check client OPAQUE library usage |
-| `value too long for type` | Database field too small | Ensure hashed_password is VARCHAR(500) |
-| `OPAQUE server did not return sessionKey` | Server OPAQUE operation failed | Check server setup and logs |
+|-------|-------|----------|
+| `400 Bad Request` | Invalid OPAQUE request format | Check base64 encoding and client library |
+| `401 Unauthorized` | Authentication failed | Verify credentials and token validity |
+| `409 Conflict` | User/tag already exists | Use different email or tag name |
+| `422 Unprocessable Entity` | Invalid input format | Validate email format and required fields |
 
 ## Testing Commands
 
-### Complete Flow Test
 ```bash
-# Test with curl (replace base64 data with real OPAQUE output)
-curl -X POST http://localhost:8001/api/auth/opaque/register/start \
+# Test OPAQUE service health
+curl http://localhost:8001/health/opaque
+
+# Test user registration
+curl -X POST http://localhost:8001/api/v1/auth/register/start \
   -H "Content-Type: application/json" \
-  -d '{"userIdentifier":"test@example.com","registrationRequest":"dGVzdA==","name":"Test User"}'
+  -d '{"email":"test@example.com","opaque_registration_request":"dGVzdA=="}'
+
+# Test OAuth authentication
+curl -X POST http://localhost:8001/api/v1/auth/google \
+  -H "Content-Type: application/json" \
+  -d '{"token":"google_id_token_here"}'
+
+# Test secret tag creation
+curl -X POST http://localhost:8001/api/v1/secret-tags/register/start \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"tag_handle":[1,2,3],"tag_name":"Test Tag","opaque_registration_request":"dGVzdA=="}'
 ```
 
-### Database Verification
+## Database Queries
+
 ```sql
--- Check user creation
-SELECT email, length(hashed_password), created_at FROM users WHERE email = 'test@example.com';
+-- Check user authentication methods
+SELECT email, 
+       CASE 
+         WHEN google_id IS NOT NULL THEN 'OAuth'
+         WHEN opaque_envelope IS NOT NULL THEN 'OPAQUE'
+         ELSE 'Invalid'
+       END as auth_method,
+       created_at 
+FROM users;
+
+-- Check secret tags
+SELECT u.email, st.tag_name, st.color, 
+       encode(st.tag_handle, 'hex') as tag_handle_hex
+FROM secret_tags st
+JOIN users u ON st.user_id = u.id;
 
 -- Check active sessions
-SELECT session_state, expires_at FROM opaque_sessions WHERE expires_at > NOW();
-
--- Clean up test data
-DELETE FROM users WHERE email LIKE 'test%@example.com';
-DELETE FROM opaque_sessions WHERE expires_at < NOW();
-```
-
-## Environment Variables
-
-```bash
-# Required
-OPAQUE_SERVER_SETUP=<171_character_base64_string>
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/vibes_db
-
-# JWT
-JWT_SECRET_KEY=<your_secret_key>
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-```
-
-## Key Security Notes
-
-1. **Never log passwords or OPAQUE intermediate states**
-2. **Always use HTTPS in production**
-3. **Session keys match verification**: `clientSessionKey === serverSessionKey`
-4. **Export key is client-only**: Server never has access to exportKey
-5. **Registration record is opaque**: Cannot be reversed to get password
-6. **Session expiration**: Temporary sessions expire after 24 hours 
+SELECT ts.id, u.email, st.tag_name, ts.created_at
+FROM tag_sessions ts
+JOIN users u ON ts.user_id = u.id  
+JOIN secret_tags st ON ts.tag_id = st.id
+WHERE ts.created_at > NOW() - INTERVAL '15 minutes';
+``` 

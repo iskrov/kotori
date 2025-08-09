@@ -35,7 +35,8 @@ from ..schemas.journal import (
     SecretTagJournalEntry, JournalEntryCreateResponse
 )
 from ..services.phrase_processor import SecretPhraseProcessor, create_phrase_processor
-from ..services.opaque_service import create_opaque_service
+from ..core.config import settings
+# Legacy opaque_service import removed - now using V1 clean implementation
 from ..services.vault_service import VaultService
 from ..services.journal_service import journal_service
 from ..utils.performance_monitor import get_performance_monitor, time_operation
@@ -120,7 +121,7 @@ class EntryProcessor:
         """Initialize the entry processor with required services"""
         self.db = db
         self.phrase_processor = create_phrase_processor(db)
-        self.opaque_service = create_opaque_service(db)
+        # Legacy opaque_service creation removed - now using V1 clean implementation
         self.vault_service = VaultService(db)
         self.performance_monitor = get_performance_monitor()
         self.rate_limiter = get_rate_limiter()
@@ -177,16 +178,16 @@ class EntryProcessor:
             # Stage 1: Validation and rate limiting
             await self._validate_entry_request(context)
             
-            # Stage 2: Phrase detection (if enabled)
-            if detect_phrases and self.enable_phrase_detection:
+            # Stage 2: Phrase detection (if enabled and globally allowed)
+            if settings.ENABLE_SECRET_TAGS and detect_phrases and self.enable_phrase_detection:
                 await self._detect_secret_phrases(context)
             
-            # Stage 3: Authentication (if phrases detected)
-            if context.detected_phrases:
+            # Stage 3: Authentication (if phrases detected and globally allowed)
+            if settings.ENABLE_SECRET_TAGS and context.detected_phrases:
                 await self._authenticate_secret_phrases(context)
             
             # Stage 4: Process based on authentication results
-            if context.authenticated_tags:
+            if settings.ENABLE_SECRET_TAGS and context.authenticated_tags:
                 # Has authenticated secret tags - create secret entry
                 return await self._create_secret_entry(context)
             else:
@@ -259,6 +260,11 @@ class EntryProcessor:
         
         try:
             with time_operation("phrase_detection"):
+                # Global feature gate
+                if not settings.ENABLE_SECRET_TAGS:
+                    context.detected_phrases = []
+                    logger.info("Secret tags disabled: skipping phrase detection")
+                    return
                 # Use phrase processor for detection
                 detected_phrases = self.phrase_processor.extract_normalized_phrases(
                     context.entry_request.content
@@ -286,7 +292,7 @@ class EntryProcessor:
         """Authenticate detected secret phrases using OPAQUE"""
         context.current_stage = ProcessingStage.AUTHENTICATION
         
-        if not context.detected_phrases:
+        if not context.detected_phrases or not settings.ENABLE_SECRET_TAGS:
             return
         
         authenticated_tags = []
@@ -308,12 +314,12 @@ class EntryProcessor:
                         if encryption_key:
                             authenticated_tags.append(secret_tag)
                             # Store encryption key securely
-                            tag_id_hex = secret_tag.phrase_hash.hex()
-                            context.encryption_keys[tag_id_hex] = encryption_key
+                            tag_handle_hex = secret_tag.tag_handle.hex()
+                            context.encryption_keys[tag_handle_hex] = encryption_key
                             
-                            logger.info(f"Successfully authenticated secret tag {tag_id_hex} for user {context.user_id}")
+                            logger.info(f"Successfully authenticated secret tag {tag_handle_hex} for user {context.user_id}")
                         else:
-                            logger.warning(f"OPAQUE authentication failed for phrase with tag {secret_tag.phrase_hash.hex()}")
+                            logger.warning(f"OPAQUE authentication failed for phrase with tag {secret_tag.tag_handle.hex()}")
                     else:
                         logger.debug(f"No matching secret tag found for detected phrase")
                 
@@ -646,7 +652,7 @@ class EntryProcessor:
             event_type="secret_entry_created",
             user_id=context.user_id,
             details={
-                "secret_tag_id": secret_tag.phrase_hash.hex(),
+                "secret_tag_id": secret_tag.tag_handle.hex(),
                 "tag_name": secret_tag.tag_name,
                 "ip_address": context.ip_address,
                 "session_id": context.session_id
@@ -696,7 +702,7 @@ class EntryProcessor:
             user_id=context.user_id,
             details={
                 "action": "password_entry_authentication",
-                "secret_tag_id": secret_tag.phrase_hash.hex(),
+                "secret_tag_id": secret_tag.tag_handle.hex(),
                 "tag_name": secret_tag.tag_name,
                 "ip_address": context.ip_address,
                 "session_id": context.session_id,
@@ -713,7 +719,7 @@ class EntryProcessor:
             user_id=context.user_id,
             details={
                 "action": "mixed_content_entry_created",
-                "secret_tag_id": secret_tag.phrase_hash.hex(),
+                "secret_tag_id": secret_tag.tag_handle.hex(),
                 "tag_name": secret_tag.tag_name,
                 "ip_address": context.ip_address,
                 "session_id": context.session_id,

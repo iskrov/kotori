@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
 import { SecretTagV2 } from '../services/secretTagOnlineManager';
+import { areSecretTagsEnabled } from '../config/featureFlags';
 import logger from '../utils/logger';
 
 interface SecretTagCardProps {
@@ -147,6 +148,10 @@ const SecretTagCard: React.FC<SecretTagCardProps> = ({
       day: 'numeric',
     });
   };
+
+  if (!areSecretTagsEnabled()) {
+    return null;
+  }
 
   return (
     <View style={[styles.container, isActive && styles.activeContainer]}>

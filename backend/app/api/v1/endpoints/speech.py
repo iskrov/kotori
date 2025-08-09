@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 
 from app.dependencies import get_db
+import uuid
 from app.models.user import User
 from app.services.speech_service import SpeechService, create_speech_service
 from app.core.config import settings
@@ -29,6 +30,7 @@ from app.schemas.speech import (
     SpeechErrorResponse,
     SpeechHealthResponse
 )
+from app.core.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -56,19 +58,26 @@ async def manual_get_user_from_header(authorization: str | None = Header(None), 
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        user_id_str: str = payload.get("sub")
+        if not user_id_str:
             logger.warning("JWT token missing 'sub' claim.")
             raise credentials_exception
     except JWTError as e:
         logger.error(f"JWT decoding error: {e}", exc_info=True)
         raise credentials_exception from e
-        
+
+    # Support UUID primary keys (current) and gracefully fallback to int (legacy)
+    user = None
     try:
-        user = user_service.get(db, id=int(user_id))
-    except ValueError:
-        logger.error(f"Invalid user ID format in token 'sub' claim: {user_id}")
-        raise credentials_exception
+        user_uuid = uuid.UUID(user_id_str)
+        user = user_service.get(db, id=user_uuid)
+    except (ValueError, AttributeError):
+        try:
+            user_int = int(user_id_str)
+            user = user_service.get(db, id=user_int)
+        except (ValueError, TypeError):
+            logger.error(f"Invalid user ID format in token 'sub' claim: {user_id_str}")
+            raise credentials_exception
         
     if user is None:
         logger.warning(f"User with ID {user_id} from token not found in DB.")
@@ -177,11 +186,14 @@ async def transcribe_audio_endpoint(
             f"Detected language: {transcription_data.get('detected_language_code')}"
         )
 
-        # Return response with server-side secret phrase detection
+        # Return response with server-side secret phrase detection only if enabled
+        code_phrase_value = transcription_data.get("code_phrase_detected")
+        if not settings.ENABLE_SECRET_TAGS:
+            code_phrase_value = None
         return SpeechTranscriptionResponse(
             transcript=transcription_data.get("transcript", ""),
             detected_language_code=transcription_data.get("detected_language_code"),
-            code_phrase_detected=transcription_data.get("code_phrase_detected"),
+            code_phrase_detected=code_phrase_value,
             confidence=transcription_data.get("confidence")
         )
 
@@ -218,6 +230,13 @@ async def activate_secret_tag_endpoint(
     current_user = await manual_get_user_from_header(authorization, db)
     
     try:
+        if not settings.ENABLE_SECRET_TAGS:
+            return SecretTagActivationResponse(
+                success=False,
+                message="Secret tags are disabled",
+                tag_name=None,
+                session_token=None
+            )
         # Validate that the secret tag belongs to the user (if tag_name is provided)
         if request.tag_name:
             from app.models import SecretTag

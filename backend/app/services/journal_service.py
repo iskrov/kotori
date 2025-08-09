@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload # Import joinedload for eager loading
 
 from ..core.config import settings
+import base64
 from ..models.journal_entry import JournalEntry as JournalEntryModel
 from ..models.tag import JournalEntryTag
 from ..models.tag import Tag as TagModel
@@ -46,9 +47,20 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         orm_tags = [assoc.tag for assoc in db_obj.tags]
         schema_tags = [TagSchema.from_orm(tag_orm_obj) for tag_orm_obj in orm_tags]
 
-        # ✅ ZERO-KNOWLEDGE: Return encrypted content as-is
+        # ✅ ZERO-KNOWLEDGE: Return encrypted content fields separately
         # Client will handle decryption if user has proper keys
-        content = db_obj.encrypted_content if db_obj.encrypted_content else db_obj.content
+        if db_obj.encrypted_content:
+            content = ""
+            encrypted_content_b64 = base64.b64encode(db_obj.encrypted_content).decode('ascii') if db_obj.encrypted_content else None
+            encryption_iv_b64 = base64.b64encode(db_obj.encryption_iv).decode('ascii') if db_obj.encryption_iv else None
+            wrapped_key_b64 = base64.b64encode(db_obj.wrapped_key).decode('ascii') if db_obj.wrapped_key else None
+            wrap_iv_b64 = base64.b64encode(db_obj.wrap_iv).decode('ascii') if db_obj.wrap_iv else None
+        else:
+            content = db_obj.content or ""
+            encrypted_content_b64 = None
+            encryption_iv_b64 = None
+            wrapped_key_b64 = None
+            wrap_iv_b64 = None
 
         return JournalEntry(
             id=db_obj.id,
@@ -60,6 +72,11 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
             created_at=db_obj.created_at,
             updated_at=db_obj.updated_at,
             tags=schema_tags,
+            is_encrypted=db_obj.encrypted_content is not None,
+            encrypted_content=encrypted_content_b64,
+            encryption_iv=encryption_iv_b64,
+            wrapped_key=wrapped_key_b64,
+            wrap_iv=wrap_iv_b64,
         )
 
     def get_multi_by_user(
@@ -113,39 +130,60 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Manually construct Pydantic response models to ensure correct structure
         response_entries: list[JournalEntry] = []
         for db_entry in db_journal_entries:
-            # ✅ ZERO-KNOWLEDGE: Return content as-is
-            # Client will handle decryption for secret tag entries
-            content = db_entry.encrypted_content if db_entry.encrypted_content else db_entry.content
-            
+            # ✅ ZERO-KNOWLEDGE: Return content empty and provide encrypted fields when encrypted
+            if db_entry.encrypted_content:
+                content = ""
+                encrypted_content_b64 = base64.b64encode(db_entry.encrypted_content).decode('ascii') if db_entry.encrypted_content else None
+                encryption_iv_b64 = base64.b64encode(db_entry.encryption_iv).decode('ascii') if db_entry.encryption_iv else None
+                wrapped_key_b64 = base64.b64encode(db_entry.wrapped_key).decode('ascii') if db_entry.wrapped_key else None
+                wrap_iv_b64 = base64.b64encode(db_entry.wrap_iv).decode('ascii') if db_entry.wrap_iv else None
+            else:
+                content = db_entry.content or ""
+                encrypted_content_b64 = None
+                encryption_iv_b64 = None
+                wrapped_key_b64 = None
+                wrap_iv_b64 = None
+
             # Extract ORM tags from the association
             orm_tags = [assoc.tag for assoc in db_entry.tags]
             # Convert ORM tags to TagSchema instances
             schema_tags = [TagSchema.from_orm(tag_orm_obj) for tag_orm_obj in orm_tags]
-            
+
             # Create the JournalEntry Pydantic model
             response_entry = JournalEntry(
                 id=db_entry.id,
                 title=db_entry.title,
-                content=content,  # Encrypted or plaintext - server doesn't know the difference
+                content=content,
                 entry_date=db_entry.entry_date,
                 audio_url=db_entry.audio_url,
                 user_id=db_entry.user_id,
                 created_at=db_entry.created_at,
                 updated_at=db_entry.updated_at,
-                tags=schema_tags
+                tags=schema_tags,
+                is_encrypted=db_entry.encrypted_content is not None,
+                encrypted_content=encrypted_content_b64,
+                encryption_iv=encryption_iv_b64,
+                wrapped_key=wrapped_key_b64,
+                wrap_iv=wrap_iv_b64,
             )
             response_entries.append(response_entry)
         
         return response_entries
 
     def create_tag(self, db: Session, *, tag_in: TagCreate, user_id: UUID) -> TagModel:
-        """Create a new tag."""
-        # Tags are not user-specific in this model, but we check for existence.
-        tag_obj = db.query(TagModel).filter(TagModel.name == tag_in.name).first()
+        """Create a new tag for a specific user."""
+        # Check if tag with this name already exists for this user
+        tag_obj = db.query(TagModel).filter(
+            TagModel.name == tag_in.name,
+            TagModel.user_id == user_id
+        ).first()
         if tag_obj:
-            raise ValueError("Tag with this name already exists")
+            raise ValueError("Tag with this name already exists for this user")
             
-        tag_obj = TagModel(**tag_in.model_dump())
+        # Create tag with user_id
+        tag_data = tag_in.model_dump()
+        tag_data["user_id"] = user_id
+        tag_obj = TagModel(**tag_data)
         db.add(tag_obj)
         db.commit()
         db.refresh(tag_obj)
@@ -154,12 +192,19 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
     def update_tag(
         self, db: Session, *, tag_id: UUID, tag_in: TagSchema, user_id: UUID
     ) -> TagModel:
-        """Update a tag."""
+        """Update a tag owned by the user."""
         tag_obj = db.get(TagModel, tag_id)
         if not tag_obj:
             raise ValueError("Tag not found")
         
+        # Check if the tag belongs to the user
+        if tag_obj.user_id != user_id:
+            raise ValueError("Tag not found")  # Don't reveal existence of other users' tags
+        
         update_data = tag_in.model_dump(exclude_unset=True)
+        # Don't allow changing user_id
+        update_data.pop("user_id", None)
+        
         for field, value in update_data.items():
             setattr(tag_obj, field, value)
             
@@ -169,10 +214,14 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return tag_obj
 
     def delete_tag(self, db: Session, *, tag_id: UUID, user_id: UUID) -> TagModel:
-        """Delete a tag and all its associations."""
+        """Delete a tag owned by the user and all its associations."""
         tag_obj = db.get(TagModel, tag_id)
         if not tag_obj:
             raise ValueError("Tag not found")
+        
+        # Check if the tag belongs to the user
+        if tag_obj.user_id != user_id:
+            raise ValueError("Tag not found")  # Don't reveal existence of other users' tags
         
         # First, delete all journal_entry_tags associations for this tag
         associations = db.query(JournalEntryTag).filter(JournalEntryTag.tag_id == tag_id).all()
@@ -195,10 +244,34 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         tag_names = obj_in.tags or []
         obj_data = obj_in.model_dump(exclude={"tags"})
 
+        # Normalize field names and decode base64 blobs for encrypted entries
+        if obj_data.get("encrypted_content"):
+            # Support legacy aliases from frontend
+            if obj_data.get("encrypted_key") and not obj_data.get("wrapped_key"):
+                obj_data["wrapped_key"] = obj_data.pop("encrypted_key")
+            if obj_data.get("encryption_wrap_iv") and not obj_data.get("wrap_iv"):
+                obj_data["wrap_iv"] = obj_data.pop("encryption_wrap_iv")
+
+            # Decode base64 to bytes for storage
+            try:
+                obj_data["encrypted_content"] = base64.b64decode(obj_data["encrypted_content"]) if isinstance(obj_data["encrypted_content"], str) else obj_data["encrypted_content"]
+                if obj_data.get("encryption_iv") and isinstance(obj_data["encryption_iv"], str):
+                    obj_data["encryption_iv"] = base64.b64decode(obj_data["encryption_iv"])
+                if obj_data.get("wrapped_key") and isinstance(obj_data["wrapped_key"], str):
+                    obj_data["wrapped_key"] = base64.b64decode(obj_data["wrapped_key"])
+                if obj_data.get("wrap_iv") and isinstance(obj_data["wrap_iv"], str):
+                    obj_data["wrap_iv"] = base64.b64decode(obj_data["wrap_iv"])
+            except Exception:
+                logger.exception("Failed to decode encrypted entry fields")
+                raise
+
         # ✅ ZERO-KNOWLEDGE: Store content as provided by client
         # Client handles encryption for secret tag entries
         obj_data["user_id"] = user_id
         
+        # Remove any schema-only fields that aren't in DB
+        obj_data.pop("encryption_algorithm", None)
+
         # Create the journal entry
         db_journal_entry = JournalEntryModel(**obj_data)
         db.add(db_journal_entry)
@@ -218,13 +291,18 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return JournalEntry(
             id=db_journal_entry.id,
             title=db_journal_entry.title,
-            content=db_journal_entry.encrypted_content if db_journal_entry.encrypted_content else db_journal_entry.content,
+            content="" if db_journal_entry.encrypted_content else (db_journal_entry.content or ""),
             entry_date=db_journal_entry.entry_date,
             audio_url=db_journal_entry.audio_url,
             user_id=db_journal_entry.user_id,
             created_at=db_journal_entry.created_at,
             updated_at=db_journal_entry.updated_at,
             tags=schema_tags,
+            is_encrypted=db_journal_entry.encrypted_content is not None,
+            encrypted_content=base64.b64encode(db_journal_entry.encrypted_content).decode('ascii') if db_journal_entry.encrypted_content else None,
+            encryption_iv=base64.b64encode(db_journal_entry.encryption_iv).decode('ascii') if db_journal_entry.encryption_iv else None,
+            wrapped_key=base64.b64encode(db_journal_entry.wrapped_key).decode('ascii') if db_journal_entry.wrapped_key else None,
+            wrap_iv=base64.b64encode(db_journal_entry.wrap_iv).decode('ascii') if db_journal_entry.wrap_iv else None,
         )
 
     def update(
@@ -246,8 +324,35 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
             tag_names = update_data.pop("tags", None)
             obj_in = update_data
 
+        # Normalize and decode encrypted fields if present
+        update_data: dict[str, Any]
+        if isinstance(obj_in, dict):
+            update_data = obj_in
+        else:
+            update_data = obj_in
+
+        if update_data.get("encrypted_content"):
+            if update_data.get("encrypted_key") and not update_data.get("wrapped_key"):
+                update_data["wrapped_key"] = update_data.pop("encrypted_key")
+            if update_data.get("encryption_wrap_iv") and not update_data.get("wrap_iv"):
+                update_data["wrap_iv"] = update_data.pop("encryption_wrap_iv")
+            try:
+                update_data["encrypted_content"] = base64.b64decode(update_data["encrypted_content"]) if isinstance(update_data["encrypted_content"], str) else update_data["encrypted_content"]
+                if update_data.get("encryption_iv") and isinstance(update_data["encryption_iv"], str):
+                    update_data["encryption_iv"] = base64.b64decode(update_data["encryption_iv"])
+                if update_data.get("wrapped_key") and isinstance(update_data["wrapped_key"], str):
+                    update_data["wrapped_key"] = base64.b64decode(update_data["wrapped_key"])
+                if update_data.get("wrap_iv") and isinstance(update_data["wrap_iv"], str):
+                    update_data["wrap_iv"] = base64.b64decode(update_data["wrap_iv"])
+            except Exception:
+                logger.exception("Failed to decode encrypted entry fields for update")
+                raise
+
+        # Remove schema-only fields
+        update_data.pop("encryption_algorithm", None)
+
         # Update the journal entry
-        db_obj = super().update(db, db_obj=db_obj, obj_in=obj_in)
+        db_obj = super().update(db, db_obj=db_obj, obj_in=update_data)
 
         # Update tags if provided
         if tag_names is not None:
@@ -265,13 +370,18 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         return JournalEntry(
             id=db_obj.id,
             title=db_obj.title,
-            content=db_obj.content,
+            content="" if db_obj.encrypted_content else (db_obj.content or ""),
             entry_date=db_obj.entry_date,
             audio_url=db_obj.audio_url,
             user_id=db_obj.user_id,
             created_at=db_obj.created_at,
             updated_at=db_obj.updated_at,
-            tags=schema_tags
+            tags=schema_tags,
+            is_encrypted=db_obj.encrypted_content is not None,
+            encrypted_content=base64.b64encode(db_obj.encrypted_content).decode('ascii') if db_obj.encrypted_content else None,
+            encryption_iv=base64.b64encode(db_obj.encryption_iv).decode('ascii') if db_obj.encryption_iv else None,
+            wrapped_key=base64.b64encode(db_obj.wrapped_key).decode('ascii') if db_obj.wrapped_key else None,
+            wrap_iv=base64.b64encode(db_obj.wrap_iv).decode('ascii') if db_obj.wrap_iv else None,
         )
 
     def _update_tags(
@@ -291,10 +401,17 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Add new tags and associations
         processed_tags = []
         for tag_name_str in tag_names:
-            # Get or create tag
-            tag_orm_obj = db.query(TagModel).filter(TagModel.name == tag_name_str).first()
+            # Get or create tag for this user
+            tag_orm_obj = db.query(TagModel).filter(
+                TagModel.name == tag_name_str,
+                TagModel.user_id == journal_entry.user_id
+            ).first()
             if not tag_orm_obj:
-                tag_orm_obj = TagModel(name=tag_name_str)
+                # Create tag with user_id
+                tag_orm_obj = TagModel(
+                    name=tag_name_str,
+                    user_id=journal_entry.user_id
+                )
                 db.add(tag_orm_obj)
                 db.commit()
                 db.refresh(tag_orm_obj)
@@ -309,10 +426,10 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
 
     def get_tags_by_user(self, db: Session, *, user_id: UUID) -> list[TagModel]:
         """
-        Get all tags (tags are global, not user-specific)
+        Get all tags for a specific user
         """
-        # Return all tags since they are global in this system
-        return db.query(TagModel).all()
+        # Return tags filtered by user_id
+        return db.query(TagModel).filter(TagModel.user_id == user_id).all()
 
     def get_recent_tags_by_user(self, db: Session, *, user_id: UUID, limit: int = 5) -> list[dict]:
         """
@@ -356,6 +473,15 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
             })
         
         return recent_tags
+
+    def delete_journal_entry(self, db: Session, *, entry_id: UUID, user_id: UUID) -> bool:
+        """Delete a journal entry owned by the user. Returns True if deleted."""
+        db_entry = self.get(db, id=entry_id)
+        if not db_entry or db_entry.user_id != user_id:
+            return False
+        db.delete(db_entry)
+        db.commit()
+        return True
 
     async def create_with_phrase_detection(
         self,

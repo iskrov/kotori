@@ -6,7 +6,7 @@ This is critical for OPAQUE authentication to work correctly.
 """
 
 from sqlalchemy import Column, String, DateTime, Text, Boolean
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from .base import Base
 
 
@@ -26,10 +26,10 @@ class OpaqueServerConfig(Base):
     server_setup = Column(Text, nullable=False)
     
     # When this config was created
-    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     
     # When this config was last updated
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Whether this config is active
     is_active = Column(Boolean, nullable=False, default=True)

@@ -82,7 +82,7 @@ def audit_security_event(
             "timestamp": datetime.now(UTC).isoformat(),
             "user_id": user_id,
             "details": details or {},
-            "source": "vibes_backend"
+            "source": "kotori_backend"
         }
         
         # Log at appropriate level

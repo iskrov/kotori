@@ -8,11 +8,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import logger from '../utils/logger';
+import { opaqueKeyManager } from './opaqueKeyManager';
 
 interface EncryptionResult {
   encryptedContent: string;  // Base64 encoded encrypted data
   iv: string;               // Base64 encoded initialization vector
-  salt: string;             // Base64 encoded salt used for key derivation
+  salt?: string;             // Optional salt (legacy). For per-user encryption we may omit.
+  wrappedKey?: string;       // Base64-wrapped per-entry key using user master key
+  wrapIv?: string;           // Base64 IV used for key wrapping
+  algorithm?: string;        // Algorithm identifier (e.g., AES-GCM)
 }
 
 interface KeyDerivationParams {
@@ -27,6 +31,7 @@ class ClientEncryptionService {
   private static readonly IV_LENGTH = 12; // 96 bits for GCM
   private static readonly SALT_LENGTH = 32; // 256 bits
   private static readonly DEFAULT_ITERATIONS = 100000;
+  private static readonly MASTER_INFO = 'UserMasterKey';
   
   // Secure storage keys
   private static readonly USER_SALT_KEY = 'user_encryption_salt';
@@ -137,22 +142,83 @@ class ClientEncryptionService {
   }
 
   /**
-   * Encrypt content using user-derived key
+   * Derive per-user master key from OPAQUE export key using HKDF
+   * Lives only in memory; never persisted
    */
-  async encryptContent(content: string, userSecret: string): Promise<EncryptionResult> {
+  private async getUserMasterKey(): Promise<CryptoKey> {
+    if (!opaqueKeyManager.isInitialized()) {
+      throw new Error('OPAQUE key manager not initialized');
+    }
+    const exportKey = opaqueKeyManager.getExportKey();
+    // Import raw export key for HKDF
+    const ikm = await crypto.subtle.importKey('raw', exportKey, 'HKDF', false, ['deriveKey']);
+    const masterKey = await crypto.subtle.deriveKey(
+      {
+        name: 'HKDF',
+        hash: 'SHA-256',
+        // Use zero salt by default; exportKey already high entropy; info distinguishes use
+        salt: new Uint8Array(32),
+        info: new TextEncoder().encode(ClientEncryptionService.MASTER_INFO),
+      },
+      ikm,
+      {
+        name: ClientEncryptionService.ALGORITHM,
+        length: ClientEncryptionService.KEY_LENGTH,
+      },
+      false,
+      ['encrypt', 'decrypt', 'wrapKey', 'unwrapKey']
+    );
+    return masterKey;
+  }
+
+  /**
+   * Generate a new random content key for a single entry
+   */
+  private async generateEntryKey(): Promise<CryptoKey> {
+    return await crypto.subtle.generateKey(
+      { name: ClientEncryptionService.ALGORITHM, length: ClientEncryptionService.KEY_LENGTH },
+      true,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  /**
+   * Export CryptoKey to raw bytes
+   */
+  private async exportRawKey(key: CryptoKey): Promise<Uint8Array> {
+    const raw = await crypto.subtle.exportKey('raw', key);
+    return new Uint8Array(raw);
+  }
+
+  /**
+   * Wrap entry key with per-user master key
+   */
+  private async wrapEntryKey(entryKey: CryptoKey, masterKey: CryptoKey, wrapIv: Uint8Array): Promise<Uint8Array> {
+    const wrapped = await crypto.subtle.encrypt(
+      { name: ClientEncryptionService.ALGORITHM, iv: wrapIv },
+      masterKey,
+      await this.exportRawKey(entryKey)
+    );
+    return new Uint8Array(wrapped);
+  }
+
+  /**
+   * Encrypt content using per-user master key wrapping a per-entry key
+   */
+  async encryptPerUser(content: string): Promise<EncryptionResult> {
     if (!this.isWebCryptoAvailable()) {
       throw new Error('Encryption not available on this platform');
     }
 
     try {
-      // Get user-specific salt
-      const salt = await this.getUserSalt();
-      
-      // Derive encryption key from user secret
-      const key = await this.deriveKeyFromSecret({ userSecret, salt });
+      // Derive per-user master key from OPAQUE export key
+      const masterKey = await this.getUserMasterKey();
+      // Generate per-entry key
+      const entryKey = await this.generateEntryKey();
 
       // Generate random IV
       const iv = crypto.getRandomValues(new Uint8Array(ClientEncryptionService.IV_LENGTH));
+      const wrapIv = crypto.getRandomValues(new Uint8Array(ClientEncryptionService.IV_LENGTH));
 
       // Encrypt the content
       const encoder = new TextEncoder();
@@ -161,22 +227,28 @@ class ClientEncryptionService {
           name: ClientEncryptionService.ALGORITHM,
           iv: iv
         },
-        key,
+        entryKey,
         encoder.encode(content)
       );
+
+      // Wrap entry key with master key
+      const wrapped = await this.wrapEntryKey(entryKey, masterKey, wrapIv);
 
       // Convert to base64 for storage/transmission
       const encryptedArray = new Uint8Array(encryptedData);
       const encryptedBase64 = btoa(String.fromCharCode(...encryptedArray));
       const ivBase64 = btoa(String.fromCharCode(...iv));
-      const saltBase64 = btoa(String.fromCharCode(...salt));
+      const wrapIvBase64 = btoa(String.fromCharCode(...wrapIv));
+      const wrappedBase64 = btoa(String.fromCharCode(...wrapped));
 
       logger.info('Content encrypted successfully');
       
       return {
         encryptedContent: encryptedBase64,
         iv: ivBase64,
-        salt: saltBase64
+        wrappedKey: wrappedBase64,
+        wrapIv: wrapIvBase64,
+        algorithm: ClientEncryptionService.ALGORITHM,
       };
     } catch (error) {
       logger.error('Encryption failed:', error);

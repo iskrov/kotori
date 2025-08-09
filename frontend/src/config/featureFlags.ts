@@ -11,6 +11,8 @@ export interface FeatureFlags {
   ENABLE_SECRET_TAG_CACHING: boolean;
   ENABLE_SECURITY_MODE_SWITCHING: boolean;
   ENABLE_BORDER_CROSSING_MODE: boolean;
+  // Global kill-switch for all secret-tag UI & detection paths
+  ENABLE_SECRET_TAGS: boolean;
   
   // Future features can be added here
   ENABLE_TEAM_COLLABORATION: boolean;
@@ -32,6 +34,8 @@ export interface FeatureFlags {
  * flags to true and the system will seamlessly restore full functionality.
  */
 export const FEATURE_FLAGS: FeatureFlags = {
+  // Global kill-switch (default OFF for Kotori)
+  ENABLE_SECRET_TAGS: false,
   // Secret Tags - TEMPORARILY DISABLED FOR LAUNCH SIMPLIFICATION
   ENABLE_OFFLINE_SECRET_TAGS: false,        // Disable offline caching
   ENABLE_SECRET_TAG_CACHING: false,         // Disable local storage of tags
@@ -72,26 +76,30 @@ export function getFeatureFlag<K extends keyof FeatureFlags>(key: K): boolean {
  * Check if offline secret tag features are enabled
  */
 export function isOfflineSecretTagsEnabled(): boolean {
-  return getFeatureFlag('ENABLE_OFFLINE_SECRET_TAGS');
+  return getFeatureFlag('ENABLE_SECRET_TAGS') && getFeatureFlag('ENABLE_OFFLINE_SECRET_TAGS');
 }
 
 /**
  * Check if security mode switching is enabled
  */
 export function isSecurityModeSwitchingEnabled(): boolean {
-  return getFeatureFlag('ENABLE_SECURITY_MODE_SWITCHING');
+  return getFeatureFlag('ENABLE_SECRET_TAGS') && getFeatureFlag('ENABLE_SECURITY_MODE_SWITCHING');
 }
 
 /**
  * Check if secret tag caching is enabled  
  */
 export function isSecretTagCachingEnabled(): boolean {
-  return getFeatureFlag('ENABLE_SECRET_TAG_CACHING');
+  return getFeatureFlag('ENABLE_SECRET_TAGS') && getFeatureFlag('ENABLE_SECRET_TAG_CACHING');
 }
 
 /**
  * Check if border crossing mode is enabled
  */
 export function isBorderCrossingModeEnabled(): boolean {
-  return getFeatureFlag('ENABLE_BORDER_CROSSING_MODE');
+  return getFeatureFlag('ENABLE_SECRET_TAGS') && getFeatureFlag('ENABLE_BORDER_CROSSING_MODE');
 } 
+
+export function areSecretTagsEnabled(): boolean {
+  return getFeatureFlag('ENABLE_SECRET_TAGS');
+}

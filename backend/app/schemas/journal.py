@@ -26,7 +26,8 @@ class Tag(TagBase):
 # Base schema for JournalEntry
 class JournalEntryBase(BaseModel):
     title: Optional[str] = None
-    content: str
+    # Allow plaintext to be omitted when providing encrypted fields
+    content: Optional[str] = None
     entry_date: datetime
     tags: List[str] = []  # List of tag names
 
@@ -41,6 +42,7 @@ class JournalEntryCreate(JournalEntryBase):
     wrapped_key: Optional[str] = None
     encryption_iv: Optional[str] = None
     wrap_iv: Optional[str] = None
+    encryption_algorithm: Optional[str] = None
 
 
 # Properties to receive on update
@@ -57,6 +59,7 @@ class JournalEntryUpdate(BaseModel):
     wrapped_key: Optional[str] = None
     encryption_iv: Optional[str] = None
     wrap_iv: Optional[str] = None
+    encryption_algorithm: Optional[str] = None
 
 
 # Properties shared by models stored in DB
@@ -73,6 +76,10 @@ class JournalEntryInDBBase(JournalEntryBase):
     wrapped_key: Optional[str] = None
     encryption_iv: Optional[str] = None
     wrap_iv: Optional[str] = None
+    encryption_algorithm: Optional[str] = None
+    
+    # Convenience flag for clients
+    is_encrypted: Optional[bool] = None
 
     model_config = ConfigDict(from_attributes=True)
 

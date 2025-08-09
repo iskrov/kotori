@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, UTC
 
 from ..models.secret_tag_opaque import SecretTag
 from ..crypto.blake2 import generate_tag_id
-from .opaque_service import create_opaque_service, OpaqueAuthenticationError
+# Legacy opaque_service import removed - now using V1 clean implementation
 from ..crypto.opaque_keys import find_matching_tag_id, authenticate_secret_phrase
 from ..models.journal_entry import JournalEntry as JournalEntryModel
 from ..crypto.secure_ops import timed_authentication
@@ -79,7 +79,7 @@ class SecretPhraseProcessor:
     def __init__(self, db: Session):
         """Initialize the phrase processor with database session"""
         self.db = db
-        self.opaque_service = create_opaque_service(db)
+        # Legacy opaque_service creation removed - now using V1 clean implementation
         
         # Enhanced utilities
         self.text_normalizer = create_medium_normalizer()
@@ -402,10 +402,10 @@ class SecretPhraseProcessor:
             # Generate TagID for the phrase
             tag_id = self.generate_tag_id(phrase)
             
-            # Look up secret tag by TagID
+            # Look up secret tag by tag_handle
             secret_tag = self.db.query(SecretTag).filter(
                 SecretTag.user_id == user_id,
-                SecretTag.phrase_hash == tag_id
+                SecretTag.tag_handle == tag_id
             ).first()
             
             return secret_tag
@@ -426,20 +426,11 @@ class SecretPhraseProcessor:
             True if authentication successful
         """
         try:
-            # Create a compatible SecretTag object for the opaque_keys module
-            from ..crypto.opaque_keys import SecretTag as OpaqueSecretTag
-            import base64
-            
-            # Convert database SecretTag to opaque_keys SecretTag format
-            opaque_tag = OpaqueSecretTag(
-                tag_id_b64=base64.b64encode(secret_tag.phrase_hash).decode('ascii'),
-                salt_b64=base64.b64encode(secret_tag.salt).decode('ascii'),
-                verifier_b64=base64.b64encode(secret_tag.verifier_kv).decode('ascii')  # Use verifier_kv field
-            )
-            
-            # Use the OPAQUE key derivation to authenticate
-            encryption_key = authenticate_secret_phrase(phrase, opaque_tag)
-            return encryption_key is not None
+            # NOTE: This method is deprecated - phrase_processor should use V1 OPAQUE services
+            # Legacy fields phrase_hash, salt, verifier_kv have been replaced with tag_handle
+            # For now, return False to indicate authentication failure
+            logger.warning("authenticate_phrase_with_opaque called with legacy implementation - use V1 secret tag service instead")
+            return False
             
         except Exception as e:
             logger.error(f"OPAQUE authentication failed: {e}")

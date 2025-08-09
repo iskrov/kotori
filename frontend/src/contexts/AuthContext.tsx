@@ -41,6 +41,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         const token = await AsyncStorage.getItem('access_token');
         const storedUser = await AsyncStorage.getItem('user');
+        const storedSessionKey = await AsyncStorage.getItem('opaque_session_key');
+        const storedExportKey = await AsyncStorage.getItem('opaque_export_key');
         
         if (token) {
           logger.info('OPAQUE session token found. Verifying...');
@@ -60,6 +62,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           } else {
              setUser(null);
+          }
+
+          // Rehydrate OPAQUE keys if available (to enable per-user encryption after refresh)
+          try {
+            if (storedSessionKey && storedExportKey) {
+              opaqueKeyManager.initialize({
+                sessionKey: storedSessionKey,
+                exportKey: storedExportKey,
+                finishLoginRequest: ''
+              } as unknown as OpaqueSessionResult);
+              logger.info('OPAQUE key manager rehydrated from storage');
+            } else {
+              logger.warn('OPAQUE keys not found in storage; per-user encryption will require re-login');
+            }
+          } catch (rehydrateError) {
+            logger.error('Failed to rehydrate OPAQUE keys', rehydrateError);
+            opaqueKeyManager.clear();
           }
           
         } else {
@@ -164,13 +183,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Perform OPAQUE authentication - this now returns the login response with JWT token
       const loginResponse: OpaqueLoginResult = await opaqueAuth.login(email, password);
       
-      // Initialize key manager with OPAQUE session keys
+      // Initialize key manager with OPAQUE session keys for per-user encryption
       // Note: We don't need the finishLoginRequest here as it's already been used
       opaqueKeyManager.initialize({
         sessionKey: loginResponse.sessionKey,
         exportKey: loginResponse.exportKey,
         finishLoginRequest: '' // Not needed for key manager initialization
       });
+      // Persist keys for session rehydration (web dev convenience)
+      await AsyncStorage.setItem('opaque_session_key', loginResponse.sessionKey);
+      await AsyncStorage.setItem('opaque_export_key', loginResponse.exportKey);
       
       // Use JWT token for API authentication
       api.defaults.headers.common.Authorization = `Bearer ${loginResponse.token}`;
@@ -231,9 +253,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check if OPAQUE is supported and available
   const hasOpaqueSupport = async (): Promise<boolean> => {
     try {
-      // Check if server supports OPAQUE endpoints
-      const response = await api.get('/api/auth/opaque/status');
-      return response.data.opaque_enabled === true;
+      // OPAQUE is always available in V1 dual authentication system
+      // Check if server is healthy instead
+      const response = await api.get('/api/v1/auth/health');
+      return response.status >= 200 && response.status < 300;
     } catch (error) {
       logger.warn('OPAQUE support check failed, assuming not supported', error);
       return false;

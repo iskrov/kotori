@@ -2,17 +2,9 @@ import { opaqueAuth, OpaqueAuthService } from '../opaqueAuth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../api';
 
-// Mock dependencies
+// Mock dependencies (do not mock @serenity-kit/opaque; tests should exercise real client API shape)
 jest.mock('@react-native-async-storage/async-storage');
 jest.mock('../api');
-jest.mock('@serenity-kit/opaque', () => ({
-  client: {
-    startRegistration: jest.fn(),
-    finishRegistration: jest.fn(),
-    startLogin: jest.fn(),
-    finishLogin: jest.fn(),
-  },
-}));
 
 const mockAsyncStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 const mockApi = api as jest.Mocked<typeof api>;
@@ -33,7 +25,7 @@ describe('OpaqueAuthService', () => {
   describe('startRegistration', () => {
     it('should start OPAQUE registration and store state', async () => {
       const mockOpaque = require('@serenity-kit/opaque');
-      mockOpaque.client.startRegistration.mockReturnValue({
+      jest.spyOn(mockOpaque.client, 'startRegistration').mockReturnValue({
         clientRegistrationState: 'mock-state',
         registrationRequest: 'mock-request',
       });
@@ -61,7 +53,7 @@ describe('OpaqueAuthService', () => {
 
     it('should handle registration start errors', async () => {
       const mockOpaque = require('@serenity-kit/opaque');
-      mockOpaque.client.startRegistration.mockImplementation(() => {
+      jest.spyOn(mockOpaque.client, 'startRegistration').mockImplementation(() => {
         throw new Error('OPAQUE error');
       });
 
@@ -81,7 +73,7 @@ describe('OpaqueAuthService', () => {
           userIdentifier: 'test@example.com',
         })
       );
-      mockOpaque.client.finishRegistration.mockReturnValue({
+      jest.spyOn(mockOpaque.client, 'finishRegistration').mockReturnValue({
         registrationRecord: 'mock-record',
       });
 
@@ -120,7 +112,7 @@ describe('OpaqueAuthService', () => {
   describe('startLogin', () => {
     it('should start OPAQUE login and store state', async () => {
       const mockOpaque = require('@serenity-kit/opaque');
-      mockOpaque.client.startLogin.mockReturnValue({
+      jest.spyOn(mockOpaque.client, 'startLogin').mockReturnValue({
         clientLoginState: 'mock-login-state',
         loginRequest: 'mock-login-request',
       });
@@ -161,7 +153,7 @@ describe('OpaqueAuthService', () => {
       const mockSessionKey = new Uint8Array([1, 2, 3, 4]);
       const mockExportKey = new Uint8Array([5, 6, 7, 8]);
       
-      mockOpaque.client.finishLogin.mockReturnValue({
+      jest.spyOn(mockOpaque.client, 'finishLogin').mockReturnValue({
         sessionKey: mockSessionKey,
         exportKey: mockExportKey,
       });
@@ -189,8 +181,7 @@ describe('OpaqueAuthService', () => {
           userIdentifier: 'test@example.com',
         })
       );
-
-      mockOpaque.client.finishLogin.mockReturnValue(null);
+      jest.spyOn(mockOpaque.client, 'finishLogin').mockReturnValue(null);
 
       await expect(
         opaqueAuth.finishLogin('test@example.com', 'mock-response')
@@ -231,15 +222,15 @@ describe('OpaqueAuthService', () => {
 
       await opaqueAuth.register('Test User', 'test@example.com', 'password123');
 
-      expect(mockApi.post).toHaveBeenCalledWith('/api/auth/opaque/register/start', {
+      expect(mockApi.post).toHaveBeenCalledWith('/api/v1/auth/register/start', {
         userIdentifier: 'test@example.com',
-        registrationRequest: 'mock-request',
+        opaque_registration_request: 'mock-request',
         name: 'Test User',
       });
 
-      expect(mockApi.post).toHaveBeenCalledWith('/api/auth/opaque/register/finish', {
+      expect(mockApi.post).toHaveBeenCalledWith('/api/v1/auth/register/finish', {
         userIdentifier: 'test@example.com',
-        registrationRecord: 'mock-record',
+        opaque_registration_record: 'mock-record',
       });
     });
   });

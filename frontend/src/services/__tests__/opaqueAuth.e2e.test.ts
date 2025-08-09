@@ -61,7 +61,7 @@ describe('OPAQUE Authentication E2E Tests', () => {
       
       expect(hasSupport).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_BASE_URL}/api/auth/opaque/status`,
+        `${TEST_BASE_URL}/health/opaque`,
         expect.objectContaining({
           method: 'GET',
           headers: {
@@ -126,7 +126,7 @@ describe('OPAQUE Authentication E2E Tests', () => {
       
       // Verify registration start call
       expect(mockFetch).toHaveBeenNthCalledWith(1,
-        `${TEST_BASE_URL}/api/auth/opaque/register/start`,
+        `${TEST_BASE_URL}/api/v1/auth/register/start`,
         expect.objectContaining({
           method: 'POST',
           headers: {
@@ -138,7 +138,7 @@ describe('OPAQUE Authentication E2E Tests', () => {
 
       // Verify registration finish call
       expect(mockFetch).toHaveBeenNthCalledWith(2,
-        `${TEST_BASE_URL}/api/auth/opaque/register/finish`,
+        `${TEST_BASE_URL}/api/v1/auth/register/finish`,
         expect.objectContaining({
           method: 'POST',
           headers: {

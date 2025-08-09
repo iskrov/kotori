@@ -2,7 +2,7 @@
 
 /**
  * Code Quality Dashboard
- * Tracks and visualizes code quality metrics for the Vibes application
+ * Tracks and visualizes code quality metrics for the Kotori application
  */
 
 import * as fs from 'fs';
@@ -407,7 +407,7 @@ class QualityDashboard {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code Quality Dashboard - Vibes</title>
+    <title>Code Quality Dashboard - Kotori</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
         .container { max-width: 1200px; margin: 0 auto; }

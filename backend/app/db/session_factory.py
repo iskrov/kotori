@@ -49,7 +49,7 @@ class DatabaseSessionFactory:
                     max_overflow=20,     # Maximum overflow connections
                     connect_args={
                         "sslmode": "require",
-                        "application_name": f"vibes-{settings.ENVIRONMENT}"
+                        "application_name": f"kotori-{settings.ENVIRONMENT}"
                     }
                 )
             elif settings.ENVIRONMENT == "test" or self.database_url.startswith("sqlite"):

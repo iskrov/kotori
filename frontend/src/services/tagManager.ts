@@ -7,9 +7,8 @@
 
 import { Tag } from '../types';
 import { TagsAPI } from './api';
-import { opaqueTagManager } from './OpaqueTagManager';
-import { voicePhraseDetector } from './VoicePhraseDetector';
 import logger from '../utils/logger';
+import { areSecretTagsEnabled } from '../config/featureFlags';
 
 export interface TagManagerInterface {
   getAllTags(): Promise<Tag[]>;
@@ -141,12 +140,13 @@ class LegacyTagManager implements TagManagerInterface {
   async getActiveSecretTags(): Promise<any[]> {
     try {
       logger.info('Legacy tagManager: Getting active secret tags');
-      
-      // Use the OPAQUE manager to get active tags
-      const activeTags = await opaqueTagManager.getActiveTags();
-      
-      logger.info(`Legacy tagManager: Found ${activeTags.length} active secret tags`);
-      return activeTags;
+      if (!areSecretTagsEnabled()) {
+        return [];
+      }
+      // TODO: Implement active secret tags retrieval from backend
+      // For now, return empty array to avoid breaking the interface
+      logger.warn('getActiveSecretTags not yet implemented - returning empty array');
+      return [];
     } catch (error) {
       logger.error('Failed to get active secret tags:', error);
       throw error;
@@ -159,20 +159,12 @@ class LegacyTagManager implements TagManagerInterface {
   async checkForSecretTagPhrases(content: string): Promise<{ found: boolean; tagId?: string; tagName?: string; action?: string }> {
     try {
       logger.info('Legacy tagManager: Checking for secret tag phrases');
-      
-      // Use the voice phrase detector to check for phrases
-      const result = await voicePhraseDetector.checkForPhrases(content);
-      
-      if (result.found) {
-        logger.info('Legacy tagManager: Found secret tag phrase', result);
-        return {
-          found: true,
-          tagId: result.tagId,
-          tagName: result.tagName,
-          action: result.action
-        };
+      if (!areSecretTagsEnabled()) {
+        return { found: false };
       }
-      
+      // TODO: Implement phrase detection logic with backend
+      // For now, return not found to avoid breaking the interface
+      logger.warn('checkForSecretTagPhrases not yet implemented - returning not found');
       return { found: false };
     } catch (error) {
       logger.error('Failed to check for secret tag phrases:', error);
@@ -186,12 +178,13 @@ class LegacyTagManager implements TagManagerInterface {
   async getSecretTags(): Promise<any[]> {
     try {
       logger.info('Legacy tagManager: Getting all secret tags');
-      
-      // Use the OPAQUE manager to get all tags
-      const secretTags = await opaqueTagManager.getAllTags();
-      
-      logger.info(`Legacy tagManager: Found ${secretTags.length} secret tags`);
-      return secretTags;
+      if (!areSecretTagsEnabled()) {
+        return [];
+      }
+      // TODO: Implement secret tags retrieval from backend API
+      // For now, return empty array to avoid breaking the interface
+      logger.warn('getSecretTags not yet implemented - returning empty array');
+      return [];
     } catch (error) {
       logger.error('Failed to get secret tags:', error);
       throw error;
@@ -204,11 +197,12 @@ class LegacyTagManager implements TagManagerInterface {
   async activateSecretTag(tagId: string): Promise<void> {
     try {
       logger.info('Legacy tagManager: Activating secret tag:', { tagId });
-      
-      // Use the OPAQUE manager to activate the tag
-      await opaqueTagManager.activateTag(tagId);
-      
-      logger.info('Legacy tagManager: Activated secret tag successfully');
+      if (!areSecretTagsEnabled()) {
+        return;
+      }
+      // TODO: Implement secret tag activation with backend API
+      // For now, just log to avoid breaking the interface
+      logger.warn('activateSecretTag not yet implemented - no action taken');
     } catch (error) {
       logger.error('Failed to activate secret tag:', error);
       throw error;

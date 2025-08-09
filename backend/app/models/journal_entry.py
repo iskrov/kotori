@@ -18,7 +18,7 @@ class JournalEntry(Base, TimestampMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     title = Column(String, nullable=True)  # Optional title
-    content = Column(Text, nullable=False)  # Journal entry content (plaintext for public entries)
+    content = Column(Text, nullable=True)  # Plaintext for public entries; null when encrypted
     audio_url = Column(String, nullable=True)  # URL to stored audio file (if any)
     entry_date = Column(
         DateTime(timezone=True), nullable=False
@@ -31,6 +31,7 @@ class JournalEntry(Base, TimestampMixin):
     wrapped_key = Column(LargeBinary, nullable=True)  # Entry key wrapped with phrase-derived key
     encryption_iv = Column(LargeBinary, nullable=True)  # IV for AES encryption
     wrap_iv = Column(LargeBinary, nullable=True)  # IV for key wrapping
+    encryption_algorithm = Column(String, nullable=True)  # Algorithm identifier (e.g., AES-GCM)
 
     # Foreign key to User
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)

@@ -3,7 +3,7 @@ export type RootStackParamList = {
   Main: undefined;
   Login: undefined;
   Register: undefined;
-  JournalEntryDetail: { entryId: number } | undefined;
+  JournalEntryDetail: { entryId: string } | undefined;
   ReminderForm: { reminderId?: string };
   Settings: undefined;
 };
@@ -18,7 +18,7 @@ export type MainTabParamList = {
 
 export type JournalStackParamList = {
   JournalList: undefined;
-  JournalEntryDetail: { entryId: number };
+  JournalEntryDetail: { entryId: string };
   ReminderForm: { reminderId?: string };
   DeleteConfirmation: { entryId: number };
 };
@@ -55,7 +55,7 @@ export interface Tag {
 }
 
 export interface JournalEntry {
-  id: number;
+  id: string;
   title: string;
   content: string;
   entry_date: string;
@@ -64,10 +64,11 @@ export interface JournalEntry {
   tags: Tag[];
   created_at: string;
   updated_at: string;
+  is_encrypted?: boolean;
   // Zero-Knowledge Encryption fields (for secret tag entries)
   encrypted_content?: string;
   encryption_iv?: string;
-  encryption_salt?: string;
+  encryption_salt?: string; // legacy salt
   encrypted_key?: string;
   key_derivation_iterations?: number;
   encryption_algorithm?: string;
@@ -86,7 +87,7 @@ export interface JournalEntryCreate {
   // Zero-Knowledge Encryption fields (for secret tag entries)
   encrypted_content?: string;
   encryption_iv?: string;
-  encryption_salt?: string;
+  encryption_salt?: string; // legacy salt
   encrypted_key?: string;
   key_derivation_iterations?: number;
   encryption_algorithm?: string;

@@ -7,6 +7,7 @@ import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { validateLanguageCode } from '../config/languageConfig';
 import { voicePhraseDetector } from './VoicePhraseDetector';
+import { areSecretTagsEnabled } from '../config/featureFlags';
 
 // Enhanced types for multi-language transcription
 interface TranscriptionResult {
@@ -282,8 +283,8 @@ class SpeechToTextService {
       }
     };
 
-    // Perform OPAQUE-based secret phrase detection if enabled and transcript is available
-    if (enableSecretTagDetection && processedResult.transcript.trim()) {
+    // Perform OPAQUE-based secret phrase detection only when globally enabled
+    if (areSecretTagsEnabled() && enableSecretTagDetection && processedResult.transcript.trim()) {
       try {
         logger.info(`[OPAQUE Voice Detection] Starting detection for transcript: "${processedResult.transcript}"`);
         
@@ -308,12 +309,10 @@ class SpeechToTextService {
       }
     } else {
       processedResult.secret_tag_detected = { found: false };
-      
-      if (enableSecretTagDetection) {
-        logger.info(`[OPAQUE Voice Detection] Skipped - empty transcript`);
-      } else {
-        logger.info(`[OPAQUE Voice Detection] Disabled`);
-      }
+      const reason = !areSecretTagsEnabled()
+        ? 'Disabled by global feature flag'
+        : (processedResult.transcript.trim() ? 'Detection disabled by option' : 'Skipped - empty transcript');
+      logger.info(`[OPAQUE Voice Detection] ${reason}`);
     }
 
     // Log quality metrics
@@ -378,7 +377,7 @@ class SpeechToTextService {
       logger.info('Attempting to refresh access token...');
       
       // Call refresh endpoint
-      const refreshResponse = await axios.post('/api/auth/refresh', {
+      const refreshResponse = await axios.post('/api/v1/auth/refresh', {
         refresh_token: refreshToken,
       });
 

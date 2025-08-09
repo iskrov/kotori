@@ -55,8 +55,8 @@ class JWTService:
     SESSION_TOKEN_LIFETIME = timedelta(hours=24)  # 24 hours
     
     # Security features
-    TOKEN_ISSUER = "vibes-api"
-    TOKEN_AUDIENCE = "vibes-users"
+    TOKEN_ISSUER = "kotori-api"
+    TOKEN_AUDIENCE = "kotori-users"
     
     def __init__(self):
         """Initialize JWT service with security features"""

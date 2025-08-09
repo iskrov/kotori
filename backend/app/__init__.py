@@ -1,3 +1,3 @@
 """
-Vibes API - A Voice-Controlled Journaling Application
+Kotori API - A Voice-Controlled Journaling Application
 """

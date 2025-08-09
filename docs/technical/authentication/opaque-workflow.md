@@ -1,226 +1,229 @@
-# OPAQUE Authentication Workflow
+# OPAQUE Authentication Workflow (Dual Authentication System)
 
 ## Overview
 
-The Vibes application uses the OPAQUE (Oblivious Pseudorandom Functions) protocol for zero-knowledge user authentication. This ensures that the server never sees or stores user passwords in plain text, while still being able to verify user authentication.
+The Kotori application uses a **dual authentication system** supporting both OAuth (Google Sign-in) and OPAQUE (Oblivious Pseudorandom Functions) for zero-knowledge user authentication. This ensures maximum flexibility while maintaining strong security guarantees.
 
 ## Key Components
 
 ### Backend Infrastructure
 - **OPAQUE Library**: `@serenity-kit/opaque` Node.js implementation
-- **Server Setup**: 171-character base64-encoded server configuration
-- **Database Storage**: PostgreSQL with specialized schema for OPAQUE records
+- **Server Setup**: Persistent OPAQUE server configuration
+- **Database Storage**: PostgreSQL with dual authentication schema
 - **Session Management**: Temporary session storage for multi-step authentication flows
 
 ### Database Schema
-- **Users Table**: Standard user information with OPAQUE registration record
-- **OPAQUE Sessions Table**: Temporary storage for authentication state
+- **Users Table**: Dual authentication with `google_id` (OAuth) and `opaque_envelope` (OPAQUE)
+- **Tag Sessions Table**: Ephemeral storage for secret tag authentication
 - **Key Fields**:
-  - `users.hashed_password`: OPAQUE registration record (up to 500 characters)
-  - `opaque_sessions.session_data`: Temporary cryptographic state
-  - `opaque_sessions.session_state`: Current phase ('registration_started', 'login_started')
+  - `users.google_id`: OAuth user identifier (NULL for OPAQUE users)
+  - `users.opaque_envelope`: OPAQUE registration record (NULL for OAuth users)
+  - `tag_sessions.server_ephemeral`: Temporary OPAQUE authentication state
 
-## User Registration Flow
+## User Authentication (Dual Methods)
 
-### Phase 1: Registration Start
+### OAuth Authentication (Google Sign-in)
+
+**Single-Step Flow**:
+1. **Frontend**: User clicks "Sign in with Google"
+2. **Google OAuth**: Standard OAuth 2.0 flow
+3. **API Call**: `POST /api/v1/auth/google`
+   - **Request**: `{ token: "google_id_token" }`
+   - **Server Process**:
+     - Validates Google ID token
+     - Creates/updates user with `google_id`, `opaque_envelope=NULL`
+     - Generates JWT access and refresh tokens
+   - **Response**: `{ access_token, refresh_token, user, token_type: "bearer" }`
+
+### OPAQUE User Authentication
+
+#### User Registration Flow
+
+**Phase 1: Registration Start**
 1. **Frontend**: User enters email and password
 2. **Client OPAQUE**: Generate registration request
    ```javascript
    const { clientRegistrationState, registrationRequest } = 
      opaque.client.startRegistration({ password });
    ```
-3. **API Call**: `POST /api/auth/opaque/register/start`
-   - **Request**: `{ userIdentifier, registrationRequest, name }`
+3. **API Call**: `POST /api/v1/auth/register/start`
+   - **Request**: `{ email, opaque_registration_request }`
    - **Server Process**:
-     - Validates user doesn't exist
+     - Validates email doesn't exist
      - Calls OPAQUE server to create registration response
-     - Stores temporary session with user's name and temporary UUID (since real user doesn't exist yet)
-     - Uses `temp_user_id` to satisfy database constraints during registration phase
-   - **Response**: `{ registrationResponse }`
+     - Stores temporary session state
+   - **Response**: `{ opaque_registration_response, session_id }`
 
-### Phase 2: Registration Finish
+**Phase 2: Registration Finish**
 1. **Client OPAQUE**: Complete registration
    ```javascript
    const { registrationRecord } = opaque.client.finishRegistration({
      clientRegistrationState, registrationResponse, password
    });
    ```
-2. **API Call**: `POST /api/auth/opaque/register/finish`
-   - **Request**: `{ userIdentifier, registrationRecord }`
+2. **API Call**: `POST /api/v1/auth/register/finish`
+   - **Request**: `{ email, opaque_registration_record }`
    - **Server Process**:
-     - Finds temporary session by matching email in session data (since temp_user_id was used)
-     - Creates new user record with real UUID
-     - Stores OPAQUE registration record as "hashed_password"
-     - Cleans up temporary session
-   - **Response**: `{ success: true, message: "User registered successfully" }`
+     - Creates user with `opaque_envelope`, `google_id=NULL`
+     - Stores OPAQUE registration record
+     - Generates JWT tokens
+   - **Response**: `{ access_token, refresh_token, user, token_type: "bearer" }`
 
-## User Authentication Flow
+#### User Login Flow
 
-### Phase 1: Login Start
+**Phase 1: Login Start**
 1. **Frontend**: User enters email and password
-2. **Client OPAQUE**: Generate login request
+2. **Client OPAQUE**: Generate credential request
    ```javascript
    const { clientLoginState, startLoginRequest } = 
      opaque.client.startLogin({ password });
    ```
-3. **API Call**: `POST /api/auth/opaque/login/start`
-   - **Request**: `{ userIdentifier, loginRequest }`
+3. **API Call**: `POST /api/v1/auth/login/start`
+   - **Request**: `{ email, client_credential_request }`
    - **Server Process**:
-     - Retrieves user's OPAQUE registration record
-     - Calls OPAQUE server to start login process
-     - Stores temporary server login state
-   - **Response**: `{ loginResponse }`
+     - Looks up user by email
+     - Calls OPAQUE server with stored envelope
+     - Creates temporary session
+   - **Response**: `{ server_credential_response, session_id }`
 
-### Phase 2: Login Finish
-1. **Client OPAQUE**: Complete login
+**Phase 2: Login Finish**
+1. **Client OPAQUE**: Complete authentication
    ```javascript
-   const clientResult = opaque.client.finishLogin({
+   const finishLoginRequest = opaque.client.finishLogin({
      clientLoginState, loginResponse, password
    });
-   // Returns: { finishLoginRequest, sessionKey, exportKey, serverStaticPublicKey }
    ```
-2. **API Call**: `POST /api/auth/opaque/login/finish`
-   - **Request**: `{ userIdentifier, finishLoginRequest }`
+2. **API Call**: `POST /api/v1/auth/login/finish`
+   - **Request**: `{ session_id, client_credential_response }`
    - **Server Process**:
-     - Retrieves stored server login state
-     - Calls OPAQUE server to finish login verification
-     - Generates JWT access token
+     - Validates OPAQUE authentication
+     - Generates JWT tokens
      - Cleans up temporary session
-   - **Response**: 
-     ```json
-     {
-       "success": true,
-       "user": { "id", "email", "full_name", ... },
-       "token": "jwt_access_token",
-       "token_type": "bearer",
-       "sessionKey": "server_derived_session_key",
-       "exportKey": null,
-       "message": "Login successful"
-     }
-     ```
+   - **Response**: `{ access_token, refresh_token, user, token_type: "bearer" }`
 
-## Key Security Properties
+## Secret Tag Authentication (Always OPAQUE)
 
-### Zero-Knowledge Authentication
-- **Server Never Sees Password**: Only cryptographic challenges are exchanged
-- **Registration Record**: Stored as opaque blob, not reversible to password
-- **Session Keys**: Both client and server derive identical session keys without sharing them
+**Key Principle**: Secret tags use OPAQUE authentication regardless of whether the user authenticated via OAuth or OPAQUE.
 
-### Session Key Derivation
-- **Client Side**: Derives `sessionKey` (86 chars) and `exportKey` (86 chars)
-- **Server Side**: Derives matching `sessionKey` (86 chars), no `exportKey`
-- **Verification**: `clientSessionKey === serverSessionKey` confirms successful authentication
+### Secret Tag Registration
 
-### Cryptographic Guarantees
-- **Forward Secrecy**: Session keys are unique per login session
-- **Server Compromise Resistance**: Stolen server data cannot reveal passwords
-- **Offline Attack Protection**: No password hashes available for cracking
+**Phase 1: Registration Start**
+1. **Client**: Generate random 32-byte tag handle
+2. **Client OPAQUE**: Start registration with secret phrase
+3. **API Call**: `POST /api/v1/secret-tags/register/start`
+   - **Headers**: `Authorization: Bearer ${access_token}`
+   - **Request**: `{ tag_handle, tag_name, color, opaque_registration_request }`
+   - **Response**: `{ opaque_registration_response, session_id }`
 
-## Troubleshooting Guide
+**Phase 2: Registration Finish**
+1. **Client OPAQUE**: Complete registration
+2. **API Call**: `POST /api/v1/secret-tags/register/finish`
+   - **Headers**: `Authorization: Bearer ${access_token}`
+   - **Request**: `{ session_id, opaque_registration_record }`
+   - **Response**: `{ success: true, tag: { id, tag_handle, tag_name, color } }`
 
-### Common Issues
+### Secret Tag Authentication
 
-#### Registration Failures
-1. **"User already exists"**: Email already registered
-2. **"Validation error: name field required"**: Missing name in registration start
-3. **"base64 decoding failed"**: Invalid OPAQUE data format
-4. **"value too long for type"**: Database field length insufficient (check `hashed_password` field)
+**Phase 1: Authentication Start**
+1. **Client OPAQUE**: Start login with secret phrase
+2. **API Call**: `POST /api/v1/secret-tags/{tag_id}/auth/start`
+   - **Headers**: `Authorization: Bearer ${access_token}`
+   - **Request**: `{ client_credential_request }`
+   - **Response**: `{ server_credential_response, session_id }`
 
-#### Login Failures
-1. **"Invalid credentials"**: User doesn't exist or wrong password
-2. **"No active login session"**: Session expired or missing
-3. **"Client login failed"**: Password mismatch or corrupted server response
-4. **"OPAQUE server did not return sessionKey"**: Server-side OPAQUE operation failed
+**Phase 2: Authentication Finish**
+1. **Client OPAQUE**: Complete authentication
+2. **API Call**: `POST /api/v1/secret-tags/{tag_id}/auth/finish`
+   - **Headers**: `Authorization: Bearer ${access_token}`
+   - **Request**: `{ session_id, client_credential_response }`
+   - **Response**: `{ success: true, tag_access_token }`
 
-### Diagnostic Steps
+## Token Management
 
-#### Verify OPAQUE Server Setup
+### Token Refresh
 ```bash
-curl http://localhost:8001/api/auth/opaque/status
-# Should return: {"opaque_enabled": true, "supported_features": {...}}
+POST /api/v1/auth/refresh
+Authorization: Bearer ${refresh_token}
+# Returns: { access_token, token_type: "bearer" }
 ```
 
-#### Check Database Schema
+### Logout
+```bash
+POST /api/v1/auth/logout
+Authorization: Bearer ${access_token}
+# Returns: { message: "Logged out successfully" }
+```
+
+## Error Handling
+
+### Common Error Responses
+
+| Error Code | Scenario | Solution |
+|------------|----------|----------|
+| `400 Bad Request` | Invalid OPAQUE request | Check client library usage |
+| `401 Unauthorized` | Authentication failed | Verify credentials |
+| `409 Conflict` | User already exists | Use login instead of registration |
+| `422 Unprocessable Entity` | Invalid email format | Validate input format |
+
+### Debugging Commands
+
+```bash
+# Check OPAQUE service status
+curl http://localhost:8001/health/opaque
+
+# Test user registration
+curl -X POST http://localhost:8001/api/v1/auth/register/start \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","opaque_registration_request":"..."}'
+
+# Test secret tag authentication
+curl -X POST http://localhost:8001/api/v1/secret-tags/register/start \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"tag_handle":[...],"tag_name":"Test Tag","opaque_registration_request":"..."}'
+```
+
+## Database Queries
+
 ```sql
--- Verify user table structure
-\d users;
--- Check hashed_password field length (should be VARCHAR(500))
+-- Check user authentication method
+SELECT email, 
+       CASE 
+         WHEN google_id IS NOT NULL THEN 'OAuth'
+         WHEN opaque_envelope IS NOT NULL THEN 'OPAQUE'
+         ELSE 'Invalid'
+       END as auth_method,
+       created_at 
+FROM users 
+WHERE email = 'test@example.com';
 
--- Check active sessions
-SELECT session_state, expires_at FROM opaque_sessions 
-WHERE expires_at > NOW();
+-- Check secret tags for user
+SELECT st.tag_name, st.color, st.created_at,
+       encode(st.tag_handle, 'hex') as tag_handle_hex
+FROM secret_tags st
+JOIN users u ON st.user_id = u.id
+WHERE u.email = 'test@example.com';
+
+-- Check active tag sessions
+SELECT ts.id, u.email, st.tag_name, ts.created_at
+FROM tag_sessions ts
+JOIN users u ON ts.user_id = u.id
+JOIN secret_tags st ON ts.tag_id = st.id
+WHERE ts.created_at > NOW() - INTERVAL '15 minutes';
 ```
 
-#### Test Complete Flow
-```bash
-# 1. Test registration start
-curl -X POST http://localhost:8001/api/auth/opaque/register/start \
-  -H "Content-Type: application/json" \
-  -d '{"userIdentifier":"test@example.com","registrationRequest":"test","name":"Test User"}'
+## Security Considerations
 
-# 2. Test login start (after registration)
-curl -X POST http://localhost:8001/api/auth/opaque/login/start \
-  -H "Content-Type: application/json" \
-  -d '{"userIdentifier":"test@example.com","loginRequest":"test"}'
-```
+### Zero-Knowledge Properties
+- **OAuth users**: Can create OPAQUE-protected secret tags
+- **OPAQUE users**: Full zero-knowledge for both user auth and secret tags
+- **Server storage**: Only OPAQUE envelopes, never passwords or phrases
 
 ### Session Management
+- **User sessions**: 30-minute access tokens, 30-day refresh tokens
+- **Tag sessions**: 5-minute tag access tokens for encrypted content
+- **Ephemeral storage**: Tag authentication sessions cleaned up automatically
 
-#### Session Cleanup
-- **Registration Sessions**: Automatically cleaned up after successful registration
-- **Login Sessions**: Automatically cleaned up after successful login
-- **Expired Sessions**: Cleaned up by session expiration (24 hours default)
-
-#### Session State Tracking
-- `registration_started`: User began registration, awaiting finish
-- `login_started`: User began login, awaiting finish
-- Sessions expire after 24 hours to prevent stale state
-
-## Integration Points
-
-### Frontend Integration
-- **React Native**: Uses OPAQUE client library for cryptographic operations
-- **State Management**: Manages client-side cryptographic state between API calls
-- **Token Storage**: Stores JWT token for authenticated API requests
-
-### Backend Integration
-- **FastAPI Endpoints**: RESTful API following OPAQUE protocol phases
-- **Database Persistence**: User records with OPAQUE registration data
-- **JWT Authentication**: Standard JWT tokens for post-authentication API access
-
-### Security Considerations
-- **HTTPS Required**: All OPAQUE exchanges must use encrypted transport
-- **Session Expiration**: Temporary sessions have built-in expiration
-- **Input Validation**: All OPAQUE data validated for proper base64 encoding
-- **Error Handling**: Generic error messages to prevent user enumeration
-
-## Performance Characteristics
-
-### Computational Overhead
-- **Registration**: ~1-3 seconds (includes Argon2 key stretching)
-- **Login**: ~1-3 seconds (includes Argon2 key stretching)
-- **Memory Usage**: Moderate due to cryptographic operations
-
-### Scaling Considerations
-- **Stateless Design**: Each phase is independent, supports horizontal scaling
-- **Database Load**: Standard user table queries, no special indexing needed
-- **Session Storage**: Temporary sessions have minimal storage impact
-
-## Monitoring and Logging
-
-### Key Metrics
-- Registration success/failure rates
-- Login success/failure rates  
-- Session timeout rates
-- OPAQUE server operation latency
-
-### Log Entries
-- User registration attempts and completions
-- Login attempts and completions
-- Session creation and cleanup
-- OPAQUE server operation errors
-
-### Health Checks
-- OPAQUE server status endpoint
-- Database connectivity for session storage
-- JWT token generation capability 
+### Timing Attack Prevention
+- **Constant timing**: 100ms minimum response time on all OPAQUE endpoints
+- **Consistent flows**: Same response patterns for success/failure 

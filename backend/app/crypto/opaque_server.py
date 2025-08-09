@@ -19,11 +19,14 @@ from dataclasses import dataclass
 import base64
 import json
 
-# Import the libopaque library
-import opaque
+# Import the libopaque library (optional). If unavailable, raise explicit error when used.
+try:
+    import opaque  # type: ignore
+except Exception:  # pragma: no cover
+    opaque = None  # type: ignore
 
 # OPAQUE Configuration Constants
-OPAQUE_CONTEXT = "vibes-opaque-v1.0.0"
+OPAQUE_CONTEXT = "kotori-opaque-v1.0.0"
 OPAQUE_NONCE_LENGTH = 32
 OPAQUE_SALT_LENGTH = 32
 
@@ -92,6 +95,8 @@ class ProductionOpaqueServer:
     
     def __init__(self):
         """Initialize production OPAQUE server"""
+        if opaque is None:
+            raise OpaqueServerError("OPAQUE library not available. Install libopaque to enable OPAQUE features.")
         self.registration_records: Dict[str, OpaqueRegistrationRecord] = {}
         self.active_sessions: Dict[str, bytes] = {}
         self.pending_registrations: Dict[str, Tuple[bytes, bytes]] = {}  # user_id -> (server_session, response)
@@ -99,7 +104,7 @@ class ProductionOpaqueServer:
         
     def _generate_ids(self, user_id: str) -> opaque.Ids:
         """Generate OPAQUE IDs structure"""
-        return opaque.Ids(user_id, "vibes-server")
+        return opaque.Ids(user_id, "kotori-server")
     
     def start_registration(self, request: OpaqueRegistrationRequest) -> OpaqueRegistrationResponse:
         """

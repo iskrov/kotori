@@ -49,11 +49,12 @@ class SpeechService:
         
         try:
             self.client_options = self._get_client_options()
-            # Initialize clients only if client_options are valid
+            # Initialize ONLY the sync client here.
+            # Initializing the async client here can occur on a thread without an event loop (e.g., AnyIO worker),
+            # which raises: "There is no current event loop in thread 'AnyIO worker thread'".
             if self.client_options:
-                self.async_client = self._initialize_client(speech_v2.SpeechAsyncClient, "Async")
                 self.sync_client = self._initialize_client(speech_v2.SpeechClient, "Sync")
-            else: # Should not happen if _get_client_options raises ConfigurationError
+            else:  # Should not happen if _get_client_options raises ConfigurationError
                 logger.error("ClientOptions are None after _get_client_options, clients not initialized.")
         except ConfigurationError as e:
             logger.error(f"Configuration error during SpeechService initialization: {e}")
@@ -118,6 +119,17 @@ class SpeechService:
             )
             # Wrap specific GCloud errors if desired, or keep generic RuntimeError
             raise RuntimeError(f"Could not initialize {client_type_name} Speech V2 client") from e
+
+    async def _ensure_async_client(self):
+        """
+        Lazily initialize the Async Speech client within an active event loop.
+        This avoids initialization on threads without an event loop.
+        """
+        if self.async_client is not None:
+            return self.async_client
+        # Initialize inside coroutine to guarantee an event loop exists
+        self.async_client = self._initialize_client(speech_v2.SpeechAsyncClient, "Async")
+        return self.async_client
 
     async def transcribe_audio(
         self, audio_content: bytes, language_codes: Optional[List[str]] = None
@@ -239,13 +251,17 @@ class SpeechService:
         Enhanced transcription method that includes user-specific code phrase checking.
         """
         result = await self.transcribe_audio(audio_content, language_codes)
-        
+
+        # When secret tags are globally disabled, skip any server-side phrase checks
+        if not settings.ENABLE_SECRET_TAGS:
+            result["code_phrase_detected"] = None
+            return result
+
         # Enhanced code phrase checking with user context
         transcript_text = result.get("transcript", "").strip()
         if transcript_text:
             code_phrase_type = self._check_code_phrases(transcript_text, user_id)
             result["code_phrase_detected"] = code_phrase_type
-            
         return result
 
     def _build_streaming_config(self, language_codes: Optional[List[str]] = None) -> dict:
@@ -373,8 +389,11 @@ class SpeechService:
         Defaults to automatic language detection if language_codes is None or empty.
         Uses the chirp_2 model for us-central1 compatibility.
         """
-        if not self.async_client:
-            logger.error(f"Async Speech V2 client not initialized for user {user_id}.")
+        # Ensure async client is initialized within the event loop
+        try:
+            await self._ensure_async_client()
+        except Exception as e:
+            logger.error(f"Failed to initialize Async Speech V2 client in streaming context: {e}")
             await manager.send_personal_message({"type": "error", "message": "Speech client unavailable. Check server configuration."}, user_id)
             return
 

@@ -1,6 +1,6 @@
-# Vibes - Voice Journaling App
+# Kotori - Voice Journaling App
 
-Vibes is a voice-controlled journaling application that allows users to record voice entries, which are automatically transcribed to text, and manage their personal journals.
+Kotori is a voice-controlled journaling application that allows users to record voice entries, which are automatically transcribed to text, and manage their personal journals.
 
 ## Features
 
@@ -10,29 +10,15 @@ Vibes is a voice-controlled journaling application that allows users to record v
 - **Calendar View**: Browse entries by date
 - **🔐 OPAQUE Authentication**: Zero-knowledge authentication protocol - server never sees passwords
 - **Reminder System**: Set reminders to maintain journaling habits
-- **🔒 Zero-Knowledge Privacy**: Multi-level secret tags with end-to-end encryption where only you can access your private data
+- **🔒 Zero-Knowledge Privacy**: Client-side per-user encryption where only you can access your private data (secret tags are disabled by default in Kotori)
 
 ## 🛡️ Privacy & Security Architecture
 
-### 🔒 Zero-Knowledge Encryption with Phrase-Based Secret Tags
+### 🔒 Zero-Knowledge Encryption (Per-User)
 
-Vibes implements **true zero-knowledge encryption** with **phrase-based secret tags**, allowing users to create multiple privacy levels where the server cannot decrypt any user data under any circumstances.
+Kotori implements **true zero-knowledge encryption** with **per-user encryption keys** derived from OPAQUE, enabling secure storage of journal content where the server cannot decrypt user data.
 
-#### 🏷️ Phrase-Based Secret Tags System:
-
-**Multiple Privacy Levels with Voice Activation**
-- **Custom Secret Tags**: Users define 2-5 privacy levels (e.g., "work private", "personal deep", "family sensitive")
-- **Phrase-Based Access**: Each secret tag unlocked by speaking its unique code phrase during entry creation
-- **One Tag Per Entry**: Simple model - each entry belongs to one secret tag or is public
-- **Progressive Access**: Activate different secret tags to access different sets of private entries
-
-**Example Setup:**
-```
-📝 Public Entries (always visible)
-🔒 "work private" → Activated by phrase detection during recording
-🔒 "personal deep" → Activated by phrase detection during recording
-🔒 "family sensitive" → Activated by phrase detection during recording
-```
+Secret tags are deprecated and disabled by default. Existing secret-tag features are guarded by a feature flag to allow transition from Vibes.
 
 #### Voice Activation Examples:
 
@@ -52,28 +38,23 @@ Vibes implements **true zero-knowledge encryption** with **phrase-based secret t
 #### Key Security Features:
 
 **✅ Hardware-Backed Key Storage**
-- Secret tag phrases stored in iOS Secure Enclave / Android Keystore
-- Each secret tag phrase becomes an independent encryption key
+- User encryption keys stored in iOS Secure Enclave / Android Keystore
 - Biometric authentication required for key access
 - Keys never leave the secure hardware environment
 
 **✅ Per-Entry Encryption with Forward Secrecy**
-- Each journal entry encrypted with unique key derived from detected phrase
-- Entry keys wrapped with appropriate secret tag master key
-- Phrase-to-key derivation using Argon2 hashing
+- Each journal entry encrypted with unique key derived from per-user master key
+- Entry keys wrapped with the user's master key
+- KDF uses strong parameters
 - Deleted entries cannot be recovered even with phrase access
 
-**✅ Client-Side Phrase Detection and Management**
-- Code phrase detection happens entirely on device during recording
-- Secret tag filtering client-side only
-- Server never sees secret tag names or phrases
-- Simple active/inactive state per tag
+**✅ Client-Side Only**
+- Encryption occurs entirely on device
+- Server never sees plaintext content
 
-**✅ Coercion Resistance**
-- Each secret tag can be independently activated/deactivated
-- Panic phrases can delete specific secret tag data
-- Progressive disclosure - reveal only what's necessary
-- Invisible activation prevents detection
+**✅ Privacy Guarantees**
+- Server-side decryption capability does not exist
+- Progressive disclosure removed with secret tags off by default
 
 #### Security Guarantees:
 
@@ -83,34 +64,17 @@ Vibes implements **true zero-knowledge encryption** with **phrase-based secret t
 - **Device Seizure Protection**: Secret tag entries invisible without specific code phrases
 - **Forward Secrecy**: Past entries remain secure even if current phrases compromised
 
-#### Technical Implementation:
+#### Technical Implementation (High Level):
 
-```typescript
-// Secret tag master keys derived from phrases independently
-const workTagKey = await deriveSecretTagKey("work-private-phrase", userSecret, salt, 100000);
-const personalTagKey = await deriveSecretTagKey("personal-deep-phrase", userSecret, salt, 100000);
-
-// Each entry gets unique encryption key
-const entryKey = await generateKey();
-const encryptedContent = await encrypt(content, entryKey);
-
-// Entry key wrapped with appropriate secret tag master key (derived from phrase)
-const wrappedKey = await wrapKey(entryKey, workTagKey); // if phrase "work-private" detected
-
-// Server only stores encrypted blobs with phrase hash reference
-await api.post('/entries', {
-  encrypted_content: encryptedContent,
-  encrypted_key: wrappedKey,
-  secret_tag_hash: hashPhrase("work-private-phrase"), // Only hash, not actual phrase
-  // ... other encrypted fields
-});
-```
+1. OPAQUE login derives a per-user secret used to generate an encryption master key (client-side).
+2. Each new entry generates a random key to encrypt content; that key is wrapped with the user's master key.
+3. Backend stores only ciphertext and wrapped entry key; never plaintext.
 
 The zero-knowledge phrase-based secret tags architecture ensures that even if the server is compromised, user data remains completely secure and private with granular access control through voice-activated phrases.
 
 ## 🔐 OPAQUE Zero-Knowledge Authentication
 
-Vibes implements the **OPAQUE protocol** for truly secure authentication where the server never sees user passwords.
+Kotori implements the **OPAQUE protocol** for truly secure authentication where the server never sees user passwords.
 
 ### Key OPAQUE Features:
 
@@ -205,7 +169,7 @@ This project utilizes scripts to simplify the setup and running process.
 2.  **Run the Setup Script:**
     This script installs system dependencies (like `python3-dev`, `libpq-dev`, `postgresql`), Python dependencies for the backend (`pip install`), Node.js dependencies for the frontend (`npm install`), sets up the PostgreSQL database and user (you might be prompted for your `sudo` password), and runs database migrations.
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes)
+    # From the project root (e.g., /home/ai/src/kotori)
     chmod +x scripts/*.sh # Ensure scripts are executable
     scripts/setup.sh
     ```
@@ -228,7 +192,7 @@ This project utilizes scripts to simplify the setup and running process.
 1.  **Start the Application (Backend + Frontend):**
     This script activates the virtual environment, starts the backend FastAPI server, and starts the frontend Expo development server. Logs are stored in the `logs/` directory at the workspace root.
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes)
+    # From the project root (e.g., /home/ai/src/kotori)
     scripts/start.sh
     ```
     The script will output the URLs for the backend and frontend.
@@ -241,7 +205,7 @@ This project utilizes scripts to simplify the setup and running process.
 1.  **Stop All Services (Backend + Frontend):**
     This script stops the backend and frontend processes gracefully.
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes)
+    # From the project root (e.g., /home/ai/src/kotori)
     scripts/stop.sh
     ```
 
@@ -251,7 +215,7 @@ The `setup.sh` script handles the initial database service startup. If you need 
 
 *   **Start Database Service:**
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes)
+    # From the project root (e.g., /home/ai/src/kotori)
     sudo scripts/start_db.sh
     ```
 *   **Stop Database Service:**
@@ -264,13 +228,13 @@ The `setup.sh` script handles the initial database service startup. If you need 
 
 *   **Virtual Environment:** The Python virtual environment (`.venv/`) is located at the workspace root (`/home/ai/src/vibes/.venv/`), one level above the main project directory. The scripts handle activation automatically. If you need to activate it manually (e.g., to use `pip` or `alembic` directly):
     ```bash
-    # From the workspace root (/home/ai/src/vibes)
+    # From the workspace root (/home/ai/src/kotori)
     source .venv/bin/activate
     ```
 *   **Database Migrations:** To create a new migration after changing SQLAlchemy models in `backend/app/models/`:
     ```bash
     # Make sure venv is active
-    # From the workspace root (/home/ai/src/vibes)
+    # From the workspace root (/home/ai/src/kotori)
     cd backend # Navigate to backend directory
     alembic revision --autogenerate -m "Your migration message"
     # Review the generated migration script in backend/migrations/versions/

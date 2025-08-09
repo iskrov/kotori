@@ -63,43 +63,22 @@ jest.mock('@react-navigation/native', () => {
   };
 });
 
-// Mock axios
-jest.mock('axios', () => ({
-  create: jest.fn(() => ({
-    interceptors: {
-      request: { use: jest.fn(), eject: jest.fn() },
-      response: { use: jest.fn(), eject: jest.fn() },
-    },
-    get: jest.fn(() => Promise.resolve({ data: {} })),
-    post: jest.fn(() => Promise.resolve({ data: {} })),
-    put: jest.fn(() => Promise.resolve({ data: {} })),
-    delete: jest.fn(() => Promise.resolve({ data: {} })),
-  })),
-}));
+// Do not mock axios; E2E tests use real backend
 
-// Mock react-native-opaque for testing
-jest.mock('react-native-opaque', () => ({
-  ready: Promise.resolve(),
-  client: {
-    startRegistration: jest.fn(() => ({
-      clientRegistrationState: 'mock-client-state',
-      registrationRequest: 'mock-registration-request',
-    })),
-    finishRegistration: jest.fn(() => ({
-      registrationUpload: 'mock-upload',
-      exportKey: new Uint8Array([1, 2, 3, 4]),
-    })),
-    startLogin: jest.fn(() => ({
-      clientLoginState: 'mock-login-state',
-      credentialRequest: 'mock-credential-request',
-    })),
-    finishLogin: jest.fn(() => ({
-      credentialFinalization: 'mock-finalization',
-      sessionKey: new Uint8Array([1, 2, 3, 4]),
-      exportKey: new Uint8Array([5, 6, 7, 8]),
-    })),
-  },
-}));
+// Provide WebCrypto for Node test environment to support real OPAQUE usage
+if (!global.crypto) {
+  const { webcrypto } = require('crypto');
+  global.crypto = webcrypto;
+}
+
+// Ensure TextEncoder/TextDecoder exist in Node environment
+if (typeof global.TextEncoder === 'undefined') {
+  const { TextEncoder, TextDecoder } = require('util');
+  // @ts-ignore
+  global.TextEncoder = TextEncoder;
+  // @ts-ignore
+  global.TextDecoder = TextDecoder;
+}
 
 // Suppress React Native warnings in tests
 global.console.warn = jest.fn();

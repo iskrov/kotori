@@ -165,7 +165,7 @@ class AlertManager:
                     'smtp_port': getattr(settings, 'ALERT_SMTP_PORT', 587),
                     'smtp_username': getattr(settings, 'ALERT_SMTP_USERNAME', ''),
                     'smtp_password': getattr(settings, 'ALERT_SMTP_PASSWORD', ''),
-                    'from_address': getattr(settings, 'ALERT_FROM_EMAIL', 'alerts@vibes.app'),
+                    'from_address': getattr(settings, 'ALERT_FROM_EMAIL', 'alerts@kotori.io'),
                     'to_addresses': getattr(settings, 'ALERT_TO_EMAILS', [])
                 }
             ),

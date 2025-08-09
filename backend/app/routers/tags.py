@@ -80,4 +80,4 @@ def get_recent_tags(
     Get recently used tags for the current user, ordered by last usage date.
     Returns tags with usage statistics.
     """
-    return journal_service.get_recent_tags(db=db, user_id=current_user.id, limit=limit) 
+    return journal_service.get_recent_tags_by_user(db=db, user_id=current_user.id, limit=limit) 

@@ -14,7 +14,7 @@
 
 ## Overview
 
-This document provides comprehensive documentation of the database schema for the Vibes application. The schema is designed to support a personal journaling and reminder system with robust data integrity, optimal performance, and scalability.
+This document provides comprehensive documentation of the database schema for the Vibes application. The schema is designed to support a personal journaling and reminder system with **dual authentication** (OAuth and OPAQUE), **zero-knowledge secret tags**, robust data integrity, optimal performance, and scalability.
 
 ### Database Technology
 - **Database Engine**: PostgreSQL 14+
@@ -27,9 +27,12 @@ This document provides comprehensive documentation of the database schema for th
 - **Normalization**: Third normal form (3NF) for data integrity
 - **Referential Integrity**: Foreign key constraints throughout
 - **UUID Primary Keys**: Globally unique identifiers for all entities
+- **Dual Authentication**: Support for both OAuth (convenience) and OPAQUE (zero-knowledge)
+- **Zero-Knowledge Security**: Server never stores passwords or secret phrases
 - **Audit Trail**: Created/updated timestamps on all tables
 - **Soft Deletes**: Logical deletion for data recovery capabilities
 - **Performance**: Strategic indexing for common query patterns
+- **Privacy by Design**: Minimal data collection, encrypted sensitive content
 
 ## Database Architecture
 
@@ -67,7 +70,7 @@ This document provides comprehensive documentation of the database schema for th
 │  ┌─────────────────┐                                       │
 │  │  User Domain    │                                       │
 │  │  ┌───────────┐  │                                       │
-│  │  │   users   │  │                                       │
+│  │  │   users   │  │ (Dual Auth: OAuth + OPAQUE)          │
 │  │  └───────────┘  │                                       │
 │  └─────────────────┘                                       │
 │                                                             │
@@ -76,7 +79,16 @@ This document provides comprehensive documentation of the database schema for th
 │  │  ┌───────────┐  │                                       │
 │  │  │ journals  │  │                                       │
 │  │  │   tags    │  │                                       │
-│  │  │secret_tags│  │                                       │
+│  │  │secret_tags│  │ (Zero-knowledge OPAQUE)               │
+│  │  │tag_sessions│ │ (Ephemeral auth sessions)             │
+│  │  └───────────┘  │                                       │
+│  └─────────────────┘                                       │
+│                                                             │
+│  ┌─────────────────┐                                       │
+│  │ Encryption      │                                       │
+│  │  ┌───────────┐  │                                       │
+│  │  │wrapped_keys│ │ (AES-KW key storage)                  │
+│  │  │vault_blobs │ │ (AES-GCM encrypted content)           │
 │  │  └───────────┘  │                                       │
 │  └─────────────────┘                                       │
 │                                                             │
@@ -112,13 +124,14 @@ This document provides comprehensive documentation of the database schema for th
 │  │─────────────────│                                       │
 │  │ id (UUID) PK    │◄──────────────────────┐               │
 │  │ email (UNIQUE)  │                       │               │
-│  │ password_hash   │                       │               │
+│  │ google_id       │ (OAuth)               │               │
+│  │ opaque_envelope │ (OPAQUE)              │               │
+│  │ show_secret_tag │                       │               │
 │  │ first_name      │                       │               │
 │  │ last_name       │                       │               │
 │  │ is_active       │                       │               │
 │  │ created_at      │                       │               │
 │  │ updated_at      │                       │               │
-│  │ last_login      │                       │               │
 │  └─────────────────┘                       │               │
 │         │                                  │               │
 │         │ 1:N                              │               │
@@ -144,12 +157,26 @@ This document provides comprehensive documentation of the database schema for th
 │  │      tags       │  │  secret_tags    │                 │
 │  │─────────────────│  │─────────────────│                 │
 │  │ id (UUID) PK    │  │ id (UUID) PK    │                 │
-│  │ journal_id FK   │  │ journal_id FK   │                 │
-│  │ name            │  │ name            │                 │
-│  │ color           │  │ access_level    │                 │
-│  │ created_at      │  │ created_at      │                 │
-│  │ updated_at      │  │ updated_at      │                 │
-│  └─────────────────┘  └─────────────────┘                 │
+│  │ user_id FK      │  │ user_id FK      │                 │
+│  │ name            │  │ tag_handle      │ (32 bytes)      │
+│  │ color           │  │ opaque_envelope │ (OPAQUE)        │
+│  │ created_at      │  │ tag_name        │                 │
+│  │ updated_at      │  │ color           │                 │
+│  └─────────────────┘  │ created_at      │                 │
+│                        │ updated_at      │                 │
+│                        └─────────────────┘                 │
+│                               │                            │
+│                               │ 1:N                        │
+│                               ▼                            │
+│                        ┌─────────────────┐                 │
+│                        │  tag_sessions   │                 │
+│                        │─────────────────│                 │
+│                        │ id (UUID) PK    │                 │
+│                        │ user_id FK      │                 │
+│                        │ tag_id FK       │                 │
+│                        │ server_ephemeral│                 │
+│                        │ created_at      │                 │
+│                        └─────────────────┘                 │
 │                                                             │
 │  ┌─────────────────┐                                       │
 │  │   reminders     │                                       │
@@ -187,14 +214,19 @@ This document provides comprehensive documentation of the database schema for th
 ### Domain Boundaries
 
 #### User Domain
-- **Purpose**: User authentication and profile management
-- **Tables**: users, user_sessions, audit_logs
-- **Responsibilities**: Authentication, authorization, user preferences
+- **Purpose**: Dual authentication and profile management
+- **Tables**: users
+- **Responsibilities**: OAuth & OPAQUE authentication, user preferences, profile data
 
 #### Content Domain
 - **Purpose**: Journal entries and content management
-- **Tables**: journals, tags, secret_tags
-- **Responsibilities**: Content creation, organization, privacy
+- **Tables**: journals, tags, secret_tags, tag_sessions
+- **Responsibilities**: Content creation, organization, zero-knowledge secret tags
+
+#### Encryption Domain
+- **Purpose**: Cryptographic key management and encrypted storage
+- **Tables**: wrapped_keys, vault_blobs
+- **Responsibilities**: AES-KW key wrapping, AES-GCM encrypted content storage
 
 #### Task Domain
 - **Purpose**: Personal task and reminder management
@@ -210,44 +242,124 @@ This document provides comprehensive documentation of the database schema for th
 
 ### users
 
-The core user table storing account information and authentication data.
+The core user table storing account information and dual authentication data.
 
 ```sql
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    email CITEXT UNIQUE NOT NULL,
+    
+    -- OAuth authentication (Google Sign-in)
+    google_id TEXT UNIQUE NULL,
+    
+    -- OPAQUE authentication (zero-knowledge passwords)
+    opaque_envelope BYTEA NULL,
+    
+    -- Secret tag preferences
+    show_secret_tag_names BOOLEAN NOT NULL DEFAULT TRUE,
+    
+    -- Personal Information Fields
     first_name VARCHAR(100),
     last_name VARCHAR(100),
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP WITH TIME ZONE,
+    full_name VARCHAR(255),  -- Keep for backward compatibility
+    display_name VARCHAR(150),
+    bio TEXT,
+    phone VARCHAR(20),
+    date_of_birth DATE,
     
+    -- User Preferences & Localization
+    timezone VARCHAR(50) NOT NULL DEFAULT 'UTC',
+    language_code VARCHAR(10) NOT NULL DEFAULT 'en',
+    theme_preference VARCHAR(20) NOT NULL DEFAULT 'system',
+    notification_preferences JSONB NOT NULL DEFAULT '{}',
+    privacy_settings JSONB NOT NULL DEFAULT '{}',
+    
+    -- Flexible User Tier Foundation
+    account_tier VARCHAR(50) NOT NULL DEFAULT 'free',
+    tier_metadata JSONB NOT NULL DEFAULT '{}',
+    subscription_status VARCHAR(20) NOT NULL DEFAULT 'none',
+    subscription_expires_at TIMESTAMPTZ,
+    
+    -- Enhanced User Experience
+    onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE,
+    last_seen_at TIMESTAMPTZ,
+    login_count INTEGER NOT NULL DEFAULT 0,
+    avatar_url VARCHAR(500),
+    cover_image_url VARCHAR(500),
+    
+    -- Security & Compliance
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    terms_accepted_at TIMESTAMPTZ,
+    privacy_policy_accepted_at TIMESTAMPTZ,
+    
+    -- Analytics & Insights (privacy-conscious)
+    registration_source VARCHAR(50),
+    referral_code VARCHAR(20),
+    referred_by_user_id UUID REFERENCES users(id),
+    user_agent TEXT,
+    ip_address_hash VARCHAR(64),
+    
+    -- Legacy fields (maintain compatibility)
+    is_active BOOLEAN DEFAULT TRUE,
+    is_superuser BOOLEAN DEFAULT FALSE,
+    
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraints
     CONSTRAINT users_email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
     CONSTRAINT users_name_length CHECK (
         (first_name IS NULL OR length(first_name) >= 1) AND
         (last_name IS NULL OR length(last_name) >= 1)
+    ),
+    -- Dual authentication constraint: exactly one method must be configured
+    CONSTRAINT user_auth_method CHECK (
+        (google_id IS NOT NULL AND opaque_envelope IS NULL) OR
+        (google_id IS NULL AND opaque_envelope IS NOT NULL)
     )
 );
 ```
 
 **Column Details:**
 - `id`: UUID primary key, automatically generated
-- `email`: Unique email address for authentication
-- `password_hash`: Bcrypt hashed password (never store plain text)
-- `first_name`, `last_name`: Optional user display names
-- `is_active`: Account status flag for soft deletion
-- `created_at`: Account creation timestamp
-- `updated_at`: Last profile update timestamp
-- `last_login`: Last successful login timestamp
+- `email`: Unique email address (case-insensitive via CITEXT)
+- `google_id`: OAuth user identifier from Google (NULL for OPAQUE users)
+- `opaque_envelope`: OPAQUE registration envelope (NULL for OAuth users)
+- `show_secret_tag_names`: User preference for displaying secret tag names
+- `first_name`, `last_name`, `full_name`, `display_name`: User display information
+- `bio`: Optional user biography
+- `phone`, `date_of_birth`: Personal contact information
+- `timezone`, `language_code`: Localization preferences
+- `theme_preference`: UI theme selection ('light', 'dark', 'system')
+- `notification_preferences`, `privacy_settings`: JSON configuration objects
+- `account_tier`: User subscription level ('free', 'premium', 'enterprise')
+- `tier_metadata`: Flexible tier-specific configuration
+- `subscription_status`, `subscription_expires_at`: Subscription management
+- `onboarding_completed`: First-time user experience tracking
+- `last_seen_at`, `login_count`: Activity tracking
+- `avatar_url`, `cover_image_url`: Profile media
+- `email_verified`, `phone_verified`, `two_factor_enabled`: Security features
+- `terms_accepted_at`, `privacy_policy_accepted_at`: Legal compliance
+- `registration_source`, `referral_code`, `referred_by_user_id`: Analytics
+- `user_agent`, `ip_address_hash`: Privacy-conscious tracking
+- `is_active`, `is_superuser`: Legacy compatibility fields
+- `created_at`, `updated_at`: Audit timestamps
+
+**Authentication Methods:**
+- **OAuth Users**: `google_id` populated, `opaque_envelope` is NULL
+- **OPAQUE Users**: `opaque_envelope` populated, `google_id` is NULL
+- **Constraint**: Exactly one authentication method must be configured per user
 
 **Business Rules:**
-- Email must be unique across all users
+- Email must be unique across all users (case-insensitive)
 - Email format validation via check constraint
-- Password must be hashed before storage
-- Soft deletion via `is_active` flag
+- Dual authentication constraint ensures data integrity
 - Names must be at least 1 character if provided
+- Soft deletion via `is_active` flag
+- Self-referential relationship for user referrals
+- Privacy-conscious analytics (hashed IP addresses)
 
 ### journals
 
@@ -325,44 +437,97 @@ CREATE TABLE tags (
 
 ### secret_tags
 
-OPAQUE zero-knowledge secret tags for secure voice phrase activation.
+Clean OPAQUE zero-knowledge secret tags for secure voice phrase activation.
 
 ```sql
 CREATE TABLE secret_tags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    phrase_hash BYTEA(16) NOT NULL UNIQUE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    salt BYTEA(16) NOT NULL,
-    verifier_kv BYTEA(32) NOT NULL,
-    opaque_envelope BYTEA NOT NULL,
-    tag_name VARCHAR(100) NOT NULL,
-    color_code VARCHAR(7) NOT NULL DEFAULT '#007AFF',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
-    CONSTRAINT unique_user_secret_tag UNIQUE (user_id, tag_name),
-    CONSTRAINT secret_tags_phrase_hash_key UNIQUE (phrase_hash)
+    -- Clean OPAQUE authentication - random handle chosen by client
+    tag_handle BYTEA(32) UNIQUE NOT NULL,
+    opaque_envelope BYTEA NOT NULL,
+    
+    -- Tag metadata
+    tag_name TEXT NOT NULL,
+    color TEXT NULL,
+    
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Indexes
+    CONSTRAINT unique_user_secret_tag UNIQUE (user_id, tag_name)
 );
+
+-- Indexes for performance
+CREATE INDEX idx_secret_tags_user_id ON secret_tags(user_id);
+CREATE UNIQUE INDEX idx_secret_tags_handle ON secret_tags(tag_handle);
+CREATE INDEX idx_secret_tags_user_tag_name ON secret_tags(user_id, tag_name);
+CREATE INDEX idx_secret_tags_user_created ON secret_tags(user_id, created_at);
 ```
 
 **Column Details:**
 - `id`: UUID primary key, automatically generated
-- `phrase_hash`: BLAKE2s hash of secret phrase (16 bytes, deterministic lookup)
 - `user_id`: Foreign key to users table with cascade delete
-- `salt`: Random salt for Argon2id key derivation (16 bytes)
-- `verifier_kv`: OPAQUE server verification key (32 bytes)
+- `tag_handle`: Random 32-byte identifier chosen by client (not derived from phrase)
 - `opaque_envelope`: OPAQUE registration envelope (variable length)
-- `tag_name`: Human-readable tag name (max 100 chars)
-- `color_code`: Hex color code for UI display
+- `tag_name`: Human-readable tag name
+- `color`: Hex color code for UI display (nullable)
 - `created_at`: Tag creation timestamp
 - `updated_at`: Last modification timestamp
 
 **Business Rules:**
 - Must belong to a valid user
 - Secret tag names must be unique per user
-- Phrase hash must be globally unique (deterministic from phrase)
+- Tag handle must be globally unique (32 random bytes)
 - Implements zero-knowledge authentication via OPAQUE protocol
 - Server never stores actual secret phrases
+- Clean implementation without legacy phrase_hash/salt/verifier_kv fields
+
+**Security Properties:**
+- **Zero-knowledge**: Server stores only OPAQUE envelopes, never learns phrases
+- **Random handles**: Tag handles are not derived from phrases, providing plausible deniability
+- **Independent authentication**: Secret tags use OPAQUE regardless of user authentication method
+- **Perfect forward secrecy**: Authentication sessions are ephemeral
+
+### tag_sessions
+
+Ephemeral OPAQUE authentication sessions for secret tags.
+
+```sql
+CREATE TABLE tag_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    tag_id UUID NOT NULL REFERENCES secret_tags(id),
+    server_ephemeral BYTEA NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance
+CREATE INDEX idx_tag_sessions_user_id ON tag_sessions(user_id);
+CREATE INDEX idx_tag_sessions_tag_id ON tag_sessions(tag_id);
+CREATE INDEX idx_tag_sessions_created_at ON tag_sessions(created_at);
+```
+
+**Column Details:**
+- `id`: UUID primary key, automatically generated
+- `user_id`: Foreign key to users table
+- `tag_id`: Foreign key to secret_tags table
+- `server_ephemeral`: OPAQUE server ephemeral state (binary data)
+- `created_at`: Session creation timestamp
+- `updated_at`: Last modification timestamp
+
+**Business Rules:**
+- Sessions are ephemeral and automatically cleaned up by TTL job
+- Used for multi-round OPAQUE authentication protocol
+- Contains temporary cryptographic state during authentication
+- Cleaned up after configured timeout (typically 15 minutes)
+
+**Security Properties:**
+- **Ephemeral**: Sessions exist only during active authentication
+- **Automatic cleanup**: TTL job removes expired sessions
+- **No persistent secrets**: Contains only temporary protocol state
 
 ### wrapped_keys
 
@@ -374,11 +539,15 @@ CREATE TABLE wrapped_keys (
     tag_id UUID NOT NULL REFERENCES secret_tags(id) ON DELETE CASCADE,
     vault_id UUID NOT NULL,
     wrapped_key BYTEA(40) NOT NULL,
-    key_purpose VARCHAR(50) NOT NULL DEFAULT 'vault_data',
+    key_purpose TEXT NOT NULL DEFAULT 'vault_data',
     key_version INTEGER NOT NULL DEFAULT 1,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Indexes for performance
+CREATE INDEX idx_wrapped_keys_tag_id ON wrapped_keys(tag_id);
+CREATE INDEX idx_wrapped_keys_vault_id ON wrapped_keys(vault_id);
 ```
 
 **Column Details:**
@@ -397,32 +566,39 @@ CREATE TABLE wrapped_keys (
 - Key wrapping uses AES Key Wrap (RFC 3394) standard
 - Supports key rotation through version tracking
 
+**Security Properties:**
+- **AES-KW**: Industry standard key wrapping algorithm
+- **Cascade delete**: Keys are automatically removed when tags are deleted
+- **Version tracking**: Supports key rotation for enhanced security
+
 ### vault_blobs
 
 Encrypted content blobs stored in secure vaults.
 
 ```sql
 CREATE TABLE vault_blobs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vault_id UUID NOT NULL,
     object_id UUID NOT NULL,
-    wrapped_key_id UUID NOT NULL REFERENCES wrapped_keys(id) ON DELETE CASCADE,
+    wrapped_key_id UUID NOT NULL REFERENCES wrapped_keys(id),
     iv BYTEA(12) NOT NULL,
     ciphertext BYTEA NOT NULL,
     auth_tag BYTEA(16) NOT NULL,
-    content_type VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
+    content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
     content_size INTEGER NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     
-    CONSTRAINT unique_vault_object UNIQUE (vault_id, object_id)
+    PRIMARY KEY (vault_id, object_id)
 );
+
+-- Indexes for performance
+CREATE INDEX idx_vault_blobs_vault_id ON vault_blobs(vault_id);
+CREATE INDEX idx_vault_blobs_wrapped_key_id ON vault_blobs(wrapped_key_id);
 ```
 
 **Column Details:**
-- `id`: UUID primary key, automatically generated
-- `vault_id`: UUID identifier for the vault containing this blob
-- `object_id`: UUID identifier for the specific object within the vault
+- `vault_id`: UUID identifier for the vault containing this blob (part of composite PK)
+- `object_id`: UUID identifier for the specific object within the vault (part of composite PK)
 - `wrapped_key_id`: Foreign key to wrapped_keys table
 - `iv`: AES-GCM initialization vector (12 bytes)
 - `ciphertext`: Encrypted content (variable length)
@@ -435,43 +611,25 @@ CREATE TABLE vault_blobs (
 **Business Rules:**
 - Must reference a valid wrapped key for decryption
 - Uses AES-GCM authenticated encryption
-- Vault/object combination must be unique
+- Vault/object combination forms composite primary key
 - Content type helps with proper handling after decryption
 
-### opaque_sessions
+**Security Properties:**
+- **AES-GCM**: Authenticated encryption with associated data (AEAD)
+- **Composite key**: Ensures uniqueness within vaults
+- **IV uniqueness**: Each blob has unique initialization vector
+- **Authentication tag**: Prevents tampering with encrypted content
 
-OPAQUE protocol authentication session state management.
+### Legacy Tables (Deprecated)
 
-```sql
-CREATE TABLE opaque_sessions (
-    session_id VARCHAR(64) PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    phrase_hash BYTEA(16),
-    session_state VARCHAR(20) NOT NULL DEFAULT 'initialized',
-    session_data BYTEA,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    last_activity TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
+The following tables have been deprecated in favor of the clean dual authentication system:
 
-**Column Details:**
-- `session_id`: String primary key (required by OPAQUE protocol)
-- `user_id`: Foreign key to users table with cascade delete
-- `phrase_hash`: Optional phrase hash being authenticated (16 bytes)
-- `session_state`: Current authentication state ('initialized', 'registration_started', 'login_started', etc.)
-- `session_data`: Protocol-specific binary session data
-- `expires_at`: Session expiration timestamp
-- `last_activity`: Last activity timestamp for cleanup
-- `created_at`: Session creation timestamp
-- `updated_at`: Last modification timestamp
+#### opaque_sessions (Deprecated)
+- **Replaced by**: `tag_sessions` for secret tag authentication
+- **Reason**: Simplified to focus only on secret tag authentication sessions
+- **Migration**: Old OPAQUE user sessions are now handled via JWT tokens directly
 
-**Business Rules:**
-- Session ID must be unique and cryptographically random
-- Sessions automatically expire for security
-- Session data contains temporary OPAQUE protocol state
-- Supports both registration and authentication flows
+**Note**: This table may still exist in some database instances but is no longer used by the application.
 
 ### security_audit_logs
 

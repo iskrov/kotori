@@ -8,6 +8,7 @@ import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import SecretTagSetup from '../SecretTagSetup';
+jest.mock('../../config/featureFlags', () => ({ areSecretTagsEnabled: () => true }));
 import { tagManager } from '../../services/tagManager';
 import { opaqueTagManager } from '../../services/OpaqueTagManager';
 import { sessionStorageManager } from '../../services/SessionStorageManager';

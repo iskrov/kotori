@@ -1,20 +1,14 @@
-# Tasks for PBI 3: OPAQUE Client Integration
+# Tasks for PBI 3: Phase 3 — Per-user encryption without secret tags
 
 This document lists all tasks associated with PBI 3.
 
-**Parent PBI**: [PBI 3: OPAQUE Client Integration](./prd.md)
+**Parent PBI**: [PBI 3: Phase 3 — Per-user encryption without secret tags](./prd.md)
 
 ## Task Summary
 
 | Task ID | Name | Status | Description |
-| :------ | :--- | :----- | :---------- |
-| 3-1 | [Create OPAQUE Client Wrapper](./3-1.md) | Done | Implement TypeScript wrapper for OPAQUE library with error handling |
-| 3-2 | [Integrate Voice Phrase Detection](./3-2.md) | Done | Connect OPAQUE authentication to the existing voice transcription workflow without any changes to the transcription service |
-| 3-3 | [Implement Session Management](./3-3.md) | Done | Create secure session handling for active secret tags with timeout management |
-| 3-4 | [Implement Secret Tag Creation UI on top of existing UI](./3-4.md) | Done | Change the existing user interface to support OPAQUE-based secret tag registration. The existing UI should be left unchanged. |
-| 3-5 | [Implement Encrypted Entry Creation](./3-5.md) | Done | Create encrypted journal entry flow using session data keys |
-| 3-6 | [Create Active Session Indicators](./3-6.md) | Done | Build UI components to show active secret sessions and timeouts |
-| 3-7 | [Remove Legacy Client Authentication](./3-7.md) | Done | Remove all legacy V1/V2 client authentication code and UI components |
-| 3-8 | [Create Manual Session Controls](./3-8.md) | Done | Build UI for manual session extension, deactivation, and management |
-| 3-9 | [Implement Error Handling](./3-9.md) | Done | Create graceful error handling that doesn't leak security information |
-| 3-10 | [Create E2E Integration Tests](./3-10.md) | Done | Build comprehensive tests for voice-to-encryption workflow | 
+| :------ | :--------------------------------------- | :------- | :--------------------------------- |
+| 3-1 | [Client per-user key derivation](./3-1.md) | Review | Derive user master key from OPAQUE client-side. |
+| 3-2 | [Update API serializers/validators](./3-2.md) | Review | Remove secret_tag from payloads; add encrypted flag. |
+| 3-3 | [Backend read/write path updates](./3-3.md) | Review | Journal endpoints handle per-user encryption metadata. |
+| 3-4 | [E2E CoS Test](./3-4.md) | InProgress | End-to-end verification of per-user encryption.

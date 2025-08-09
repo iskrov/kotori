@@ -19,6 +19,7 @@ import { MainStackParamList, RecordScreenParams } from '../../navigation/types';
 // Components
 import AudioRecorder from '../../components/AudioRecorder';
 import { SecretTagFloatingIndicator } from '../../components/SecretTagIndicator';
+import { areSecretTagsEnabled } from '../../config/featureFlags';
 
 // Hooks
 import useJournalEntry from '../../hooks/useJournalEntry'; // Removed JournalData import as it's implicitly used
@@ -195,6 +196,10 @@ const RecordScreen: React.FC = () => {
 
   // Load active secret tags
   useEffect(() => {
+    if (!areSecretTagsEnabled()) {
+      setActiveTags([]);
+      return;
+    }
     const loadActiveTags = async () => {
       try {
         const activeTagsList = await tagManager.getActiveSecretTags();
@@ -455,10 +460,12 @@ const RecordScreen: React.FC = () => {
               />
               
               {/* Secret Tag Floating Indicator */}
-              <SecretTagFloatingIndicator
-                activeTags={activeTags}
-                onPress={() => navigation.navigate('TagManagement')}
-              />
+              {areSecretTagsEnabled() && (
+                <SecretTagFloatingIndicator
+                  activeTags={activeTags}
+                  onPress={() => navigation.navigate('TagManagement')}
+                />
+              )}
             </View>
           </View>
         ) : (

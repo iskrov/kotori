@@ -9,6 +9,8 @@ import { JournalAPI } from './api';
 import { zeroKnowledgeEncryption } from './zeroKnowledgeEncryption';
 import { tagManager } from './tagManager';
 import logger from '../utils/logger';
+import { clientEncryption } from './clientEncryption';
+import { areSecretTagsEnabled } from '../config/featureFlags';
 
 export interface JournalEntryData {
   id?: number;
@@ -95,16 +97,21 @@ class EncryptedJournalService {
     
     // Determine the final secret tag to use for this entry
     const targetSecretTagId = secretTagId || optionDetectedTagId || manuallyDetectedTagId;
-    
+
+    // If secret tags feature is disabled, use per-user encryption path
+    if (!areSecretTagsEnabled()) {
+      return this.createPerUserEncryptedEntry(finalEntryData);
+    }
+
     if (targetSecretTagId && zeroKnowledgeEncryption.isPhraseKeyLoaded(targetSecretTagId)) {
       return this.createSecretTagEntry(finalEntryData, targetSecretTagId);
-    } else {
-      if (targetSecretTagId && !zeroKnowledgeEncryption.isPhraseKeyLoaded(targetSecretTagId)) {
-        logger.warn(`Entry should use secret tag ${targetSecretTagId} but phrase encryption not ready, creating public entry`);
-      }
-      // Fall back to public entry
-      return this.createPublicEntry(finalEntryData);
     }
+
+    if (targetSecretTagId && !zeroKnowledgeEncryption.isPhraseKeyLoaded(targetSecretTagId)) {
+      logger.warn(`Entry should use secret tag ${targetSecretTagId} but phrase encryption not ready, creating public entry`);
+    }
+    // Fall back to public entry
+    return this.createPublicEntry(finalEntryData);
   }
 
   /**
@@ -118,8 +125,7 @@ class EncryptedJournalService {
         entry_date: entryData.entry_date || new Date().toISOString(),
         audio_url: entryData.audio_url,
         tags: entryData.tags || [],
-        secret_tag_id: null,
-        secret_tag_hash: null,
+        // Remove secret tag references in per-user encryption mode
       });
       
       logger.info('Created public journal entry');
@@ -127,6 +133,35 @@ class EncryptedJournalService {
     } catch (error) {
       logger.error('Failed to create public journal entry:', error);
       throw new Error('Failed to create journal entry');
+    }
+  }
+
+  /**
+   * Create a per-user encrypted journal entry (no secret tags)
+   */
+  private async createPerUserEncryptedEntry(entryData: Omit<JournalEntryData, 'id'>): Promise<JournalEntryData> {
+    try {
+      const enc = await clientEncryption.encryptPerUser(entryData.content);
+      const response = await JournalAPI.createEntry({
+        title: entryData.title || '',
+        content: '',
+        entry_date: entryData.entry_date || new Date().toISOString(),
+        audio_url: entryData.audio_url,
+        tags: entryData.tags || [],
+        encrypted_content: enc.encryptedContent,
+        encryption_iv: enc.iv,
+        encrypted_key: enc.wrappedKey,
+        encryption_wrap_iv: enc.wrapIv,
+        encryption_algorithm: enc.algorithm || 'AES-GCM',
+      } as any);
+      logger.info('Created per-user encrypted journal entry');
+      return {
+        ...response.data,
+        content: entryData.content,
+      };
+    } catch (error) {
+      logger.error('Failed to create per-user encrypted journal entry:', error);
+      throw new Error('Failed to create encrypted journal entry');
     }
   }
 
@@ -385,7 +420,8 @@ class EncryptedJournalService {
         // Update the content with the cleaned version
         updates.content = processedContent;
 
-        if (detectedTagId && zeroKnowledgeEncryption.isPhraseKeyLoaded(detectedTagId)) {
+        // Secret tags path if enabled
+        if (areSecretTagsEnabled() && detectedTagId && zeroKnowledgeEncryption.isPhraseKeyLoaded(detectedTagId)) {
           logger.info(`Secret phrase detected during update. Encrypting entry ${id} with tag ${detectedTagId}.`);
           
           const encrypted = await zeroKnowledgeEncryption.encryptEntryWithSecretPhrase(processedContent, detectedTagId);
@@ -415,6 +451,23 @@ class EncryptedJournalService {
             content: processedContent, // Return decrypted content for UI
           };
         }
+
+        // Per-user encryption path when secret tags disabled
+        if (!areSecretTagsEnabled()) {
+          logger.info(`Updating entry ${id} with per-user encryption.`);
+          const enc = await clientEncryption.encryptPerUser(processedContent);
+          const encryptedUpdatePayload: any = {
+            ...updates,
+            content: '',
+            encrypted_content: enc.encryptedContent,
+            encryption_iv: enc.iv,
+            encrypted_key: enc.wrappedKey,
+            encryption_wrap_iv: enc.wrapIv,
+            encryption_algorithm: enc.algorithm || 'AES-GCM',
+          };
+          const response = await JournalAPI.updateEntry(id, encryptedUpdatePayload);
+          return { ...response.data, content: processedContent };
+        }
       }
       
       // If no secret phrase was detected or encryption is not ready, perform a standard public update
@@ -430,10 +483,10 @@ class EncryptedJournalService {
   /**
    * Delete a journal entry
    */
-  async deleteEntry(id: number): Promise<void> {
+  async deleteEntry(id: string): Promise<void> {
     try {
-      await JournalAPI.deleteEntry(id);
-      logger.info(`Deleted journal entry ${id}`);
+      await JournalAPI.deleteEntry(String(id));
+      logger.info(`Deleted journal entry ${String(id)}`);
     } catch (error) {
       logger.error(`Failed to delete journal entry ${id}:`, error);
       throw new Error('Failed to delete journal entry');

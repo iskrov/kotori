@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Vibes",
-    "slug": "vibes",
+    "name": "Kotori",
+    "slug": "kotori",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,14 +18,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vibes.app"
+      "bundleIdentifier": "com.kotori.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.vibes.app"
+      "package": "com.kotori.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -42,11 +42,11 @@
     "extra": {
       "apiUrl": "http://localhost:8001",
       "googleClientId": "your-google-client-id-here",
-      "googleCloudProjectId": "gen-lang-client-0845999334",
+      "googleCloudProjectId": "kotori-io",
       "eas": {
         "projectId": "your-project-id"
       }
     }
   },
-  "name": "vibes"
+  "name": "kotori"
 } 

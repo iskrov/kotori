@@ -17,14 +17,15 @@ class SecretTag(Base, TimestampMixin):
 
     # Use UUID as primary key to match the updated schema
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
-    # Store the binary phrase hash for OPAQUE lookups
-    phrase_hash = Column(LargeBinary(16), nullable=False, unique=True, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    salt = Column(LargeBinary(16), nullable=False)
-    verifier_kv = Column(LargeBinary(32), nullable=False)
+    
+    # Clean OPAQUE authentication - random 32-byte handle chosen by client
+    tag_handle = Column(LargeBinary(32), unique=True, nullable=False, index=True)
     opaque_envelope = Column(LargeBinary, nullable=False)
+    
+    # Tag metadata
     tag_name = Column(String(100), nullable=False)
-    color_code = Column(String(7), nullable=False, default='#007AFF')
+    color = Column(String(7), nullable=True)
 
     user = relationship("User", back_populates="secret_tags")
     wrapped_keys = relationship("WrappedKey", back_populates="secret_tag", cascade="all, delete-orphan")
@@ -33,9 +34,29 @@ class SecretTag(Base, TimestampMixin):
     # Indexes defined in the model for documentation
     __table_args__ = (
         Index('idx_secret_tags_user_id', 'user_id'),
-        Index('idx_secret_tags_phrase_hash', 'phrase_hash', unique=True),
+        Index('idx_secret_tags_handle', 'tag_handle', unique=True),
         Index('idx_secret_tags_user_tag_name', 'user_id', 'tag_name'),
         Index('idx_secret_tags_user_created', 'user_id', 'created_at'),
+    )
+
+
+class TagSession(Base, TimestampMixin):
+    """Ephemeral tag authentication sessions - TTL managed by background job"""
+    __tablename__ = "tag_sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    tag_id = Column(UUID(as_uuid=True), ForeignKey("secret_tags.id"), nullable=False, index=True)
+    server_ephemeral = Column(LargeBinary, nullable=False)
+    
+    # Relationships
+    user = relationship("User")
+    tag = relationship("SecretTag")
+
+    __table_args__ = (
+        Index('idx_tag_sessions_user_id', 'user_id'),
+        Index('idx_tag_sessions_tag_id', 'tag_id'),
+        Index('idx_tag_sessions_created_at', 'created_at'),
     )
 
 
@@ -88,7 +109,7 @@ class OpaqueSession(Base, TimestampMixin):
     session_id = Column(String(64), primary_key=True, nullable=False)
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     # Remove binary_tag_id as it's no longer used with the new schema
-    session_state = Column(String(20), nullable=False, default='initialized')
+    session_state = Column(String(64), nullable=False, default='initialized')
     session_data = Column(LargeBinary, nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     last_activity = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

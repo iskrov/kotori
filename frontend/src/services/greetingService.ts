@@ -37,7 +37,7 @@ const TIME_GREETINGS: TimeBasedGreetings = {
     "Morning motivation time, {userName} ⚡",
     "Seize the morning, {userName} 🏆",
     "{userName}, what story will today tell? 📚",
-    "Morning vibes are strong, {userName} 🎵",
+    "Morning energy is strong, {userName} 🎵",
     "Ready for today's adventure, {userName}? 🗺️",
   ],
   afternoon: [

@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
 import { SecretTagV2 } from '../services/secretTagOnlineManager';
+import { areSecretTagsEnabled } from '../config/featureFlags';
 import logger from '../utils/logger';
 
 // Helper to determine if native driver should be used
@@ -64,8 +65,8 @@ const SecretTagIndicator: React.FC<SecretTagIndicatorProps> = ({
     }
   }, [activeTags.length, showPulse, pulseAnim]);
 
-  // Don't render if no active tags
-  if (activeTags.length === 0) {
+  // Don't render if feature disabled or no active tags
+  if (!areSecretTagsEnabled() || activeTags.length === 0) {
     return null;
   }
 
@@ -165,7 +166,7 @@ export const SecretTagFloatingIndicator: React.FC<{
     }
   }, [activeTags.length, pulseAnim]);
 
-  if (activeTags.length === 0) {
+  if (!areSecretTagsEnabled() || activeTags.length === 0) {
     return null;
   }
 

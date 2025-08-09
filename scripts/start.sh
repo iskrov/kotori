@@ -1,10 +1,10 @@
 #!/bin/bash
 
-echo "Starting Vibes Application..."
+echo "Starting Kotori Application..."
 
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-# Project root is the parent directory of the script directory (vibes/)
+# Project root is the parent directory of the script directory (kotori/)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Venv, logs, and PID files are now relative to the new PROJECT_ROOT (workspace root)
 VENV_PATH="$PROJECT_ROOT/.venv"
@@ -45,14 +45,35 @@ echo "Ensuring previous instances are stopped..."
 "$SCRIPT_DIR/stop.sh"
 sleep 1 # Give processes a moment to terminate
 
-# Activate virtual environment
-echo "Attempting to activate virtual environment..."
-if [ -f "$VENV_PATH/bin/activate" ]; then
-    source "$VENV_PATH/bin/activate"
-    echo "Virtual environment activated."
+# Activate Python environment (conda preferred)
+echo "Attempting to activate conda environment 'kotori'..."
+if command -v conda > /dev/null 2>&1; then
+    # Initialize conda in this shell
+    eval "$(conda shell.bash hook)"
+    if conda env list | awk '{print $1}' | grep -qx "kotori"; then
+        conda activate kotori
+        echo "Conda environment 'kotori' activated."
+        # Ensure dynamic linker can find locally built crypto libs
+        export LD_LIBRARY_PATH="/home/ai/src/libopaque/src:/usr/local/lib:${LD_LIBRARY_PATH}"
+        echo "LD_LIBRARY_PATH set to: $LD_LIBRARY_PATH"
+        # Ensure Python can pick up backend local shims (e.g., sitecustomize) and package modules
+        export PYTHONPATH="$PROJECT_ROOT/backend:${PYTHONPATH}"
+        echo "PYTHONPATH set to: $PYTHONPATH"
+    else
+        echo "ERROR: Conda environment 'kotori' not found. Please create it and install backend deps."
+        echo "Try: conda create -y -n kotori python=3.10 && conda activate kotori && pip install -r backend/requirements.txt"
+        exit 1
+    fi
 else
-    echo "ERROR: Virtual environment not found at $VENV_PATH. Cannot start backend."
-    exit 1
+    echo "WARNING: 'conda' not found. Falling back to virtualenv at $VENV_PATH if available."
+    if [ -f "$VENV_PATH/bin/activate" ]; then
+        # shellcheck disable=SC1090
+        source "$VENV_PATH/bin/activate"
+        echo "Virtual environment activated."
+    else
+        echo "ERROR: Neither conda env 'kotori' nor venv at $VENV_PATH found. Cannot start backend."
+        exit 1
+    fi
 fi
 
 # Start backend
@@ -103,7 +124,7 @@ fi
 
 echo "Backend server started successfully (PID: $(cat "$BACKEND_PID_FILE"))."
 
-cd "$PROJECT_ROOT" # Go back to project root (vibes/)
+cd "$PROJECT_ROOT" # Go back to project root (kotori/)
 
 # Start frontend
 echo "Starting frontend..."
@@ -142,7 +163,7 @@ fi
 cd "$PROJECT_ROOT"
 
 echo "----------------------------------------"
-echo "Vibes Application Started!"
+echo "Kotori Application Started!"
 echo "----------------------------------------"
 echo "Backend: http://localhost:$BACKEND_PORT (Health: /api/health)"
 echo "Frontend: http://localhost:$FRONTEND_PORT"

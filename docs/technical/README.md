@@ -1,6 +1,6 @@
 # Technical Documentation
 
-This directory contains technical documentation for the Vibes application, including architecture, implementation details, and troubleshooting guides.
+This directory contains technical documentation for the Kotori application, including architecture, implementation details, and troubleshooting guides.
 
 ## Authentication
 
@@ -16,7 +16,7 @@ This directory contains technical documentation for the Vibes application, inclu
 
 ## Architecture
 
-The Vibes application uses:
+The Kotori application uses:
 - **Backend**: FastAPI with SQLAlchemy ORM
 - **Frontend**: React Native with Expo
 - **Database**: PostgreSQL 14

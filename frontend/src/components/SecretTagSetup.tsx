@@ -15,7 +15,6 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
@@ -23,6 +22,10 @@ import { AppTheme } from '../config/theme';
 import OpaqueTagIndicator from './OpaqueTagIndicator';
 import logger from '../utils/logger';
 import { OpaqueSecretTag } from '../types/opaqueTypes';
+import { api } from '../services/api';
+import { OpaqueAuthService } from '../services/opaqueAuth';
+import { areSecretTagsEnabled } from '../config/featureFlags';
+import { tagManager } from '../services/tagManager';
 
 interface SecretTagSetupProps {
   onTagCreated?: (tagId: string) => void;
@@ -37,6 +40,9 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
   existingTagNames = [],
   enableOpaqueAuth = true,
 }) => {
+  if (!areSecretTagsEnabled()) {
+    return null;
+  }
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
   
@@ -46,7 +52,7 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
   const [selectedColor, setSelectedColor] = useState('#007AFF');
   const [isLoading, setIsLoading] = useState(false);
   const [useOpaqueAuth, setUseOpaqueAuth] = useState(true);
-  const [securityLevel, setSecurityLevel] = useState<'standard' | 'enhanced'>('standard');
+  const [securityLevel] = useState<'standard' | 'enhanced'>('standard'); // Always use standard - no user selection needed
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [justCreated, setJustCreated] = useState<{ 
     tagName: string; 
@@ -135,7 +141,7 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
   }, []);
 
   /**
-   * Handle tag creation
+   * Handle tag creation using OPAQUE protocol
    */
   const handleCreateTag = useCallback(async () => {
     // Validate inputs
@@ -161,44 +167,179 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
     setIsLoading(true);
 
     try {
-      let tagId: string;
-      let createdTag: OpaqueSecretTag | undefined;
-
-      // Create server-side secret tag (PBI-7 approach)
-      // This creates the tag on the server using OPAQUE registration
-      const response = await fetch('/api/opaque/secret-tags/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          tag_name: tagName.trim(),
-          phrase: activationPhrase.trim(),
-          color_code: selectedColor
-        })
+      const phrase = activationPhrase.trim();
+      
+      logger.info('🚀 UPDATED CODE: Starting OPAQUE secret tag registration', { 
+        tagName: tagName.trim(),
+        phraseLength: phrase.length,
+        timestamp: new Date().toISOString()
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create secret tag');
+      // Use the exact same OPAQUE flow as user registration
+      const opaqueAuth = OpaqueAuthService.getInstance();
+      
+      // Create a unique identifier for this secret tag registration
+      const secretTagIdentifier = `secret-tag-${tagName.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+      
+      logger.info('Step 1: Starting OPAQUE registration with OpaqueAuthService');
+      
+      // Step 1: Start OPAQUE registration (same as user registration)
+      let registrationRequest;
+      try {
+        const result = await opaqueAuth.startRegistration(phrase, secretTagIdentifier);
+        registrationRequest = result.registrationRequest;
+        
+        logger.info('Step 1 Complete: OPAQUE startRegistration result', {
+          registrationRequestType: typeof registrationRequest,
+          registrationRequestLength: registrationRequest?.length,
+          registrationRequestSample: registrationRequest?.slice(0, 50),
+          registrationRequestFull: registrationRequest
+        });
+      } catch (error) {
+        logger.error('Step 1 Failed: OPAQUE startRegistration error', error);
+        throw new Error(`OPAQUE startRegistration failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      
+      logger.info('Step 2: Sending registration request to server');
+      
+      // Debug: Log exactly what we're sending
+      const requestData = {
+        opaque_registration_request: registrationRequest,
+        tag_name: tagName.trim(),
+        color: selectedColor
+      };
+      
+      logger.info('Request data being sent to backend:', {
+        opaque_registration_request_length: registrationRequest?.length,
+        opaque_registration_request_type: typeof registrationRequest,
+        opaque_registration_request_sample: registrationRequest?.slice(0, 20),
+        tag_name: requestData.tag_name,
+        color: requestData.color
+      });
+      
+      // Step 2: Send registration request to server (secret tags endpoint)
+      const response = await api.post('/api/v1/secret-tags/register/start', requestData);
+
+      const { opaque_registration_response: registrationResponse, session_id, tag_handle } = response.data;
+      
+      if (!registrationResponse) {
+        throw new Error('Invalid server registration response');
       }
 
-      const secretTag = await response.json();
-      tagId = secretTag.id;
+      logger.info('Step 3: Completing OPAQUE registration');
+      
+      // Step 3: Finish OPAQUE registration (same as user registration)
+      let registrationRecord;
+      try {
+        registrationRecord = await opaqueAuth.finishRegistration(secretTagIdentifier, registrationResponse);
+        
+        logger.info('Step 3 Complete: OPAQUE finishRegistration result', {
+          registrationRecordType: typeof registrationRecord,
+          registrationRecordLength: registrationRecord?.length,
+          registrationRecordSample: registrationRecord?.slice(0, 50),
+          registrationRecordFull: registrationRecord
+        });
+      } catch (error) {
+        logger.error('Step 3 Failed: OPAQUE finishRegistration error', error);
+        throw new Error(`OPAQUE finishRegistration failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      
+      if (!registrationRecord) {
+        throw new Error('Failed to complete OPAQUE registration');
+      }
+
+      logger.info('Step 4: Creating secret tag with OPAQUE data', {
+        registrationRequestType: typeof registrationRequest,
+        registrationRequestLength: registrationRequest?.length,
+        registrationRequestValue: registrationRequest,
+        registrationRecordType: typeof registrationRecord,
+        registrationRecordLength: registrationRecord?.length,
+        registrationRecordValue: registrationRecord
+      });
+      
+      // Step 4: Generate salt (16 bytes)
+      const saltBytes = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+      
+      // Step 5: Register the secret tag with the OPAQUE data
+      // Add debugging to see what data we're actually sending
+      logger.info('OPAQUE data before sending to backend:', {
+        registrationRequestType: typeof registrationRequest,
+        registrationRequestLength: registrationRequest.length,
+        registrationRequestSample: registrationRequest.slice(0, 20),
+        registrationRecordType: typeof registrationRecord,
+        registrationRecordLength: registrationRecord.length,
+        registrationRecordSample: registrationRecord.slice(0, 20)
+      });
+      
+      // Test base64 validity before sending
+      logger.info('🔍 About to validate base64 data:', {
+        registrationRequestType: typeof registrationRequest,
+        registrationRequestValue: registrationRequest,
+        registrationRecordType: typeof registrationRecord,
+        registrationRecordValue: registrationRecord
+      });
+      
+      // Validate base64/base64url encoding (OPAQUE uses URL-safe base64)
+      const validateBase64 = (data: string, name: string): void => {
+        try {
+          // Try URL-safe base64 first (OPAQUE standard)
+          const urlSafeDecoded = data.replace(/-/g, '+').replace(/_/g, '/');
+          // Add padding if needed
+          const padding = urlSafeDecoded.length % 4;
+          const paddedData = padding ? urlSafeDecoded + '='.repeat(4 - padding) : urlSafeDecoded;
+          const testDecode = atob(paddedData);
+          logger.info(`✅ ${name} base64url valid (length: ${testDecode.length})`);
+        } catch (error) {
+          logger.error(`❌ ${name} base64 validation failed:`, error);
+          throw new Error(`${name} is not valid base64/base64url`);
+        }
+      };
+
+      try {
+        logger.info('🧪 Validating OPAQUE base64 data...');
+        validateBase64(registrationRequest, 'registrationRequest');
+        validateBase64(registrationRecord, 'registrationRecord');
+        logger.info('✅ All OPAQUE base64 validation passed');
+      } catch (error) {
+        logger.error('Base64 validation failed:', error);
+        throw new Error('OPAQUE data is not valid base64');
+      }
+      
+      const serverResponse = await api.post('/api/v1/secret-tags/register/finish', {
+        session_id: session_id,
+        opaque_registration_record: registrationRecord
+      });
+
+      if (!serverResponse.data) {
+        throw new Error('Invalid registration response from server');
+      }
+
+      // Step 3: Complete OPAQUE registration (if backend provides registration response)
+      // Note: For secret tags, we might not need the full two-step flow depending on backend implementation
+      // The backend should handle the OPAQUE verification internally
+      
+      const secretTag = serverResponse.data;
+      const tagId = secretTag.tag_id;
       
       // Convert to OpaqueSecretTag format for display
-      createdTag = {
-        ...secretTag,
+      const createdTag: OpaqueSecretTag = {
+        id: tagId,
+        tag_name: secretTag.tag_name,
+        color_code: secretTag.color_code,
+        created_at: secretTag.created_at,
+        updated_at: secretTag.updated_at,
+        user_id: secretTag.user_id || 0,
         auth_method: 'opaque' as const,
         security_level: securityLevel,
         authentication_count: 0
       };
       
+      logger.info('OPAQUE secret tag created successfully:', tagId);
+      
       // Set success state with created tag info
       setJustCreated({
         tagName: tagName.trim(),
-        phrase: activationPhrase.trim(),
+        phrase,
         isOpaque: true, // Always OPAQUE now
         tag: createdTag
       });
@@ -217,6 +358,18 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
       
     } catch (error) {
       logger.error('Failed to create secret tag:', error);
+      
+      // Log detailed error information for debugging
+      if (error && typeof error === 'object' && 'response' in error) {
+        const response = (error as any).response;
+        if (response?.data?.detail) {
+          logger.error('Backend validation error detail:', response.data.detail);
+        }
+        if (response?.data?.errors) {
+          logger.error('Backend validation errors:', response.data.errors);
+        }
+      }
+      
       Alert.alert(
         'Creation Failed',
         error instanceof Error ? error.message : 'Failed to create secret tag'
@@ -323,52 +476,22 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
           Include your activation phrase in journal entries to automatically access encrypted content.
         </Text>
 
-        {/* Security Level Selection */}
+        {/* Security Information */}
         <View style={styles.securityLevelContainer}>
           <Text style={styles.securityLevelTitle}>Security Level</Text>
           <Text style={styles.securityLevelDescription}>
-            All tags use OPAQUE zero-knowledge authentication with server-side phrase detection
+            All tags use OPAQUE zero-knowledge authentication with server-side phrase detection.
+            Neither we nor anyone else can see or recover your secret tags or entries.
           </Text>
-          <View style={styles.securityLevelOptions}>
-            <TouchableOpacity
-              style={[
-                styles.securityLevelOption,
-                securityLevel === 'standard' && styles.securityLevelOptionSelected
-              ]}
-              onPress={() => setSecurityLevel('standard')}
-            >
-              <Ionicons 
-                name="shield" 
-                size={20} 
-                color={securityLevel === 'standard' ? '#007AFF' : '#8E8E93'} 
-              />
-              <Text style={[
-                styles.securityLevelOptionText,
-                securityLevel === 'standard' && styles.securityLevelOptionTextSelected
-              ]}>
-                Standard
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.securityLevelOption,
-                securityLevel === 'enhanced' && styles.securityLevelOptionSelected
-              ]}
-              onPress={() => setSecurityLevel('enhanced')}
-            >
-              <Ionicons 
-                name="shield-checkmark" 
-                size={20} 
-                color={securityLevel === 'enhanced' ? '#00C851' : '#8E8E93'} 
-              />
-              <Text style={[
-                styles.securityLevelOptionText,
-                securityLevel === 'enhanced' && styles.securityLevelOptionTextSelected
-              ]}>
-                Enhanced
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.securityInfoBox}>
+            <Ionicons 
+              name="shield-checkmark" 
+              size={24} 
+              color="#00C851" 
+            />
+            <Text style={styles.securityInfoText}>
+              Zero-Knowledge OPAQUE Authentication
+            </Text>
           </View>
         </View>
 
@@ -805,33 +928,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: theme.spacing.md,
     fontFamily: theme.typography.fontFamilies.regular,
   },
-  securityLevelOptions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  securityLevelOption: {
-    flex: 1,
+  securityInfoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.spacing.sm,
+    padding: theme.spacing.md,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
+    borderColor: '#00C851',
+    backgroundColor: '#00C851' + '10',
   },
-  securityLevelOptionSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary + '10',
-  },
-  securityLevelOptionText: {
+  securityInfoText: {
     marginLeft: theme.spacing.sm,
-    fontSize: theme.typography.fontSizes.sm,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilies.medium,
-  },
-  securityLevelOptionTextSelected: {
-    color: theme.colors.primary,
-    fontWeight: '500',
+    fontSize: theme.typography.fontSizes.md,
+    color: '#00C851',
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    fontWeight: '600',
   },
 
   // Form Input Styles

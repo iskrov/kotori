@@ -1,5 +1,5 @@
 """
-Journal routes for the Vibes application.
+Journal routes for the Kotori application.
 
 This module provides endpoints for journal management including creating,
 retrieving, updating, and deleting journal entries.
@@ -222,7 +222,7 @@ async def create_journal_entry(
         )
         
         if auth_success and authenticated_tag and encryption_key:
-            logger.info(f"Secret phrase authentication successful for tag: {authenticated_tag.phrase_hash.hex()}")
+            logger.info(f"Secret phrase authentication successful for tag: {authenticated_tag.tag_handle.hex()}")
             
             # Decrypt entries for response
             decrypted_entries = []
@@ -242,7 +242,7 @@ async def create_journal_entry(
                             user_id=encrypted_entry.user_id,
                             created_at=encrypted_entry.created_at,
                             updated_at=encrypted_entry.updated_at,
-                            secret_tag_id=authenticated_tag.phrase_hash.hex(),
+                            secret_tag_id=authenticated_tag.tag_handle.hex(),
                             tag_name=authenticated_tag.tag_name
                         )
                         decrypted_entries.append(decrypted_entry)
@@ -256,7 +256,7 @@ async def create_journal_entry(
             # Return secret phrase authentication response
             return SecretPhraseAuthResponse(
                 authentication_successful=True,
-                secret_tag_id=authenticated_tag.phrase_hash.hex(),
+                secret_tag_id=authenticated_tag.tag_handle.hex(),
                 tag_name=authenticated_tag.tag_name,
                 encrypted_entries=decrypted_entries,
                 total_entries=len(decrypted_entries),

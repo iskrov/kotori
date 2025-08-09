@@ -54,7 +54,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   autoRecordingEnabled: true,
 };
 
-const SETTINGS_STORAGE_KEY = '@vibes_user_settings';
+const SETTINGS_STORAGE_KEY = '@kotori_user_settings';
 const SETTINGS_VERSION = '1.0';
 
 class SettingsService {

@@ -21,6 +21,7 @@ import {
   assertTest,
   createTestSummaryReport
 } from './helpers/TestHelpers';
+// Use real opaque client; keep other helper mocks
 import { createMockServices, resetMockServices } from './helpers/MockServices';
 import { globalPerformanceMonitor } from './helpers/PerformanceMonitor';
 

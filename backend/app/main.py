@@ -13,19 +13,21 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from app.api.v1.endpoints import speech as speech_router_module
-from app.api.v1.endpoints import opaque as opaque_router_module
+from app.api.v1.endpoints import journal as v1_journal_router_module
 from app.api.v1.endpoints import vault as vault_router_module
 from app.api.v1.endpoints import session as session_router_module
 from app.api.v1.endpoints import audit as audit_router_module
 from app.api.v1.endpoints import maintenance as maintenance_router_module
 from app.api.v1 import monitoring as monitoring_router_module
+# New v1 authentication routers
+from app.api.v1 import auth as v1_auth_router
+from app.api.v1 import secret_tags as v1_secret_tags_router
 from app.core.config import settings
-from app.routers import auth_router
+# Legacy endpoints (non-authentication)
 from app.routers import journals_router
 from app.routers import reminders_router
 from app.routers import users_router
 from app.routers.tags import router as tags_router
-from app.routers.user_opaque_auth import router as user_opaque_auth_router
 
 from app.websockets import speech as speech_websocket_router
 
@@ -63,8 +65,8 @@ class UUIDJSONResponse(JSONResponse):
 
 
 app = FastAPI(
-    title="Vibes API",
-    description="API for Vibes: Voice-Controlled Journaling Application",
+    title="Kotori API",
+    description="API for Kotori: Voice-Controlled Journaling Application",
     version="0.1.0",
     default_response_class=UUIDJSONResponse,  # Use our custom response class
 )
@@ -103,7 +105,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Security middleware configuration (must be first)
 app.add_middleware(SecurityMiddleware)
-logger.info("Security middleware configured with comprehensive protection")
+logger.info("Security middleware configured with comprehensive protection for Kotori")
 
 # CORS middleware configuration
 if settings.ENVIRONMENT == "development":
@@ -164,18 +166,30 @@ async def log_requests(request: Request, call_next):
 # Include routers
 app.include_router(maintenance_router_module.router, prefix="/api/v1")
 app.include_router(monitoring_router_module.router, prefix="/api/v1", tags=["Monitoring"])
-app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(user_opaque_auth_router, prefix="/api/auth/opaque", tags=["User OPAQUE Authentication"])
-app.include_router(opaque_router_module.router, prefix="/api/opaque", tags=["OPAQUE"])
+
+# New unified v1 authentication routers (replacing old scattered auth endpoints)
+app.include_router(v1_auth_router.router, prefix="/api/v1", tags=["Authentication v1"])
+if settings.ENABLE_SECRET_TAGS:
+    app.include_router(v1_secret_tags_router.router, prefix="/api/v1", tags=["Secret Tags v1"])
+
+# Existing v1 endpoints 
 app.include_router(vault_router_module.router, prefix="/api/vault", tags=["Vault Storage"])
 app.include_router(audit_router_module.router, prefix="/api/audit", tags=["Security Audit"])
 app.include_router(session_router_module.router, prefix="/api/session", tags=["Session Management"])
+
+# Legacy endpoints (non-authentication - preserved)
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(journals_router, prefix="/api/journals", tags=["Journals"])
 app.include_router(reminders_router, prefix="/api/reminders", tags=["Reminders"])
 app.include_router(tags_router, prefix="/api/tags", tags=["Tags"])
 app.include_router(speech_router_module.router, prefix="/api/speech", tags=["Speech"])
 
+# New v1 journals endpoints
+app.include_router(v1_journal_router_module.router, prefix="/api/v1/journals", tags=["Journals v1"])
+
+# Legacy OPAQUE endpoints removed - replaced by V1 implementation
+
+# WebSocket endpoints
 app.include_router(speech_websocket_router.router, prefix="/ws", tags=["WebSockets"])
 
 

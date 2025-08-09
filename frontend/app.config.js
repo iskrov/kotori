@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 // Load environment variables
-const apiUrl = process.env.API_URL || "http://localhost:8001";
+const apiUrl = process.env.API_URL || "http://localhost:8001"; // Production is configured per-env to https://api.kotori.io
 const googleCloudProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const googleSpeechApiKey = process.env.GOOGLE_SPEECH_API_KEY;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -16,8 +16,8 @@ if (!googleCloudProjectId || !googleSpeechApiKey) {
 
 export default {
   expo: {
-    name: "Vibes",
-    slug: "vibes",
+    name: "Kotori",
+    slug: "kotori",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -34,14 +34,14 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.vibes.app"
+      bundleIdentifier: "com.kotori.app"
     },
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      package: "com.vibes.app"
+      package: "com.kotori.app"
     },
     web: {
       favicon: "./assets/favicon.png",

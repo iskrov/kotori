@@ -14,8 +14,10 @@ httpx==0.25.2
 argon2-cffi==23.1.0
 cryptography==41.0.7
 pynacl==1.5.0
-opaque-ke==0.1.0
-libopaque==1.0.0
+# OPAQUE dependencies are optional in this repo and may be provided out-of-band.
+# Commented out to allow local dev without private packages; OPAQUE features remain disabled.
+# opaque-ke==0.1.0
+# libopaque==1.0.0
 redis==5.0.1
 passlib==1.7.4
 
@@ -50,3 +52,5 @@ python-magic==0.4.27  # File type detection
 validators==0.22.0  # Additional validation utilities
 bcrypt==4.1.2  # Secure password hashing
 bcrypt==4.1.2  # Secure password hashing
+pycryptodome==3.20.0
+google-cloud-speech==2.26.0

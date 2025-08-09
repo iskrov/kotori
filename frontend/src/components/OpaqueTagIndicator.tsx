@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
 import { OpaqueTagIndicatorProps } from '../types/opaqueTypes';
+import { areSecretTagsEnabled } from '../config/featureFlags';
 
 const OpaqueTagIndicator: React.FC<OpaqueTagIndicatorProps> = ({
   tag,
@@ -19,6 +20,9 @@ const OpaqueTagIndicator: React.FC<OpaqueTagIndicatorProps> = ({
   onSessionToggle,
   size = 'medium'
 }) => {
+  if (!areSecretTagsEnabled()) {
+    return null;
+  }
   const { theme } = useAppTheme();
   const styles = getStyles(theme, size);
 

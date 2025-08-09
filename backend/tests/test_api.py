@@ -261,5 +261,5 @@ def test_user_registration_and_login_flow(client_with_db: TestClient, db: Sessio
 
 def test_logout_user(client_with_db: TestClient, token_headers):
     """Test logout endpoint"""
-    response = client_with_db.post("/api/auth/logout", headers=token_headers)
+    response = client_with_db.post("/api/v1/auth/logout", headers=token_headers)
     assert response.status_code == 204

@@ -67,7 +67,7 @@ def get_required_env_int(key: str) -> int:
 
 class Settings(BaseSettings):
     # App settings (non-sensitive defaults allowed)
-    APP_NAME: str = os.getenv("APP_NAME", "Vibes API")
+    APP_NAME: str = os.getenv("APP_NAME", "Kotori API")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
     HOST: str = os.getenv("HOST", "0.0.0.0")
@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     # Encryption settings - REQUIRED in .env
     ENCRYPTION_MASTER_SALT: str = get_required_env("ENCRYPTION_MASTER_SALT")
     HIDDEN_MODE_TIMEOUT_MINUTES: int = int(os.getenv("HIDDEN_MODE_TIMEOUT_MINUTES", "2"))
+
+    # Feature flags
+    ENABLE_SECRET_TAGS: bool = os.getenv("ENABLE_SECRET_TAGS", "false").lower() == "true"
 
     model_config = ConfigDict(case_sensitive=True)
 

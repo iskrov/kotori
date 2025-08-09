@@ -24,6 +24,7 @@ import { MainStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import { tagManager } from '../../services/tagManager';
+import { api } from '../../services/api';
 import SecretTagSetup from '../../components/SecretTagSetup';
 import RegularTagCreate from '../../components/RegularTagCreate';
 import SecretTagCard from '../../components/SecretTagCard';
@@ -31,12 +32,17 @@ import ScreenHeader from '../../components/ScreenHeader';
 import { Tag } from '../../types';
 import { OpaqueSecretTag } from '../../types/opaqueTypes';
 import logger from '../../utils/logger';
+import { areSecretTagsEnabled } from '../../config/featureFlags';
 
 type TagManagementNavigationProp = StackNavigationProp<MainStackParamList, 'TagManagement'>;
 
 interface TagManagementScreenProps {}
 
 const TagManagementScreen: React.FC<TagManagementScreenProps> = () => {
+  // If secret tags are disabled globally, render nothing
+  if (!areSecretTagsEnabled()) {
+    return null;
+  }
   const navigation = useNavigation<TagManagementNavigationProp>();
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
@@ -58,26 +64,19 @@ const TagManagementScreen: React.FC<TagManagementScreenProps> = () => {
     try {
       logger.info('Loading secret tags from server');
       
-      // Use the working OPAQUE API endpoint
-      const response = await fetch('/api/opaque/secret-tags', {
-        method: 'GET',
-        credentials: 'include',
-      });
+      // Use the proper API service with authentication headers
+      const response = await api.get('/api/v1/secret-tags');
       
-      if (response.ok) {
-        const tags = await response.json();
-        setSecretTags(tags.map((tag: any) => ({
-          ...tag,
-          id: tag.tag_id, // Convert tag_id to id for consistency
-          auth_method: 'opaque' as const,
-          security_level: 'standard' as const,
-          authentication_count: 0
-        })));
-        logger.info(`Loaded ${tags.length} secret tags`);
-      } else {
-        logger.error('Failed to load secret tags:', response.statusText);
-        setSecretTags([]);
-      }
+      // Backend returns SecretTagListResponse with tags array
+      const tagsData = response.data?.tags || [];
+      setSecretTags(tagsData.map((tag: any) => ({
+        ...tag,
+        id: tag.tag_id, // Convert tag_id to id for consistency
+        auth_method: 'opaque' as const,
+        security_level: 'standard' as const,
+        authentication_count: 0
+      })));
+      logger.info(`Loaded ${tagsData.length} secret tags`);
     } catch (error) {
       logger.error('Error loading secret tags:', error);
       setSecretTags([]);
@@ -214,13 +213,10 @@ const TagManagementScreen: React.FC<TagManagementScreenProps> = () => {
    */
   const handleSecretTagDelete = useCallback(async (tagId: string) => {
     try {
-      // Use the working OPAQUE API endpoint for deletion
-      const response = await fetch(`/api/opaque/secret-tags/${tagId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      // Use the V1 secret tags API endpoint for deletion
+      const response = await api.delete(`/api/v1/secret-tags/${tagId}`);
 
-      if (response.ok) {
+              if (response.status >= 200 && response.status < 300) {
         setSecretTags(prev => prev.filter(tag => tag.id !== tagId));
         setActiveSecretTags(prev => {
           const newSet = new Set(prev);

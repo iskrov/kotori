@@ -1,10 +1,10 @@
 #!/bin/bash
 
-echo "Stopping Vibes Application..."
+echo "Stopping Kotori Application..."
 
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-# Project root is the parent directory of the script directory (vibes/)
+# Project root is the parent directory of the script directory (kotori/)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # PID files are now relative to the new PROJECT_ROOT (workspace root)
 BACKEND_PID_FILE="$PROJECT_ROOT/.server.pid"
@@ -82,6 +82,15 @@ done
 # Remove any dangling PID files in the root location (just in case)
 rm -f "$BACKEND_PID_FILE" "$FRONTEND_PID_FILE"
 
+# Deactivate conda env if active in this shell (best-effort; no-op in separate shells)
+if command -v conda > /dev/null 2>&1; then
+  # shellcheck disable=SC1090
+  eval "$(conda shell.bash hook)"
+  if [[ "$CONDA_DEFAULT_ENV" == "kotori" ]]; then
+    conda deactivate >/dev/null 2>&1 || true
+  fi
+fi
+
 echo "Cleanup finished."
 
 # 4. Optional: Stop PostgreSQL (commented out by default)
@@ -89,4 +98,4 @@ echo "Cleanup finished."
 # echo "Stopping PostgreSQL..."
 # sudo service postgresql stop
 
-echo "Vibes Application has been stopped!" 
+echo "Kotori Application has been stopped!"

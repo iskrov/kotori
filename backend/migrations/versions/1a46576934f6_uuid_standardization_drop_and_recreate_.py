@@ -32,9 +32,23 @@ def upgrade() -> None:
     4. Proper indexes added for performance
     """
     
-    # Since databases are empty, we can skip dropping tables and just create them
-    # This avoids transaction issues with non-existent tables
-    pass
+    # Ensure idempotency: drop existing objects created by previous revisions
+    # so this migration can recreate a clean schema even if prior revision created tables.
+    # Use IF EXISTS to avoid transaction aborts when objects don't exist
+    op.execute('DROP TABLE IF EXISTS journal_entry_tags CASCADE')
+    op.execute('DROP TABLE IF EXISTS wrapped_keys CASCADE')
+    op.execute('DROP TABLE IF EXISTS vault_blobs CASCADE')
+    op.execute('DROP TABLE IF EXISTS reminders CASCADE')
+    op.execute('DROP TABLE IF EXISTS tags CASCADE')
+    op.execute('DROP TABLE IF EXISTS journal_entries CASCADE')
+    op.execute('DROP TABLE IF EXISTS opaque_sessions CASCADE')
+    op.execute('DROP TABLE IF EXISTS secret_tags CASCADE')
+    op.execute('DROP TABLE IF EXISTS security_alerts CASCADE')
+    op.execute('DROP TABLE IF EXISTS security_metrics CASCADE')
+    op.execute('DROP TABLE IF EXISTS security_audit_logs CASCADE')
+    op.execute('DROP TABLE IF EXISTS users CASCADE')
+    # Drop enum if exists
+    op.execute('DROP TYPE IF EXISTS reminderfrequency CASCADE')
     
     # Create users table with UUID primary key
     op.create_table('users',
@@ -81,7 +95,7 @@ def upgrade() -> None:
     op.create_table('journal_entries',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('title', sa.String, nullable=True),
-        sa.Column('content', sa.Text, nullable=False),
+        sa.Column('content', sa.Text, nullable=True),
         sa.Column('audio_url', sa.String, nullable=True),
         sa.Column('entry_date', sa.DateTime(timezone=True), nullable=False),
         sa.Column('secret_tag_id', UUID(as_uuid=True), sa.ForeignKey('secret_tags.tag_id'), nullable=True),
@@ -89,6 +103,7 @@ def upgrade() -> None:
         sa.Column('wrapped_key', sa.LargeBinary, nullable=True),
         sa.Column('encryption_iv', sa.LargeBinary, nullable=True),
         sa.Column('wrap_iv', sa.LargeBinary, nullable=True),
+        sa.Column('encryption_algorithm', sa.String, nullable=True),
         sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id'), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -133,6 +148,18 @@ def upgrade() -> None:
     # Create unique constraint for entry-tag associations
     op.create_unique_constraint('unique_entry_tag', 'journal_entry_tags', ['entry_id', 'tag_id'])
     
+    # Create enum type for reminderfrequency prior to table creation
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'reminderfrequency') THEN
+                CREATE TYPE reminderfrequency AS ENUM (
+                    'DAILY','WEEKDAYS','WEEKENDS','WEEKLY','MONTHLY','CUSTOM'
+                );
+            END IF;
+        END$$;
+    """)
+
     # Create reminders table with UUID primary key
     op.create_table('reminders',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),

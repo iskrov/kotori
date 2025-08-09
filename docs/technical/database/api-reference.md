@@ -18,7 +18,7 @@
 
 ## Overview
 
-This document provides comprehensive API reference documentation for the Vibes application. The API follows RESTful principles and provides complete functionality for personal journaling, task management, and content organization.
+This document provides comprehensive API reference documentation for the Kotori application. The API follows RESTful principles and provides complete functionality for personal journaling, task management, and content organization.
 
 ### API Characteristics
 - **Architecture**: RESTful API with JSON payloads
@@ -29,9 +29,9 @@ This document provides comprehensive API reference documentation for the Vibes a
 - **CORS**: Configurable cross-origin resource sharing
 
 ### Base URLs
-- **Development**: `http://localhost:8000/api/v1`
-- **Staging**: `https://staging-api.vibes.app/api/v1`
-- **Production**: `https://api.vibes.app/api/v1`
+- **Development**: `http://localhost:8001/api/v1`
+- **Staging**: `https://staging.api.kotori.io/api/v1`
+- **Production**: `https://api.kotori.io/api/v1`
 
 ### Content Types
 - **Request**: `application/json`
@@ -96,58 +96,126 @@ This document provides comprehensive API reference documentation for the Vibes a
 
 ## Authentication
 
-### Authentication Flow
+### Dual Authentication System
+
+The Kotori API supports two authentication methods:
+
+1. **OAuth (Google Sign-in)**: Convenient single sign-on using Google accounts
+2. **OPAQUE**: Zero-knowledge password authentication for enhanced security
+
+### OAuth Authentication Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 Authentication Flow                         │
+│                 OAuth Authentication Flow                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Client                    API Server                       │
 │    │                          │                            │
-│    │ POST /auth/login         │                            │
-│    │ {email, password}        │                            │
+│    │ POST /api/v1/auth/google │                            │
+│    │ {token: google_id_token} │                            │
 │    ├─────────────────────────►│                            │
-│    │                          │ Validate credentials       │
+│    │                          │ Validate Google token      │
+│    │                          │ Create/update user         │
 │    │                          │ Generate JWT tokens        │
 │    │                          │                            │
 │    │ {access_token,           │                            │
 │    │  refresh_token,          │                            │
-│    │  expires_in}             │                            │
+│    │  user, token_type}       │                            │
+│    │◄─────────────────────────┤                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### OPAQUE Authentication Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              OPAQUE Authentication Flow                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Client                    API Server                       │
+│    │                          │                            │
+│    │ POST /api/v1/auth/       │                            │
+│    │ login/start              │                            │
+│    │ {email, credential_req}  │                            │
+│    ├─────────────────────────►│                            │
+│    │                          │ OPAQUE protocol step 1     │
+│    │                          │                            │
+│    │ {credential_response,    │                            │
+│    │  session_id}             │                            │
 │    │◄─────────────────────────┤                            │
 │    │                          │                            │
-│    │ GET /journals            │                            │
-│    │ Authorization: Bearer    │                            │
-│    │ {access_token}           │                            │
+│    │ POST /api/v1/auth/       │                            │
+│    │ login/finish             │                            │
+│    │ {session_id, cred_resp}  │                            │
 │    ├─────────────────────────►│                            │
-│    │                          │ Validate JWT               │
-│    │                          │ Process request            │
-│    │                          │                            │
-│    │ {journals: [...]}        │                            │
-│    │◄─────────────────────────┤                            │
-│    │                          │                            │
-│    │ POST /auth/refresh       │                            │
-│    │ {refresh_token}          │                            │
-│    ├─────────────────────────►│                            │
-│    │                          │ Validate refresh token     │
-│    │                          │ Generate new access token  │
+│    │                          │ OPAQUE protocol step 2     │
+│    │                          │ Generate JWT tokens        │
 │    │                          │                            │
 │    │ {access_token,           │                            │
-│    │  expires_in}             │                            │
+│    │  refresh_token,          │                            │
+│    │  user, token_type}       │                            │
 │    │◄─────────────────────────┤                            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Authentication Endpoints
 
-#### POST /auth/register
-Register a new user account.
+#### OAuth Authentication
+
+##### POST /api/v1/auth/google
+Authenticate using Google OAuth.
+
+**Request:**
+```json
+{
+  "token": "google_id_token_here"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user": {
+    "id": "12345678-1234-1234-1234-123456789012",
+    "email": "user@example.com",
+    "full_name": "John Doe"
+  }
+}
+```
+
+#### OPAQUE User Authentication
+
+##### POST /api/v1/auth/register/start
+Start OPAQUE user registration.
 
 **Request:**
 ```json
 {
   "email": "user@example.com",
-  "password": "securePassword123",
+  "opaque_registration_request": "base64_encoded_request"
+}
+```
+
+**Response:**
+```json
+{
+  "opaque_registration_response": "base64_encoded_response",
+  "session_id": "session_uuid"
+}
+```
+
+##### POST /api/v1/auth/register/finish
+Complete OPAQUE user registration.
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "opaque_registration_record": "base64_encoded_record"
   "first_name": "John",
   "last_name": "Doe"
 }

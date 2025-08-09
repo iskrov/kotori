@@ -1,5 +1,5 @@
 """
-Reminder routes for the Vibes application.
+Reminder routes for the Kotori application.
 
 This module provides endpoints for reminder management including creating,
 retrieving, updating, and deleting reminders.

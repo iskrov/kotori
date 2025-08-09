@@ -40,7 +40,7 @@ const DeleteConfirmationScreen = () => {
       setIsDeleting(true);
       hapticService.medium(); // Strong feedback for destructive action
       console.log(`[DeleteConfirmation] Deleting entry with ID: ${entryId}`);
-      await JournalAPI.deleteEntry(parseInt(entryId));
+      await JournalAPI.deleteEntry(String(entryId));
       console.log('[DeleteConfirmation] Delete successful');
       
       hapticService.success(); // Success feedback

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Boolean, Column, String, Date, Integer, Text, ForeignKey
+from sqlalchemy import Boolean, Column, String, Date, Integer, Text, ForeignKey, LargeBinary
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -12,7 +12,15 @@ class User(Base, TimestampMixin):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String(500), nullable=True)  # Nullable for OAuth users, longer for OPAQUE records
+    
+    # OPAQUE authentication - nullable for OAuth-only users
+    opaque_envelope = Column(LargeBinary, nullable=True)  # OPAQUE envelope for password-based auth
+    
+    # OAuth authentication - nullable for OPAQUE-only users  
+    google_id = Column(String, unique=True, nullable=True)
+    
+    # Secret tag preferences
+    show_secret_tag_names = Column(Boolean, nullable=False, default=True)
     
     # Personal Information Fields
     first_name = Column(String(100), nullable=True)
@@ -60,7 +68,6 @@ class User(Base, TimestampMixin):
     # Legacy fields (maintain compatibility)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
-    google_id = Column(String, unique=True, nullable=True)
     
 
 

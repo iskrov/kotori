@@ -115,7 +115,7 @@ const JournalEntryDetailScreen = () => {
   const fetchEntryDetails = async () => {
     try {
       setIsLoading(true);
-      const response = await JournalAPI.getEntry(parseInt(entryId));
+      const response = await JournalAPI.getEntry(String(entryId));
       const entryData = response.data;
       setEntry(entryData);
       
@@ -152,7 +152,7 @@ const JournalEntryDetailScreen = () => {
         tags: editTags.map(tag => tag.name)
       };
       
-      const response = await JournalAPI.updateEntry(parseInt(entryId), updateData);
+      const response = await JournalAPI.updateEntry(String(entryId), updateData);
       console.log('Entry saved successfully');
       
       // Update local entry state with new values
