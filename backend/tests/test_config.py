@@ -513,26 +513,26 @@ class TestDataFactory:
     @staticmethod
     def create_journal_entry_data(user_id, title_suffix="entry"):
         """Create test journal entry data with proper UUID foreign key."""
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone
         
         return {
             'title': f'Test Entry {title_suffix.title()}',
             'content': f'Test content for {title_suffix}',
             'user_id': user_id,
-            'entry_date': datetime.now(UTC),
+            'entry_date': datetime.now(timezone.utc),
         }
     
     @staticmethod
     def create_reminder_data(user_id, title_suffix="reminder"):
         """Create test reminder data with proper UUID foreign key."""
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone
         from app.schemas.reminder import ReminderFrequency
         
         return {
             'title': f'Test Reminder {title_suffix.title()}',
             'message': f'Test message for {title_suffix}',
             'frequency': ReminderFrequency.DAILY,
-            'time': datetime.now(UTC),
+            'time': datetime.now(timezone.utc),
             'user_id': user_id,
             'is_active': True,
         }

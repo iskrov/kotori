@@ -10,7 +10,7 @@ import asyncio
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
@@ -236,7 +236,7 @@ class MonitoringService:
                 health_result = HealthCheckResult(
                     service_name=service_name,
                     status=ServiceStatus.HEALTHY if result.get('status') == 'healthy' else ServiceStatus.WARNING,
-                    timestamp=datetime.now(UTC),
+                    timestamp=datetime.now(timezone.utc),
                     response_time_ms=response_time,
                     details=result,
                     error_message=result.get('error'),
@@ -249,7 +249,7 @@ class MonitoringService:
                 health_result = HealthCheckResult(
                     service_name=service_name,
                     status=ServiceStatus.CRITICAL,
-                    timestamp=datetime.now(UTC),
+                    timestamp=datetime.now(timezone.utc),
                     response_time_ms=0,
                     error_message=str(e)
                 )
@@ -258,7 +258,7 @@ class MonitoringService:
         # Store health results
         with self.lock:
             self.health_history.append(health_results)
-            self.last_health_check = datetime.now(UTC)
+            self.last_health_check = datetime.now(timezone.utc)
         
         # Check for health-based alerts
         self._check_health_alerts(health_results)
@@ -278,7 +278,7 @@ class MonitoringService:
             
             # Calculate composite metrics
             system_metrics = SystemMetrics(
-                timestamp=datetime.now(UTC),
+                timestamp=datetime.now(timezone.utc),
                 cpu_usage=resource_stats.get('cpu_percent', {}).get('current', 0),
                 memory_usage=resource_stats.get('memory_percent', {}).get('current', 0),
                 active_sessions=security_metrics.get('active_sessions', 0),
@@ -292,7 +292,7 @@ class MonitoringService:
             
             with self.lock:
                 self.metrics_history.append(system_metrics)
-                self.last_metrics_collection = datetime.now(UTC)
+                self.last_metrics_collection = datetime.now(timezone.utc)
             
             # Check for metric-based alerts
             self._check_metric_alerts(system_metrics)
@@ -415,7 +415,7 @@ class MonitoringService:
     
     def _cleanup_old_data(self):
         """Clean up old monitoring data"""
-        cutoff_time = datetime.now(UTC) - timedelta(days=self.config.metric_retention_days)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(days=self.config.metric_retention_days)
         
         # This would clean up database records in a real implementation
         # For now, we just maintain in-memory limits via deque maxlen
@@ -509,7 +509,7 @@ class MonitoringService:
             latest_metrics = self.metrics_history[-1] if self.metrics_history else None
             
             return {
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "overall_status": self._get_overall_status(),
                 "health_score": self._calculate_health_score(),
                 "services": {
@@ -549,7 +549,7 @@ class MonitoringService:
     
     def get_health_history(self, hours: int = 1) -> List[Dict[str, Any]]:
         """Get health check history"""
-        cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
         with self.lock:
             filtered_health = []
@@ -569,7 +569,7 @@ class MonitoringService:
     
     def get_metrics_history(self, hours: int = 1) -> List[Dict[str, Any]]:
         """Get metrics history"""
-        cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
         with self.lock:
             filtered_metrics = []

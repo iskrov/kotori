@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.models import User
-from app.models.secret_tag_opaque import OpaqueSession
+from app.models.opaque_auth import OpaqueSession
 from app.models.opaque_server_config import OpaqueServerConfig
 from app.schemas.opaque_user import (
     UserRegistrationStartRequest,

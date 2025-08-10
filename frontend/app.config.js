@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 // Load environment variables
-const apiUrl = process.env.API_URL || "http://localhost:8001"; // Production is configured per-env to https://api.kotori.io
+const apiUrl = process.env.API_URL || "https://api.kotori.io"; // Production domain
 const googleCloudProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const googleSpeechApiKey = process.env.GOOGLE_SPEECH_API_KEY;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;

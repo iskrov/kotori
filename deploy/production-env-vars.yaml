@@ -1,0 +1,4 @@
+ENVIRONMENT: production
+DEBUG: 'false'
+ENABLE_SECRET_TAGS: 'false'
+CORS_ORIGINS: https://app.kotori.io,https://kotori.io,https://www.kotori.io

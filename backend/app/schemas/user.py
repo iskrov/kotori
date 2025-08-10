@@ -20,7 +20,7 @@ class UserBase(BaseModel):
     date_of_birth: date | None = None
     
     # User Preferences & Localization
-    timezone: str = Field(default="UTC", max_length=50)
+    timezone: str = Field(default="timezone.utc", max_length=50)
     language_code: str = Field(default="en", max_length=10)
     theme_preference: str = Field(default="system", pattern="^(light|dark|system)$")
     notification_preferences: Dict[str, Any] = Field(default_factory=dict)
@@ -158,7 +158,7 @@ class UserInDB(UserInDBBase):
 
 # Schema for user preferences management
 class UserPreferences(BaseModel):
-    timezone: str = Field(default="UTC", max_length=50)
+    timezone: str = Field(default="timezone.utc", max_length=50)
     language_code: str = Field(default="en", max_length=10)
     theme_preference: str = Field(default="system", pattern="^(light|dark|system)$")
     notification_preferences: Dict[str, Any] = Field(default_factory=dict)

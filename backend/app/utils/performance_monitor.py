@@ -16,7 +16,7 @@ import psutil
 import threading
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict, deque
 import logging
 import json
@@ -91,9 +91,20 @@ class PerformanceMonitor:
         
         # Resource monitoring
         self.process = psutil.Process()
-        self.start_time = datetime.now(UTC)
-        self.last_disk_io = self.process.io_counters()
-        self.last_network_io = psutil.net_io_counters()
+        self.start_time = datetime.now(timezone.utc)
+        
+        # Initialize IO counters with fallback for Cloud Run environments
+        try:
+            self.last_disk_io = self.process.io_counters()
+        except (ValueError, OSError) as e:
+            logger.warning(f"Unable to initialize disk IO counters (common in containerized environments): {e}")
+            self.last_disk_io = None
+            
+        try:
+            self.last_network_io = psutil.net_io_counters()
+        except (ValueError, OSError) as e:
+            logger.warning(f"Unable to initialize network IO counters: {e}")
+            self.last_network_io = None
         
         # Background monitoring
         self.monitoring_active = False
@@ -137,17 +148,32 @@ class PerformanceMonitor:
             memory_info = self.process.memory_info()
             memory_percent = self.process.memory_percent()
             
-            # Disk I/O
-            current_disk_io = self.process.io_counters()
-            disk_read_mb = (current_disk_io.read_bytes - self.last_disk_io.read_bytes) / (1024 * 1024)
-            disk_write_mb = (current_disk_io.write_bytes - self.last_disk_io.write_bytes) / (1024 * 1024)
-            self.last_disk_io = current_disk_io
+            # Disk I/O (with fallback for containerized environments)
+            disk_read_mb = 0.0
+            disk_write_mb = 0.0
+            if self.last_disk_io is not None:
+                try:
+                    current_disk_io = self.process.io_counters()
+                    disk_read_mb = (current_disk_io.read_bytes - self.last_disk_io.read_bytes) / (1024 * 1024)
+                    disk_write_mb = (current_disk_io.write_bytes - self.last_disk_io.write_bytes) / (1024 * 1024)
+                    self.last_disk_io = current_disk_io
+                except (ValueError, OSError):
+                    # IO counters not available in this environment
+                    pass
             
-            # Network I/O
-            current_network_io = psutil.net_io_counters()
-            network_sent_mb = (current_network_io.bytes_sent - self.last_network_io.bytes_sent) / (1024 * 1024)
-            network_recv_mb = (current_network_io.bytes_recv - self.last_network_io.bytes_recv) / (1024 * 1024)
-            self.last_network_io = current_network_io
+            # Network I/O (with fallback for containerized environments)
+            network_sent_mb = 0.0
+            network_recv_mb = 0.0
+            if self.last_network_io is not None:
+                try:
+                    current_network_io = psutil.net_io_counters()
+                    if current_network_io is not None:
+                        network_sent_mb = (current_network_io.bytes_sent - self.last_network_io.bytes_sent) / (1024 * 1024)
+                        network_recv_mb = (current_network_io.bytes_recv - self.last_network_io.bytes_recv) / (1024 * 1024)
+                        self.last_network_io = current_network_io
+                except (ValueError, OSError):
+                    # Network IO counters not available in this environment
+                    pass
             
             # Create resource metric
             resource_metric = ResourceMetric(
@@ -158,7 +184,7 @@ class PerformanceMonitor:
                 disk_io_write_mb=disk_write_mb,
                 network_sent_mb=network_sent_mb,
                 network_recv_mb=network_recv_mb,
-                timestamp=datetime.now(UTC)
+                timestamp=datetime.now(timezone.utc)
             )
             
             with self.lock:
@@ -175,7 +201,7 @@ class PerformanceMonitor:
     def _cleanup_old_metrics(self):
         """Remove old metrics based on retention policy."""
         try:
-            cutoff_time = datetime.now(UTC) - timedelta(hours=self.retention_hours)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=self.retention_hours)
             
             with self.lock:
                 # Clean up metrics
@@ -218,7 +244,7 @@ class PerformanceMonitor:
             name=name,
             value=value,
             unit=unit,
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             tags=tags or {}
         )
         
@@ -241,7 +267,7 @@ class PerformanceMonitor:
         timing_metric = TimingMetric(
             operation=operation,
             duration_ms=duration_ms,
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             success=success,
             error=error,
             tags=tags or {}
@@ -354,7 +380,7 @@ class PerformanceMonitor:
             Dictionary containing metrics summary
         """
         with self.lock:
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             uptime_seconds = (now - self.start_time).total_seconds()
             
             summary = {
@@ -434,7 +460,7 @@ class PerformanceMonitor:
                 return {'error': 'No resource metrics available'}
             
             # Get recent metrics (last 5 minutes)
-            recent_time = datetime.now(UTC) - timedelta(minutes=5)
+            recent_time = datetime.now(timezone.utc) - timedelta(minutes=5)
             recent_metrics = [r for r in self.resource_metrics if r.timestamp > recent_time]
             
             if not recent_metrics:
@@ -535,7 +561,7 @@ class PerformanceMonitor:
         """
         try:
             with self.lock:
-                now = datetime.now(UTC)
+                now = datetime.now(timezone.utc)
                 uptime = (now - self.start_time).total_seconds()
                 
                 # Check if monitoring is active
@@ -564,7 +590,7 @@ class PerformanceMonitor:
             return {
                 'status': 'unhealthy',
                 'error': str(e),
-                'timestamp': datetime.now(UTC).isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
 
 # Global performance monitor instance

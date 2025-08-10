@@ -8,7 +8,7 @@ including JWT-based session token generation, validation, lifecycle management, 
 import secrets
 import hashlib
 import base64
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple
 import logging
 import json
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 
-from ..models.secret_tag_opaque import OpaqueSession
+from ..models.opaque_auth import OpaqueSession
 from ..models.user import User
 from ..core.config import settings
 from .jwt_service import jwt_service, JWTValidationError

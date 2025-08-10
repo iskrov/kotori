@@ -1,3 +1,23 @@
+## OPAQUE Authentication Lost After Secret-Tag Cleanup (PBI-4 Stage 2)
+
+### Symptoms
+- 500 errors on `/api/v1/auth/register/*` and `/api/v1/auth/login/*`
+- Backend logs mention missing `app.models.secret_tag_opaque` or disabled OPAQUE service
+
+### Root Cause
+`OpaqueSession` model was coupled with secret-tag models in `secret_tag_opaque.py`. Deleting the file removed user auth infrastructure.
+
+### Fix
+1. Create `app/models/opaque_auth.py` with `OpaqueSession` only
+2. Add migration to create `opaque_sessions` table
+3. Update imports from `secret_tag_opaque` to `opaque_auth`
+4. Restore `opaque_user_service.py`, `session_service.py`, and OPAQUE endpoints
+5. Replace `datetime.UTC` with `timezone.utc` for Python 3.10 compatibility
+
+### Verification
+- Run `node frontend/scripts/opaque-smoke.js` → should print OPAQUE OK
+- Register/Login via app → should succeed
+- `GET /api/v1/secret-tags` → 404 (removed)
 # Major Issues and Troubleshooting Guide
 
 This document tracks significant issues we've encountered during development, their root causes, and the solutions implemented. This serves as a reference for future troubleshooting and helps identify patterns in common problems.

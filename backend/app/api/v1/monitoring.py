@@ -5,7 +5,7 @@ This module provides REST API endpoints for the monitoring system including
 system health, service health, alerts, metrics, and analytics.
 """
 
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 import logging
 
@@ -572,7 +572,7 @@ async def get_monitoring_dashboard(
         recent_alerts = monitoring_service.get_recent_alerts(limit=5)
         
         dashboard_data = MonitoringDashboardResponse(
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             system_status=system_status,
             security_metrics=security_metrics,
             performance_summary=performance_summary,
@@ -580,7 +580,7 @@ async def get_monitoring_dashboard(
             dashboard_metadata={
                 "version": "1.0",
                 "refresh_interval": 60,
-                "last_updated": datetime.now(UTC).isoformat()
+                "last_updated": datetime.now(timezone.utc).isoformat()
             }
         )
         
@@ -609,7 +609,7 @@ async def trigger_health_check(
         # Trigger health check in background
         background_tasks.add_task(monitoring_service._perform_health_checks)
         
-        return HealthCheckTriggerResponse(status="health_check_triggered", timestamp=datetime.now(UTC).isoformat())
+        return HealthCheckTriggerResponse(status="health_check_triggered", timestamp=datetime.now(timezone.utc).isoformat())
         
     except Exception as e:
         logger.error(f"Error triggering health check: {e}")
@@ -626,7 +626,7 @@ async def get_monitoring_status():
     try:
         return MonitoringStatusResponse(
             status="operational",
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             version="1.0",
             uptime="monitoring_active"
         )

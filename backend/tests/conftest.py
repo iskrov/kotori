@@ -13,18 +13,20 @@ from pathlib import Path
 from typing import AsyncGenerator
 import logging
 
-# Add the backend directory to the Python path
+# Add local backend and tests directories to sys.path (avoid site-packages 'tests' module shadowing)
 backend_dir = Path(__file__).parent.parent
+local_tests_dir = Path(__file__).parent
+sys.path.insert(0, str(local_tests_dir))
 sys.path.insert(0, str(backend_dir))
 
-# Import test utilities
-from tests.utils.database_setup import (
+# Import test utilities from local tests utils
+from utils.database_setup import (  # type: ignore
     setup_test_database,
     cleanup_test_database,
     teardown_test_database,
     get_test_db_manager,
     create_test_user,
-    create_test_secret_tag
+    create_test_secret_tag,
 )
 from app.models.user import User
 
@@ -311,14 +313,14 @@ def test_factory():
         def create_journal_entry_data(user_id, title="Test Entry"):
             """Create journal entry data for testing"""
             import uuid
-            from datetime import datetime, UTC
+            from datetime import datetime, timezone
             
             return {
                 "id": uuid.uuid4(),
                 "title": title,
                 "content": f"This is a test journal entry: {title}",
                 "user_id": user_id,
-                "entry_date": datetime.now(UTC),
+                "entry_date": datetime.now(timezone.utc),
             }
         
         @staticmethod

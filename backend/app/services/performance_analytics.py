@@ -9,7 +9,7 @@ while maintaining privacy-preserving analytics and zero-knowledge compliance.
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
@@ -263,7 +263,7 @@ class PerformanceAnalytics:
             resource_stats = self.performance_monitor.get_resource_stats()
             
             # Convert to performance metrics
-            current_time = datetime.now(UTC)
+            current_time = datetime.now(timezone.utc)
             new_metrics = []
             
             # CPU metrics
@@ -331,7 +331,7 @@ class PerformanceAnalytics:
         """Analyze performance trends"""
         try:
             window_hours = self.analytics_config['trend_analysis_window_hours']
-            cutoff_time = datetime.now(UTC) - timedelta(hours=window_hours)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=window_hours)
             
             # Group metrics by type
             metrics_by_type = defaultdict(list)
@@ -417,7 +417,7 @@ class PerformanceAnalytics:
         """Detect performance bottlenecks"""
         try:
             window_hours = self.analytics_config['bottleneck_detection_window_hours']
-            cutoff_time = datetime.now(UTC) - timedelta(hours=window_hours)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=window_hours)
             
             # Get recent metrics
             recent_metrics = [m for m in self.metrics_history if m.timestamp > cutoff_time]
@@ -545,7 +545,7 @@ class PerformanceAnalytics:
         """Update performance baselines"""
         try:
             window_hours = self.analytics_config['baseline_calculation_window_hours']
-            cutoff_time = datetime.now(UTC) - timedelta(hours=window_hours)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=window_hours)
             
             # Get historical metrics
             historical_metrics = [m for m in self.metrics_history if m.timestamp > cutoff_time]
@@ -570,7 +570,7 @@ class PerformanceAnalytics:
                     'p95': self._percentile(values, 95),
                     'p99': self._percentile(values, 99),
                     'sample_count': len(values),
-                    'updated_at': datetime.now(UTC)
+                    'updated_at': datetime.now(timezone.utc)
                 }
                 
                 self.resource_baselines[resource_type] = baseline
@@ -619,7 +619,7 @@ class PerformanceAnalytics:
             # Get current utilization
             recent_metrics = [m for m in self.metrics_history 
                            if m.metric_type == trend.metric_type and 
-                           m.timestamp > datetime.now(UTC) - timedelta(hours=1)]
+                           m.timestamp > datetime.now(timezone.utc) - timedelta(hours=1)]
             
             if not recent_metrics:
                 return None
@@ -664,7 +664,7 @@ class PerformanceAnalytics:
     
     def _cleanup_old_data(self):
         """Clean up old analytics data"""
-        cutoff_time = datetime.now(UTC) - timedelta(hours=168)  # 1 week
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=168)  # 1 week
         
         # Keep only recent data in memory
         # The deque maxlen will handle most cleanup automatically
@@ -674,7 +674,7 @@ class PerformanceAnalytics:
         """Get performance summary"""
         try:
             # Get recent metrics
-            recent_time = datetime.now(UTC) - timedelta(hours=1)
+            recent_time = datetime.now(timezone.utc) - timedelta(hours=1)
             recent_metrics = [m for m in self.metrics_history if m.timestamp > recent_time]
             
             # Calculate summary statistics
@@ -683,7 +683,7 @@ class PerformanceAnalytics:
                 metrics_by_type[metric.metric_type].append(metric.value)
             
             summary = {
-                'timestamp': datetime.now(UTC).isoformat(),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'status': self._get_overall_performance_status(),
                 'metrics_analyzed': len(recent_metrics),
                 'resource_utilization': {},
@@ -710,7 +710,7 @@ class PerformanceAnalytics:
         except Exception as e:
             self.logger.error(f"Error getting performance summary: {e}")
             return {
-                'timestamp': datetime.now(UTC).isoformat(),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'status': 'unknown',
                 'error': str(e)
             }
@@ -719,7 +719,7 @@ class PerformanceAnalytics:
         """Get overall performance status"""
         try:
             # Check recent bottlenecks
-            recent_time = datetime.now(UTC) - timedelta(hours=1)
+            recent_time = datetime.now(timezone.utc) - timedelta(hours=1)
             recent_bottlenecks = [b for b in self.bottleneck_history if b.severity != 'none']
             
             if any(b.severity == 'critical' for b in recent_bottlenecks):

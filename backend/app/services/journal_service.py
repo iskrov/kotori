@@ -272,6 +272,11 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Remove any schema-only fields that aren't in DB
         obj_data.pop("encryption_algorithm", None)
 
+        # Service guard rails: strip secret-tag fields when feature disabled
+        if not settings.ENABLE_SECRET_TAGS:
+            obj_data.pop("secret_tag_id", None)
+            obj_data.pop("secret_tag_hash", None)
+
         # Create the journal entry
         db_journal_entry = JournalEntryModel(**obj_data)
         db.add(db_journal_entry)
@@ -350,6 +355,11 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
 
         # Remove schema-only fields
         update_data.pop("encryption_algorithm", None)
+
+        # Service guard rails: strip secret-tag fields when feature disabled
+        if not settings.ENABLE_SECRET_TAGS:
+            update_data.pop("secret_tag_id", None)
+            update_data.pop("secret_tag_hash", None)
 
         # Update the journal entry
         db_obj = super().update(db, db_obj=db_obj, obj_in=update_data)
@@ -549,33 +559,59 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
             else:
                 raise
     
-    def get_secret_entries_for_tag(
+    # get_secret_entries_for_tag method removed in PBI-4 Stage 2 (secret tags no longer exist)
+
+    def get_journal_entries(
         self,
         db: Session,
         *,
-        secret_tag_id: bytes,
+        user_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        include_hidden: bool = False
+    ) -> List[JournalEntry]:
+        """
+        Get journal entries for a user with optional hidden entries.
+        Alias for get_multi_by_user with consistent naming for v1 API.
+        """
+        return self.get_multi_by_user(
+            db=db,
+            user_id=user_id,
+            skip=skip,
+            limit=limit,
+            include_hidden=include_hidden
+        )
+
+    def get_entry_count(
+        self,
+        db: Session,
+        *,
+        user_id: UUID,
+        include_hidden: bool = False
+    ) -> int:
+        """Get total count of journal entries for a user."""
+        query = db.query(JournalEntryModel).filter(JournalEntryModel.user_id == user_id)
+        
+        if not include_hidden:
+            # Only count non-encrypted entries if include_hidden is False
+            query = query.filter(JournalEntryModel.encrypted_content.is_(None))
+        
+        return query.count()
+
+    def get_hidden_entries_only(
+        self,
+        db: Session,
+        *,
         user_id: UUID,
         skip: int = 0,
         limit: int = 100
     ) -> List[JournalEntry]:
-        """
-        Get encrypted journal entries for a specific secret tag.
-        
-        Args:
-            db: Database session
-            secret_tag_id: Binary tag ID for the secret tag
-            user_id: ID of the user (for security validation)
-            skip: Number of entries to skip (pagination)
-            limit: Maximum number of entries to return
-            
-        Returns:
-            List of journal entries with encrypted content
-        """
+        """Get only encrypted/hidden entries for a user."""
         query = (
             db.query(JournalEntryModel)
             .filter(
                 JournalEntryModel.user_id == user_id,
-                JournalEntryModel.secret_tag_id == secret_tag_id
+                JournalEntryModel.encrypted_content.isnot(None)
             )
             .options(joinedload(JournalEntryModel.tags).joinedload(JournalEntryTag.tag))
             .order_by(JournalEntryModel.entry_date.desc())
@@ -586,23 +622,107 @@ class JournalService(BaseService[JournalEntryModel, JournalEntryCreate, JournalE
         # Convert to schema format
         response_entries = []
         for db_entry in db_entries:
-            # Extract ORM tags from the association
             orm_tags = [assoc.tag for assoc in db_entry.tags]
             schema_tags = [TagSchema.from_orm(tag_orm_obj) for tag_orm_obj in orm_tags]
-            
-            # Return encrypted content as-is for client-side decryption
-            content = db_entry.encrypted_content.hex() if db_entry.encrypted_content else ""
             
             response_entry = JournalEntry(
                 id=db_entry.id,
                 title=db_entry.title,
-                content=content,  # Encrypted content as hex string
+                content="",  # Always empty for encrypted entries
                 entry_date=db_entry.entry_date,
                 audio_url=db_entry.audio_url,
                 user_id=db_entry.user_id,
                 created_at=db_entry.created_at,
                 updated_at=db_entry.updated_at,
-                tags=schema_tags
+                tags=schema_tags,
+                is_encrypted=True,
+                encrypted_content=base64.b64encode(db_entry.encrypted_content).decode('ascii'),
+                encryption_iv=base64.b64encode(db_entry.encryption_iv).decode('ascii') if db_entry.encryption_iv else None,
+                wrapped_key=base64.b64encode(db_entry.wrapped_key).decode('ascii') if db_entry.wrapped_key else None,
+                wrap_iv=base64.b64encode(db_entry.wrap_iv).decode('ascii') if db_entry.wrap_iv else None,
+            )
+            response_entries.append(response_entry)
+        
+        return response_entries
+
+    def search_journal_entries(
+        self,
+        db: Session,
+        *,
+        user_id: UUID,
+        search_term: str,
+        include_hidden: bool = False
+    ) -> List[JournalEntry]:
+        """Search journal entries by title, content, and tags."""
+        from sqlalchemy import or_, func
+        
+        # Base query
+        query = (
+            db.query(JournalEntryModel)
+            .filter(JournalEntryModel.user_id == user_id)
+            .options(joinedload(JournalEntryModel.tags).joinedload(JournalEntryTag.tag))
+        )
+        
+        # Apply hidden filter
+        if not include_hidden:
+            query = query.filter(JournalEntryModel.encrypted_content.is_(None))
+        
+        # Search in title and content (content search only for non-encrypted entries)
+        search_conditions = [
+            JournalEntryModel.title.ilike(f'%{search_term}%')
+        ]
+        
+        # Only search content for non-encrypted entries
+        if include_hidden:
+            # For encrypted entries, only search title
+            search_conditions.append(
+                or_(
+                    JournalEntryModel.encrypted_content.is_(None) & JournalEntryModel.content.ilike(f'%{search_term}%'),
+                    JournalEntryModel.encrypted_content.isnot(None)  # Include encrypted entries (title already searched)
+                )
+            )
+        else:
+            search_conditions.append(JournalEntryModel.content.ilike(f'%{search_term}%'))
+        
+        query = query.filter(or_(*search_conditions))
+        query = query.order_by(JournalEntryModel.entry_date.desc())
+        
+        db_entries = query.all()
+        
+        # Convert to schema format
+        response_entries = []
+        for db_entry in db_entries:
+            orm_tags = [assoc.tag for assoc in db_entry.tags]
+            schema_tags = [TagSchema.from_orm(tag_orm_obj) for tag_orm_obj in orm_tags]
+            
+            if db_entry.encrypted_content:
+                content = ""
+                encrypted_content_b64 = base64.b64encode(db_entry.encrypted_content).decode('ascii')
+                encryption_iv_b64 = base64.b64encode(db_entry.encryption_iv).decode('ascii') if db_entry.encryption_iv else None
+                wrapped_key_b64 = base64.b64encode(db_entry.wrapped_key).decode('ascii') if db_entry.wrapped_key else None
+                wrap_iv_b64 = base64.b64encode(db_entry.wrap_iv).decode('ascii') if db_entry.wrap_iv else None
+            else:
+                content = db_entry.content or ""
+                encrypted_content_b64 = None
+                encryption_iv_b64 = None
+                wrapped_key_b64 = None
+                wrap_iv_b64 = None
+            
+            response_entry = JournalEntry(
+                id=db_entry.id,
+                title=db_entry.title,
+                content=content,
+                entry_date=db_entry.entry_date,
+                audio_url=db_entry.audio_url,
+                user_id=db_entry.user_id,
+                created_at=db_entry.created_at,
+                updated_at=db_entry.updated_at,
+                tags=schema_tags,
+                is_encrypted=db_entry.encrypted_content is not None,
+                encrypted_content=encrypted_content_b64,
+                encryption_iv=encryption_iv_b64,
+                wrapped_key=wrapped_key_b64,
+                wrap_iv=wrap_iv_b64,
             )
             response_entries.append(response_entry)
         

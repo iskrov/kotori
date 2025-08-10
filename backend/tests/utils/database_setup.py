@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy.orm import sessionmaker
 import pytest
 import uuid
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 
 # Import models to ensure they're registered
 from app.models.user import User
@@ -275,8 +275,8 @@ class TestDatabaseManager:
                 display_name=config['display_name'],
                 phone=config.get('phone'),
                 is_active=config.get('is_active', True),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC)
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             
             session.add(user)
@@ -295,8 +295,8 @@ class TestDatabaseManager:
                 title=config['title'],
                 content=config['content'],
                 user_id=user.id,
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC)
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             
             session.add(entry)
@@ -315,8 +315,8 @@ class TestDatabaseManager:
                 verifier_kv=config['verifier_kv'],
                 user_id=user.id,
                 is_active=config.get('is_active', True),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC)
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             
             session.add(secret_tag)
@@ -424,8 +424,8 @@ async def create_test_user(session: AsyncSession, **kwargs) -> User:
         'display_name': 'Test User',
         'phone': '+1234567890',
         'is_active': True,
-        'created_at': datetime.now(UTC),
-        'updated_at': datetime.now(UTC)
+        'created_at': datetime.now(timezone.utc),
+        'updated_at': datetime.now(timezone.utc)
     }
     defaults.update(kwargs)
     
@@ -444,8 +444,8 @@ async def create_test_secret_tag(session: AsyncSession, user: User, **kwargs) ->
         'verifier_kv': b'test_verifier_data',
         'user_id': user.id,
         'is_active': True,
-        'created_at': datetime.now(UTC),
-        'updated_at': datetime.now(UTC)
+        'created_at': datetime.now(timezone.utc),
+        'updated_at': datetime.now(timezone.utc)
     }
     defaults.update(kwargs)
     

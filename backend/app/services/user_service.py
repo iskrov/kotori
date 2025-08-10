@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta, UTC
+from datetime import datetime, date, timedelta, timezone
 from typing import Any, List, Dict, Optional
 from uuid import UUID
 import secrets
@@ -89,8 +89,8 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             is_active=True,
             
             # Timestamps
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(db_obj)
         db.commit()
@@ -114,7 +114,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             update_data["hashed_password"] = get_password_hash(update_data["password"])
             del update_data["password"]
 
-        update_data["updated_at"] = datetime.now(UTC)
+        update_data["updated_at"] = datetime.now(timezone.utc)
 
         for field in update_data:
             setattr(db_obj, field, update_data[field])
@@ -138,7 +138,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         """Update user onboarding status"""
         update_data = {
             "onboarding_completed": onboarding_data.onboarding_completed,
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(timezone.utc)
         }
         
         # Store onboarding step data in tier_metadata if provided
@@ -147,7 +147,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             tier_metadata["onboarding"] = {
                 "step": onboarding_data.onboarding_step,
                 "data": onboarding_data.onboarding_data,
-                "completed_at": datetime.now(UTC).isoformat()
+                "completed_at": datetime.now(timezone.utc).isoformat()
             }
             update_data["tier_metadata"] = tier_metadata
         
@@ -193,7 +193,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         """Update login count and last seen timestamp"""
         return self.update(db, db_obj=db_obj, obj_in={
             "login_count": db_obj.login_count + 1,
-            "last_seen_at": datetime.now(UTC)
+            "last_seen_at": datetime.now(timezone.utc)
         })
 
     def _generate_referral_code(self, db: Session) -> str:
@@ -310,8 +310,8 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
                 is_active=True,
                 is_superuser=False,
                 referral_code=self._generate_referral_code(db),
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             )
             db.add(test_user)
             db.commit()
@@ -338,7 +338,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         if user.subscription_status != "active":
             return False
         
-        if user.subscription_expires_at and user.subscription_expires_at < datetime.now(UTC):
+        if user.subscription_expires_at and user.subscription_expires_at < datetime.now(timezone.utc):
             return False
         
         return True
@@ -412,7 +412,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             raise ValueError("User not found")
 
         # Fetch all entry dates for the user, ordered most recent first
-        # Assuming JournalEntry.entry_date stores UTC datetimes
+        # Assuming JournalEntry.entry_date stores timezone.utc datetimes
         entry_datetime_stamps = db.scalars(
             select(JournalEntry.entry_date)
             .where(JournalEntry.user_id == user_id)
@@ -423,7 +423,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         total_entries = len(entry_datetime_stamps)
 
         # Calculate days since registration
-        days_since_registration = (datetime.now(UTC).date() - user.created_at.date()).days
+        days_since_registration = (datetime.now(timezone.utc).date() - user.created_at.date()).days
 
         if not entry_datetime_stamps:
             logger.info("No entries found, returning zero stats.")
@@ -440,9 +440,9 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             )
 
         try:
-            # Convert datetime objects to UTC date objects for consistent comparison
+            # Convert datetime objects to timezone.utc date objects for consistent comparison
             unique_entry_days_utc = sorted(list(set(entry_dt.date() for entry_dt in entry_datetime_stamps)), reverse=True)
-            logger.debug(f"Unique entry days UTC (YYYY-MM-DD): {unique_entry_days_utc}")
+            logger.debug(f"Unique entry days timezone.utc (YYYY-MM-DD): {unique_entry_days_utc}")
         except Exception as e:
             logger.error(f"Error converting entry_datetime_stamps to date objects: {e}", exc_info=True)
             # Fallback to empty list to avoid crashing, will result in zero stats for streaks/week
@@ -462,9 +462,9 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
                  days_since_registration=days_since_registration
              )
 
-        # Use current UTC date as the reference for calculations
-        today_utc = datetime.now(UTC).date()
-        logger.debug(f"Today (UTC): {today_utc} for stat calculations.")
+        # Use current timezone.utc date as the reference for calculations
+        today_utc = datetime.now(timezone.utc).date()
+        logger.debug(f"Today (timezone.utc): {today_utc} for stat calculations.")
 
         current_streak = self._calculate_current_streak(unique_entry_days_utc, today_utc)
         longest_streak = self._calculate_longest_streak(unique_entry_days_utc)

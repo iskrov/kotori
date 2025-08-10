@@ -1,0 +1,22 @@
+{
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "lang": "en",
+  "name": "Kotori",
+  "short_name": "Kotori",
+  "start_url": "/?utm_source=web_app_manifest",
+  "theme_color": "#7D4CDB",
+  "orientation": "portrait",
+  "related_applications": [
+    {
+      "platform": "itunes",
+      "id": "com.kotori.app"
+    },
+    {
+      "platform": "play",
+      "url": "http://play.google.com/store/apps/details?id=com.kotori.app",
+      "id": "com.kotori.app"
+    }
+  ],
+  "prefer_related_applications": true
+}

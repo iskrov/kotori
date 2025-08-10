@@ -55,7 +55,16 @@ frontend/.expo/ # Expo specific for frontend
 *.env
 *.env.*
 !.env.example
+!.env.template
 # vibes/.env # Example for specific env files if not covered by directory gitignores
+
+# GCP Deployment Secrets
+deploy/GENERATED_SECRETS.md
+deploy/*.key
+deploy/*.json
+deploy/.gcp-credentials
+*.pem
+*.p12
 
 # Logs (Centralized)
 /logs/

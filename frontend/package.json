@@ -18,6 +18,7 @@
     "simple-api-test": "node scripts/simple-api-test.js",
     "check-api": "node scripts/check-speech-api.js",
     "speech-example": "node scripts/speech-api-example.js",
+    "opaque:smoke": "node scripts/opaque-smoke.js",
     "lint": "eslint src/ --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint src/ --ext .ts,.tsx,.js,.jsx --fix",
     "analyze:dead-code": "ts-unused-exports tsconfig.json",

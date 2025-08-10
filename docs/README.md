@@ -13,7 +13,7 @@ A modern, secure voice journaling application built with React Native and FastAP
 
 ### ✅ Core Features Implemented
 - **Voice Recording & Transcription**: Google Cloud Speech-to-Text V2 integration with multi-language support
-- **Zero-Knowledge Encryption**: Client-side per-user encryption (secret tags disabled by default)
+- **Zero-Knowledge Encryption**: Client-side per-user encryption
 - **Modern UI/UX**: Floating tab navigation, modern forms, and professional recording interface
 - **Journal Management**: Full CRUD operations with tags, search, and calendar integration
 - **Authentication**: Google Sign-in with secure session management
@@ -58,31 +58,19 @@ POST /api/v1/auth/google
 POST /api/v1/auth/register/start
 POST /api/v1/auth/register/finish
 
-# Login flow  
+# Login flow
 POST /api/v1/auth/login/start
 POST /api/v1/auth/login/finish
 # Response: { access_token, refresh_token }
 ```
 
-**Secret Tags API (Works with both authentication methods)**
-```bash
-# Create encrypted secret tags (always uses OPAQUE)
-POST /api/v1/secret-tags/register/start
-POST /api/v1/secret-tags/register/finish
+Note: Request field names for OPAQUE follow the schema in `backend/app/schemas/opaque_user.py` and use `userIdentifier`, not `email`.
 
-# Authenticate with secret phrase (OPAQUE regardless of user auth)
-POST /api/v1/secret-tags/{tag_id}/auth/start
-POST /api/v1/secret-tags/{tag_id}/auth/finish
-
-# Access encrypted entries
-GET /api/v1/secret-tags/{tag_id}/entries
-```
 
 ### Key Benefits
-- **OAuth users** get convenience without compromising secret tag security
-- **OPAQUE users** get complete zero-knowledge protection for everything  
-- **Both** can create and use phrase-protected secret tags with identical security
-- Frontend sends audio data to `/api/speech/transcribe` endpoint
+- **OAuth users** get convenience without secret tags (removed in PBI-4 Stage 2)
+- **OPAQUE users** get complete zero-knowledge protection for user auth
+- Frontend sends audio data to `/api/v1/speech/transcribe` endpoint
 - Secure, centralized API management with flexible authentication
 
 ### Environment Configuration
@@ -112,7 +100,6 @@ The frontend requires the backend API to be running for:
 - Speech-to-text transcription
 - Journal entry storage and retrieval
 - User authentication
-- Secret tags management
 
 Refer to the main project README.md for backend setup instructions.
 
@@ -129,7 +116,7 @@ Refer to the main project README.md for backend setup instructions.
 - **Enhanced Journal Management**: Improved list navigation and search capabilities
 - **Audio Recording Stability**: Fixed transcript display and save functionality
 - **Navigation Architecture**: Modal-based recording screen with proper flow
-- **Phrase-Based Encryption**: Voice-activated secret tags with real-time phrase detection
+
 
 ### Troubleshooting Common Issues
 
@@ -155,22 +142,17 @@ Refer to the main project README.md for backend setup instructions.
 
 ## 🔒 Security Features
 
-### Zero-Knowledge Phrase-Based Encryption
+### Zero-Knowledge Password-Based Encryption
 - All journal entries encrypted client-side before storage
 - Server cannot decrypt user data even under compromise
 - Hardware-backed key storage on supported devices
-- Phrase-to-key derivation using Argon2 hashing
+- Password-to-key derivation using Argon2 hashing
 
-### Voice-Activated Secret Tags
-- Real-time phrase detection during recording
-- Automatic encryption with phrase-derived keys
-- Coercion resistance with independent tag activation
-- Progressive disclosure of private content
+
 
 ### Dual Authentication System
 - **Google Sign-in (OAuth)**: Quick and convenient user authentication via `/api/v1/auth/google`
 - **OPAQUE Zero-Knowledge**: Password-based authentication with no server-side secrets via `/api/v1/auth/*`
-- **Universal Secret Tags**: All secret tags use OPAQUE encryption regardless of user authentication method
 - Secure session management with JWT tokens for both authentication types
 - Automatic logout and cleanup
 

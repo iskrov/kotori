@@ -18,7 +18,7 @@ import time
 import hashlib
 import json
 from typing import Dict, Optional, Tuple, List
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from enum import Enum
 import redis
@@ -133,7 +133,7 @@ class EnhancedRateLimiter:
             'total_requests': 0,
             'blocked_requests': 0,
             'abuse_detections': 0,
-            'last_reset': datetime.now(UTC)
+            'last_reset': datetime.now(timezone.utc)
         }
         
         logger.info(f"Rate limiter initialized with Redis: {self.use_redis}")
@@ -213,9 +213,9 @@ class EnhancedRateLimiter:
             limit_type=limit_type,
             identifier=identifier,
             config=config,
-            window_start=datetime.now(UTC),
+            window_start=datetime.now(timezone.utc),
             request_count=0,
-            last_request=datetime.now(UTC),
+            last_request=datetime.now(timezone.utc),
             violation_count=0,
             blocked_until=None
         )
@@ -233,12 +233,12 @@ class EnhancedRateLimiter:
     
     def _is_window_expired(self, rule: RateLimitRule) -> bool:
         """Check if the current time window has expired."""
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         return (now - rule.window_start).total_seconds() >= 60  # 1 minute window
     
     def _reset_window(self, rule: RateLimitRule):
         """Reset the rate limit window."""
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         rule.window_start = now
         rule.request_count = 0
         rule.last_request = now
@@ -257,7 +257,7 @@ class EnhancedRateLimiter:
     
     def _apply_abuse_block(self, rule: RateLimitRule):
         """Apply long-term block for abusive behavior."""
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         rule.blocked_until = now + timedelta(hours=self.abuse_cooldown_hours)
         
         # Log abuse detection
@@ -287,7 +287,7 @@ class EnhancedRateLimiter:
                 identifier = f"{identifier}:{operation}"
             
             rule = self._get_rule(limit_type, identifier)
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             
             # Check if currently blocked
             if rule.blocked_until and now < rule.blocked_until:
@@ -359,7 +359,7 @@ class EnhancedRateLimiter:
         """
         try:
             rule = self._get_rule(limit_type, identifier)
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             
             # Calculate remaining requests
             remaining = max(0, rule.config.requests_per_minute - rule.request_count)
@@ -425,7 +425,7 @@ class EnhancedRateLimiter:
             return  # Redis handles TTL automatically
         
         try:
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             expired_keys = []
             
             with self.lock:

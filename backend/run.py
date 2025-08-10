@@ -1,6 +1,6 @@
 import uvicorn
 try:
-    import sitecustomize  # ensure compatibility shims (e.g., datetime.UTC)
+    import sitecustomize  # ensure compatibility shims (e.g., datetime.timezone.utc)
 except Exception:
     pass
 import argparse # Import argparse

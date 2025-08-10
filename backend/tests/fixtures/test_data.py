@@ -8,7 +8,7 @@ including users, phrases, journal entries, vault content, and security test data
 import uuid
 import secrets
 import json
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
@@ -248,7 +248,7 @@ MOCK_RESPONSES = {
         "success": True,
         "session_token": secrets.token_bytes(32).hex(),
         "vault_key": secrets.token_bytes(32).hex(),
-        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+        "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
     },
     "vault_upload": {
         "success": True,

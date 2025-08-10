@@ -7,7 +7,7 @@ and OPAQUE session management, including token generation, validation, refresh t
 
 import secrets
 import hashlib
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Set, Tuple
 import logging
 import json
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from ..core.config import settings
-from ..models.secret_tag_opaque import OpaqueSession
+from ..models.opaque_auth import OpaqueSession
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class JWTService:
             str: JWT access token
         """
         try:
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             expires_at = now + self.ACCESS_TOKEN_LIFETIME
             
             # Standard JWT claims
@@ -135,7 +135,7 @@ class JWTService:
             str: JWT session token
         """
         try:
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             expires_at = now + self.SESSION_TOKEN_LIFETIME
             
             # Standard JWT claims for session token
@@ -189,7 +189,7 @@ class JWTService:
             str: JWT refresh token
         """
         try:
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             expires_at = now + self.REFRESH_TOKEN_LIFETIME
             
             claims = {
@@ -407,8 +407,8 @@ class JWTService:
             return {
                 "user_id": claims.get("sub"),
                 "token_type": claims.get("token_type"),
-                "issued_at": datetime.fromtimestamp(claims.get("iat", 0), UTC),
-                "expires_at": datetime.fromtimestamp(claims.get("exp", 0), UTC),
+                "issued_at": datetime.fromtimestamp(claims.get("iat", 0), timezone.utc),
+                "expires_at": datetime.fromtimestamp(claims.get("exp", 0), timezone.utc),
                 "jti": claims.get("jti"),
                 "is_blacklisted": self._is_token_blacklisted(token),
                 "usage_count": self._token_usage_count.get(claims.get("jti"), 0)

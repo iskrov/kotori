@@ -9,7 +9,7 @@ privacy-preserving analytics and zero-knowledge compliance.
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.audit_service import SecurityAuditService
-from app.models.secret_tag_opaque import SecurityAuditLog
+# SecurityAuditLog import removed in PBI-4 Stage 2
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -259,16 +259,16 @@ class SecurityAnalytics:
                 self.recent_events.extend(security_events)
                 self.security_metrics['total_events_analyzed'] += len(security_events)
                 self.security_metrics['analysis_runtime_ms'] = int((time.time() - start_time) * 1000)
-                self.last_analysis = datetime.now(UTC)
+                self.last_analysis = datetime.now(timezone.utc)
             
         except Exception as e:
             self.logger.error(f"Error analyzing security events: {e}")
     
-    def _get_recent_audit_logs(self) -> List[SecurityAuditLog]:
+    def _get_recent_audit_logs(self) -> List:
         """Get recent audit logs for analysis"""
         try:
             # Get logs from last 5 minutes
-            cutoff_time = datetime.now(UTC) - timedelta(minutes=5)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=5)
             
             logs = self.db.query(SecurityAuditLog).filter(
                 SecurityAuditLog.timestamp >= cutoff_time,
@@ -334,7 +334,7 @@ class SecurityAnalytics:
             return False
         
         # Count recent failures from same IP or user
-        window_start = datetime.now(UTC) - timedelta(
+        window_start = datetime.now(timezone.utc) - timedelta(
             minutes=self.detection_rules['brute_force_detection']['window_minutes']
         )
         
@@ -369,7 +369,7 @@ class SecurityAnalytics:
         if not event.ip_address_hash:
             return False
         
-        window_start = datetime.now(UTC) - timedelta(
+        window_start = datetime.now(timezone.utc) - timedelta(
             minutes=self.detection_rules['credential_stuffing_detection']['window_minutes']
         )
         
@@ -430,7 +430,7 @@ class SecurityAnalytics:
         if not event.ip_address_hash:
             return False
         
-        window_start = datetime.now(UTC) - timedelta(
+        window_start = datetime.now(timezone.utc) - timedelta(
             minutes=self.detection_rules['enumeration_detection']['window_minutes']
         )
         
@@ -458,7 +458,7 @@ class SecurityAnalytics:
         if event.event_type != 'rate_limit_exceeded':
             return False
         
-        window_start = datetime.now(UTC) - timedelta(
+        window_start = datetime.now(timezone.utc) - timedelta(
             minutes=self.detection_rules['rate_limit_bypass_detection']['window_minutes']
         )
         
@@ -621,7 +621,7 @@ class SecurityAnalytics:
             ]
             
             baseline = {
-                'last_updated': datetime.now(UTC),
+                'last_updated': datetime.now(timezone.utc),
                 'event_count': len(user_events),
                 'hourly_activity': defaultdict(int)
             }
@@ -650,7 +650,7 @@ class SecurityAnalytics:
             
             # Calculate request rate statistics
             baseline = {
-                'last_updated': datetime.now(UTC),
+                'last_updated': datetime.now(timezone.utc),
                 'event_count': len(ip_events),
                 'request_rate': len(ip_events) / 60,  # requests per minute
                 'unique_users': len(set(event.user_id_hash for event in ip_events if event.user_id_hash))
@@ -663,24 +663,24 @@ class SecurityAnalytics:
     
     def _cleanup_old_data(self):
         """Clean up old analytics data"""
-        cutoff_time = datetime.now(UTC) - timedelta(hours=24)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
         
         # Clean up old baselines
         for user_id_hash in list(self.user_baselines.keys()):
             baseline = self.user_baselines[user_id_hash]
-            if baseline.get('last_updated', datetime.min.replace(tzinfo=UTC)) < cutoff_time:
+            if baseline.get('last_updated', datetime.min.replace(tzinfo=timezone.utc)) < cutoff_time:
                 del self.user_baselines[user_id_hash]
         
         for ip_hash in list(self.ip_baselines.keys()):
             baseline = self.ip_baselines[ip_hash]
-            if baseline.get('last_updated', datetime.min.replace(tzinfo=UTC)) < cutoff_time:
+            if baseline.get('last_updated', datetime.min.replace(tzinfo=timezone.utc)) < cutoff_time:
                 del self.ip_baselines[ip_hash]
     
     def get_security_metrics(self) -> Dict[str, Any]:
         """Get current security metrics"""
         try:
             # Get recent events for metrics calculation
-            recent_time = datetime.now(UTC) - timedelta(hours=1)
+            recent_time = datetime.now(timezone.utc) - timedelta(hours=1)
             recent_events = [event for event in self.recent_events if event.timestamp > recent_time]
             
             # Calculate metrics
@@ -724,7 +724,7 @@ class SecurityAnalytics:
     def get_threat_intelligence(self) -> Dict[str, Any]:
         """Get threat intelligence summary"""
         try:
-            recent_time = datetime.now(UTC) - timedelta(hours=24)
+            recent_time = datetime.now(timezone.utc) - timedelta(hours=24)
             recent_events = [event for event in self.recent_events if event.timestamp > recent_time]
             
             # Aggregate threat patterns

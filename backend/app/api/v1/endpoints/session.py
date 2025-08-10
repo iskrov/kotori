@@ -5,7 +5,7 @@ This module provides FastAPI routes for OPAQUE session management operations.
 """
 
 import asyncio
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, status, Request
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -13,7 +13,7 @@ import logging
 
 from app.dependencies import get_db, get_current_active_user_from_session, get_opaque_session
 from app.models.user import User
-from app.models.secret_tag_opaque import OpaqueSession
+from app.models.opaque_auth import OpaqueSession
 from app.services.session_service import session_service, SessionTokenError, SessionValidationError
 from app.schemas.session import (
     SessionCreateRequest,
@@ -504,7 +504,7 @@ async def get_token_info(
         return {
             "token_info": token_info,
             "service": "session_service",
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:

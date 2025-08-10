@@ -10,7 +10,7 @@ Kotori is a voice-controlled journaling application that allows users to record 
 - **Calendar View**: Browse entries by date
 - **🔐 OPAQUE Authentication**: Zero-knowledge authentication protocol - server never sees passwords
 - **Reminder System**: Set reminders to maintain journaling habits
-- **🔒 Zero-Knowledge Privacy**: Client-side per-user encryption where only you can access your private data (secret tags are disabled by default in Kotori)
+- **🔒 Zero-Knowledge Privacy**: Client-side per-user encryption where only you can access your private data
 
 ## 🛡️ Privacy & Security Architecture
 
@@ -18,22 +18,6 @@ Kotori is a voice-controlled journaling application that allows users to record 
 
 Kotori implements **true zero-knowledge encryption** with **per-user encryption keys** derived from OPAQUE, enabling secure storage of journal content where the server cannot decrypt user data.
 
-Secret tags are deprecated and disabled by default. Existing secret-tag features are guarded by a feature flag to allow transition from Vibes.
-
-#### Voice Activation Examples:
-
-```typescript
-// User speaks: "work private thoughts about the meeting..."
-// → Phrase detected, entry encrypted with "work private" key
-// → Only visible when "work private" tag is active
-
-// User speaks: "personal deep feelings about..."  
-// → Phrase detected, entry encrypted with "personal deep" key
-// → Only visible when "personal deep" tag is active
-
-// Regular entry: "had a great day today..."
-// → No phrase detected, public entry, always visible
-```
 
 #### Key Security Features:
 
@@ -54,15 +38,14 @@ Secret tags are deprecated and disabled by default. Existing secret-tag features
 
 **✅ Privacy Guarantees**
 - Server-side decryption capability does not exist
-- Progressive disclosure removed with secret tags off by default
+
 
 #### Security Guarantees:
 
-- **Database Breach Protection**: Encrypted data is useless without client phrase keys
+- **Database Breach Protection**: Encrypted data is useless without client password
 - **Server Compromise Protection**: No server-side decryption capability exists
 - **Admin Access Protection**: No backdoors or master keys on server
-- **Device Seizure Protection**: Secret tag entries invisible without specific code phrases
-- **Forward Secrecy**: Past entries remain secure even if current phrases compromised
+
 
 #### Technical Implementation (High Level):
 
@@ -70,7 +53,7 @@ Secret tags are deprecated and disabled by default. Existing secret-tag features
 2. Each new entry generates a random key to encrypt content; that key is wrapped with the user's master key.
 3. Backend stores only ciphertext and wrapped entry key; never plaintext.
 
-The zero-knowledge phrase-based secret tags architecture ensures that even if the server is compromised, user data remains completely secure and private with granular access control through voice-activated phrases.
+The zero-knowledge password-based architecture ensures that even if the server is compromised, user data remains completely secure and private with granular access control through voice-activated phrases.
 
 ## 🔐 OPAQUE Zero-Knowledge Authentication
 
@@ -162,9 +145,9 @@ This project utilizes scripts to simplify the setup and running process.
 1.  **Clone the Repository:**
     ```bash
     git clone <your-repository-url>
-    cd vibes # Navigate into the repository root
+    cd kotori # Navigate into the repository root
     ```
-    *Note: The repository root contains the `.venv/` virtual environment and `logs/` directory (ignored by git) alongside the main `vibes/` source directory.*
+    *Note: The repository root contains the `logs/` directory (ignored by git) alongside the main `kotori/` source directory.*
 
 2.  **Run the Setup Script:**
     This script installs system dependencies (like `python3-dev`, `libpq-dev`, `postgresql`), Python dependencies for the backend (`pip install`), Node.js dependencies for the frontend (`npm install`), sets up the PostgreSQL database and user (you might be prompted for your `sudo` password), and runs database migrations.
@@ -220,20 +203,20 @@ The `setup.sh` script handles the initial database service startup. If you need 
     ```
 *   **Stop Database Service:**
     ```bash
-    # From the project root (e.g., /home/ai/src/vibes)
+    # From the project root (e.g., /home/ai/src/kotori)
     sudo scripts/stop_db.sh
     ```
 
 ### Development Notes
 
-*   **Virtual Environment:** The Python virtual environment (`.venv/`) is located at the workspace root (`/home/ai/src/vibes/.venv/`), one level above the main project directory. The scripts handle activation automatically. If you need to activate it manually (e.g., to use `pip` or `alembic` directly):
+*   **Virtual Environment:** The project uses a Conda environment named `kotori`. The scripts handle activation automatically. If you need to activate it manually (e.g., to use `pip` or `alembic` directly):
     ```bash
     # From the workspace root (/home/ai/src/kotori)
-    source .venv/bin/activate
+    conda activate kotori
     ```
 *   **Database Migrations:** To create a new migration after changing SQLAlchemy models in `backend/app/models/`:
     ```bash
-    # Make sure venv is active
+    # Make sure kotori environment is active
     # From the workspace root (/home/ai/src/kotori)
     cd backend # Navigate to backend directory
     alembic revision --autogenerate -m "Your migration message"
@@ -254,8 +237,7 @@ The `setup.sh` script handles the initial database service startup. If you need 
 ## Project Structure
 
 ```
-vibes/      # Workspace Root (Git Repository Root)
-├── .venv/               # Python Virtual Environment (Ignored by Git)
+kotori/      # Workspace Root (Git Repository Root)
 ├── logs/                # Runtime Logs (Ignored by Git)
 ├── .server.pid          # Backend PID File (Ignored by Git)
 ├── .frontend.pid        # Frontend PID File (Ignored by Git)

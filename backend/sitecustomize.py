@@ -9,10 +9,10 @@ import sys
 import datetime as _dt
 from datetime import timezone as _timezone
 
-# Backport datetime.UTC for Python < 3.11
-if not hasattr(_dt, "UTC"):
+# Backport datetime.timezone.utc for Python < 3.11
+if not hasattr(_dt, "timezone.utc"):
     try:
-        _dt.UTC = _timezone.utc  # type: ignore[attr-defined]
+        _dt.timezone.utc = _timezone.utc  # type: ignore[attr-defined]
     except Exception:
         # If anything goes wrong, at least don't crash interpreter startup
         pass

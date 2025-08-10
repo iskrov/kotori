@@ -3,6 +3,7 @@
     "@types/lodash.debounce": "^4.0.9"
   },
   "dependencies": {
-    "@serenity-kit/opaque": "^0.9.0"
+    "@serenity-kit/opaque": "^0.9.0",
+    "axios": "^1.11.0"
   }
 }

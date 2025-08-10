@@ -13,7 +13,7 @@ for monitoring and compliance purposes.
 
 import logging
 import time
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 from enum import Enum
 
@@ -79,7 +79,7 @@ def audit_security_event(
         # Create audit log entry
         audit_entry = {
             "event_type": event_type,
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "user_id": user_id,
             "details": details or {},
             "source": "kotori_backend"
@@ -196,7 +196,7 @@ def get_security_context() -> Dict[str, Any]:
     """
     return {
         "timestamp": time.time(),
-        "timezone": "UTC",
+        "timezone": "timezone.utc",
         "audit_version": "1.0"
     }
 
@@ -280,14 +280,14 @@ def create_access_token(subject: str, expires_delta: timedelta = None) -> str:
     Returns:
         Encoded JWT token string
     """
-    from datetime import datetime, timedelta, UTC
+    from datetime import datetime, timedelta, timezone
     from jose import jwt
     from ..core.config import settings
     
     if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode = {
         "exp": expire,
@@ -315,14 +315,14 @@ def create_refresh_token(subject: str, expires_delta: timedelta = None) -> str:
     Returns:
         Encoded JWT refresh token string
     """
-    from datetime import datetime, timedelta, UTC
+    from datetime import datetime, timedelta, timezone
     from jose import jwt
     from ..core.config import settings
     
     if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(UTC) + timedelta(days=7)  # Default 7 days for refresh tokens
+        expire = datetime.now(timezone.utc) + timedelta(days=7)  # Default 7 days for refresh tokens
     
     to_encode = {
         "exp": expire,

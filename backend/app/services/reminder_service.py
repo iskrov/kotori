@@ -1,6 +1,6 @@
 # Standard library imports
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import List
 from uuid import UUID
 
@@ -37,8 +37,8 @@ class ReminderService(BaseService[Reminder, ReminderCreate, ReminderUpdate]):
         db_obj = Reminder(
             **obj_in.dict(),
             user_id=user_id,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
         db.add(db_obj)
         db.commit()
@@ -60,7 +60,7 @@ class ReminderService(BaseService[Reminder, ReminderCreate, ReminderUpdate]):
 
     def get_upcoming_reminders(self, db: Session, user_id: UUID) -> list[Reminder]:
         """Get upcoming reminders for a user within the next 24 hours."""
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         tomorrow = now + timedelta(days=1)
         
         return (

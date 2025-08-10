@@ -124,7 +124,7 @@ class PerformanceTestRunner:
         print("\n" + "="*80)
         print("UUID DATABASE PERFORMANCE TEST SUITE")
         print("="*80)
-        print(f"Started at: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        print(f"Started at: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S timezone.utc')}")
         
         self.start_time = time.time()
         
@@ -159,8 +159,8 @@ class PerformanceTestRunner:
         total_duration = self.end_time - self.start_time if self.start_time and self.end_time else 0
         
         print(f"Total execution time: {total_duration:.2f} seconds")
-        print(f"Started at: {datetime.fromtimestamp(self.start_time, timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-        print(f"Finished at: {datetime.fromtimestamp(self.end_time, timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        print(f"Started at: {datetime.fromtimestamp(self.start_time, timezone.utc).strftime('%Y-%m-%d %H:%M:%S timezone.utc')}")
+        print(f"Finished at: {datetime.fromtimestamp(self.end_time, timezone.utc).strftime('%Y-%m-%d %H:%M:%S timezone.utc')}")
         
         print("\nTest Category Results:")
         print("-" * 60)

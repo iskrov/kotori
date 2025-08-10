@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Optional, Set, List, Any, Callable
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 
 from .memory import secure_zero, constant_time_compare
 from .secure_memory import locked_memory, register_cleanup_handler
@@ -112,7 +112,7 @@ class SecureKeyStore:
         ttl = ttl or self.default_ttl
         tags = tags or set()
         
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         expires_at = now + timedelta(seconds=ttl) if ttl > 0 else None
         
         metadata = KeyMetadata(
@@ -168,7 +168,7 @@ class SecureKeyStore:
                 return None
             
             # Update access information
-            metadata.last_accessed = datetime.now(UTC)
+            metadata.last_accessed = datetime.now(timezone.utc)
             metadata.access_count += 1
             
             # Return copy of key data
@@ -314,7 +314,7 @@ class SecureKeyStore:
         """Check if a key has expired."""
         if metadata.expires_at is None:
             return False
-        return datetime.now(UTC) > metadata.expires_at
+        return datetime.now(timezone.utc) > metadata.expires_at
     
     def _remove_key(self, key_id: str) -> bool:
         """Internal method to remove a key."""
@@ -381,7 +381,7 @@ class SessionKeyManager:
         """
         session_id = str(uuid.uuid4())
         ttl = session_ttl or self.default_session_ttl
-        expires_at = datetime.now(UTC) + timedelta(seconds=ttl)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl)
         
         with self._lock:
             self._sessions[session_id] = expires_at
@@ -420,7 +420,7 @@ class SessionKeyManager:
             # Use session TTL if no specific TTL provided
             if ttl is None:
                 session_expires = self._sessions[session_id]
-                ttl = int((session_expires - datetime.now(UTC)).total_seconds())
+                ttl = int((session_expires - datetime.now(timezone.utc)).total_seconds())
                 ttl = max(ttl, 0)  # Ensure non-negative
             
             return self._key_store.store_key(
@@ -488,7 +488,7 @@ class SessionKeyManager:
             Number of sessions cleaned up
         """
         with self._lock:
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             expired_sessions = []
             
             for session_id, expires_at in self._sessions.items():
@@ -526,7 +526,7 @@ class SessionKeyManager:
             return False
         
         expires_at = self._sessions[session_id]
-        return datetime.now(UTC) <= expires_at
+        return datetime.now(timezone.utc) <= expires_at
 
 
 # Global key store and session manager instances

@@ -155,7 +155,6 @@ async def start_user_registration(
     a registration request and receives a registration response from the server.
     """
     start_time = time.time()
-    
     try:
         logger.info(f"Starting OPAQUE user registration for {request.userIdentifier}")
         
@@ -207,7 +206,6 @@ async def finish_user_registration(
     and the user account is created with OPAQUE authentication.
     """
     start_time = time.time()
-    
     try:
         logger.info(f"Finishing OPAQUE user registration for {request.userIdentifier}")
         
@@ -259,7 +257,6 @@ async def start_user_login(
     a login request and receives a credential response from the server.
     """
     start_time = time.time()
-    
     try:
         logger.info(f"Starting OPAQUE user login for {request.userIdentifier}")
         

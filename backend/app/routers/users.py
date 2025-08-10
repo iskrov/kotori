@@ -317,14 +317,14 @@ def accept_terms_and_privacy(
     Accept terms of service and privacy policy.
     """
     try:
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone
         update_data = {}
         
         if request.terms_accepted:
-            update_data["terms_accepted_at"] = datetime.now(UTC)
+            update_data["terms_accepted_at"] = datetime.now(timezone.utc)
         
         if request.privacy_policy_accepted:
-            update_data["privacy_policy_accepted_at"] = datetime.now(UTC)
+            update_data["privacy_policy_accepted_at"] = datetime.now(timezone.utc)
         
         user_service.update(db, db_obj=current_user, obj_in=update_data)
         return {"message": "Terms and privacy policy accepted successfully"}

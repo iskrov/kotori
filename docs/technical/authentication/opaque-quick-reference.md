@@ -18,21 +18,23 @@ POST /api/v1/auth/google
 # Start User Registration
 POST /api/v1/auth/register/start
 {
-  "email": "user@example.com",
-  "opaque_registration_request": "base64_encoded_request"
+  "userIdentifier": "user@example.com",
+  "opaque_registration_request": "base64_encoded_request",
+  "name": "John Doe"
 }
 
 # Finish User Registration  
 POST /api/v1/auth/register/finish
 {
-  "email": "user@example.com",
-  "opaque_registration_record": "base64_encoded_record"
+  "userIdentifier": "user@example.com",
+  "opaque_registration_record": "base64_encoded_record",
+  "session_id": "opaque_session_id"
 }
 
 # Start User Login
 POST /api/v1/auth/login/start
 {
-  "email": "user@example.com", 
+  "userIdentifier": "user@example.com", 
   "client_credential_request": "base64_encoded_request"
 }
 
@@ -40,7 +42,8 @@ POST /api/v1/auth/login/start
 POST /api/v1/auth/login/finish
 {
   "session_id": "session_uuid",
-  "client_credential_response": "base64_encoded_response"
+  "client_credential_response": "base64_encoded_response",
+  "userIdentifier": "user@example.com"
 }
 ```
 

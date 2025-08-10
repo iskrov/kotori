@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Build outputs (will be generated in container)
+web-build/
+dist/
+build/
+
+# Development files
+.expo/
+.env*
+!.env.example
+
+# Testing
+coverage/
+cypress/
+__tests__/
+*.test.*
+*.spec.*
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+docs/

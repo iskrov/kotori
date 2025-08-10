@@ -15,7 +15,7 @@ from app.core.config import settings
 # Use absolute imports for specific modules/classes needed
 from app.db.session import get_db as session_get_db
 from app.models.user import User
-from app.models.secret_tag_opaque import OpaqueSession
+# OpaqueSession import removed in PBI-4 Stage 2
 from app.schemas.token import TokenPayload
 
 # Import the user service
@@ -242,9 +242,13 @@ async def get_current_active_superuser(
     return current_user
 
 
-async def get_opaque_session(request: Request) -> Optional[OpaqueSession]:
+async def get_opaque_session(request: Request):
     """
     Dependency to get the current OPAQUE session if available.
     Returns None if no session is available.
+    
+    This is restored for OPAQUE user authentication.
+    Secret-tag functionality remains removed.
     """
+    from app.models.opaque_auth import OpaqueSession
     return getattr(request.state, 'opaque_session', None)

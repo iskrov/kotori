@@ -32,7 +32,7 @@ class User(Base, TimestampMixin):
     date_of_birth = Column(Date, nullable=True)
     
     # User Preferences & Localization
-    timezone = Column(String(50), nullable=False, default='UTC')
+    timezone = Column(String(50), nullable=False, default='timezone.utc')
     language_code = Column(String(10), nullable=False, default='en')
     theme_preference = Column(String(20), nullable=False, default='system')
     notification_preferences = Column(JSONB, nullable=False, default=dict)
@@ -74,7 +74,7 @@ class User(Base, TimestampMixin):
     # Relationships
     journal_entries = relationship("JournalEntry", back_populates="user")
     reminders = relationship("Reminder", back_populates="user")
-    secret_tags = relationship("SecretTag", back_populates="user", cascade="all, delete-orphan")
+    # secret_tags relationship removed in PBI-4 Stage 2
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
     
     # Self-referential relationship for referrals

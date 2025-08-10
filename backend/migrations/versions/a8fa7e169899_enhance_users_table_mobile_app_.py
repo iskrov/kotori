@@ -39,7 +39,7 @@ def upgrade() -> None:
     op.add_column('users', sa.Column('date_of_birth', sa.Date(), nullable=True))
     
     # User Preferences & Localization
-    op.add_column('users', sa.Column('timezone', sa.String(50), nullable=False, server_default='UTC'))
+    op.add_column('users', sa.Column('timezone', sa.String(50), nullable=False, server_default='timezone.utc'))
     op.add_column('users', sa.Column('language_code', sa.String(10), nullable=False, server_default='en'))
     op.add_column('users', sa.Column('theme_preference', sa.String(20), nullable=False, server_default='system'))
     op.add_column('users', sa.Column('notification_preferences', JSONB, nullable=False, server_default='{}'))

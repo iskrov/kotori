@@ -10,7 +10,7 @@ import uuid
 import secrets
 import time
 import json
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Union, Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -140,7 +140,7 @@ class UserTestHelper:
             email=email,
             hashed_password=self.hasher.hash_password(password),
             full_name=full_name,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(user)
         self.db.commit()
@@ -178,7 +178,7 @@ class UserTestHelper:
                 tag_name=f"test_tag_{i}",
                 user_id=user.id,
                 phrase_hash=self.hasher.hash_password(phrase),
-                created_at=datetime.now(UTC),
+                created_at=datetime.now(timezone.utc),
                 is_active=True
             )
             self.db.add(tag)
@@ -217,7 +217,7 @@ class SecretTagTestHelper:
             tag_name=name,
             user_id=user_id,
             phrase_hash=self.hasher.hash_password(phrase),
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             is_active=is_active
         )
         self.db.add(tag)
@@ -268,7 +268,7 @@ class JournalEntryTestHelper:
             content=content,
             is_encrypted=is_encrypted,
             secret_phrase_hash=secret_tag_id,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(entry)
         self.db.commit()
@@ -335,7 +335,7 @@ class VaultTestHelper:
             user_id=user_id,
             content_type=content_type,
             encrypted_content=encrypted_content,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(blob)
         self.db.commit()
@@ -357,7 +357,7 @@ class VaultTestHelper:
             user_id=user_id,
             key_type=key_type,
             wrapped_key=key_data,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(wrapped_key)
         self.db.commit()
@@ -577,7 +577,7 @@ class TestAssertionHelper:
     @staticmethod
     def assert_datetime_recent(dt: datetime, tolerance_seconds: int = 60):
         """Assert that a datetime is recent (within tolerance)."""
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         diff = abs((now - dt).total_seconds())
         assert diff <= tolerance_seconds, f"DateTime {dt} is not recent (diff: {diff}s)"
     

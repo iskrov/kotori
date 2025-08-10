@@ -1,14 +1,15 @@
-# Tasks for PBI 4: Phase 4 — Database posture (PostgreSQL 17) and schema cleanup
+# Tasks for PBI 4: Stage 1 — Secret-tag schema deprecation on PG 17
 
 This document lists all tasks associated with PBI 4.
 
-**Parent PBI**: [PBI 4: Phase 4 — Database posture (PostgreSQL 17) and schema cleanup](./prd.md)
+**Parent PBI**: [PBI 4: Stage 1 — Secret-tag schema deprecation on existing Postgres 17](./prd.md)
 
 ## Task Summary
 
 | Task ID | Name | Status | Description |
-| :------ | :--------------------------------------- | :------- | :--------------------------------- |
-| 4-1 | [Update docs/scripts to PostgreSQL 17](./4-1.md) | Proposed | Ensure all docs/scripts specify PG17. |
-| 4-2 | [Stage 1 migration: deprecate secret-tag schema](./4-2.md) | Proposed | Non-destructive deprecations with compatibility. |
-| 4-3 | [Stage 2 plan and rollback](./4-3.md) | Proposed | Plan drop after backup; document rollback. |
-| 4-4 | [E2E CoS Test](./4-4.md) | Proposed | Validate DB migrations do not break flows.
+| :------ | :---------------------------------------------- | :------- | :----------------------------------------------- |
+| 4-1 | [Schema inventory and impact report](./4-1.md) | Done | Enumerate legacy secret-tag tables/columns and where they're referenced. |
+| 4-2 | [Non-destructive Alembic migration (deprecations)](./4-2.md) | Done | Add migration that comments, disables triggers, and ensures no writes to legacy objects. |
+| 4-3 | [Service guard rails with feature flag](./4-3.md) | Done | Ensure services never read/write secret-tag objects when `ENABLE_SECRET_TAGS=false`. |
+| 4-4 | [Integration check on current dev DB](./4-4.md) | Done | Apply migration on current DB; run smoke (OPAQUE + encrypted CRUD) to confirm normal behavior. Verified OPAQUE restoration after Stage 2. |
+| 4-5 | [Technical docs update](./4-5.md) | Done | Document deprecation plan and Stage 2 destructive removal outline. |

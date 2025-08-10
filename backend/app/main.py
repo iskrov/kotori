@@ -15,13 +15,15 @@ from fastapi.encoders import jsonable_encoder
 from app.api.v1.endpoints import speech as speech_router_module
 from app.api.v1.endpoints import journal as v1_journal_router_module
 from app.api.v1.endpoints import vault as vault_router_module
-from app.api.v1.endpoints import session as session_router_module
+# Session router import disabled in PBI-4 Stage 2 (OpaqueSession model removed)
+# from app.api.v1.endpoints import session as session_router_module
 from app.api.v1.endpoints import audit as audit_router_module
 from app.api.v1.endpoints import maintenance as maintenance_router_module
 from app.api.v1 import monitoring as monitoring_router_module
 # New v1 authentication routers
 from app.api.v1 import auth as v1_auth_router
-from app.api.v1 import secret_tags as v1_secret_tags_router
+# Secret tags router import removed in PBI-4 Stage 2
+# from app.api.v1 import secret_tags as v1_secret_tags_router
 from app.core.config import settings
 # Legacy endpoints (non-authentication)
 from app.routers import journals_router
@@ -169,13 +171,15 @@ app.include_router(monitoring_router_module.router, prefix="/api/v1", tags=["Mon
 
 # New unified v1 authentication routers (replacing old scattered auth endpoints)
 app.include_router(v1_auth_router.router, prefix="/api/v1", tags=["Authentication v1"])
-if settings.ENABLE_SECRET_TAGS:
-    app.include_router(v1_secret_tags_router.router, prefix="/api/v1", tags=["Secret Tags v1"])
+# Secret tags router removed in PBI-4 Stage 2
+# if settings.ENABLE_SECRET_TAGS:
+#     app.include_router(v1_secret_tags_router.router, prefix="/api/v1", tags=["Secret Tags v1"])
 
 # Existing v1 endpoints 
 app.include_router(vault_router_module.router, prefix="/api/vault", tags=["Vault Storage"])
 app.include_router(audit_router_module.router, prefix="/api/audit", tags=["Security Audit"])
-app.include_router(session_router_module.router, prefix="/api/session", tags=["Session Management"])
+# Session router disabled in PBI-4 Stage 2 (OpaqueSession model removed)
+# app.include_router(session_router_module.router, prefix="/api/session", tags=["Session Management"])
 
 # Legacy endpoints (non-authentication - preserved)
 app.include_router(users_router, prefix="/api/users", tags=["Users"])

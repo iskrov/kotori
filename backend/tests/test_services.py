@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, UTC
+from datetime import date, datetime, time, timezone
 
 from sqlalchemy.orm import Session
 
@@ -109,7 +109,7 @@ def test_reminder_service(db: Session, test_user, test_factory: TestDataFactory,
         title="Service Test Reminder",
         message="This is a test reminder",
         frequency="daily",
-        time=datetime.now(UTC),
+        time=datetime.now(timezone.utc),
         is_active=True
     )
 
@@ -198,7 +198,7 @@ def test_service_integration(db: Session, test_factory: TestDataFactory, test_as
         title="Integration Test Reminder",
         message="Integration test message",
         frequency="weekly",
-        time=datetime.now(UTC),
+        time=datetime.now(timezone.utc),
         is_active=True
     )
     reminder = reminder_service.create_with_user(

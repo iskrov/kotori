@@ -24,11 +24,9 @@ class JournalEntry(Base, TimestampMixin):
         DateTime(timezone=True), nullable=False
     )  # When the entry was recorded
 
-    # OPAQUE Secret Tag Encryption Fields
-    # Use UUID foreign key to match the updated SecretTag model
-    secret_tag_id = Column(UUID(as_uuid=True), ForeignKey("secret_tags.id"), nullable=True, index=True)
-    encrypted_content = Column(LargeBinary, nullable=True)  # AES-encrypted content for secret entries
-    wrapped_key = Column(LargeBinary, nullable=True)  # Entry key wrapped with phrase-derived key
+    # Per-user Encryption Fields (secret_tag_id removed in PBI-4 Stage 2)
+    encrypted_content = Column(LargeBinary, nullable=True)  # AES-encrypted content for per-user encryption
+    wrapped_key = Column(LargeBinary, nullable=True)  # Entry key wrapped with user master key
     encryption_iv = Column(LargeBinary, nullable=True)  # IV for AES encryption
     wrap_iv = Column(LargeBinary, nullable=True)  # IV for key wrapping
     encryption_algorithm = Column(String, nullable=True)  # Algorithm identifier (e.g., AES-GCM)
@@ -38,7 +36,7 @@ class JournalEntry(Base, TimestampMixin):
 
     # Relationships
     user = relationship("User", back_populates="journal_entries")
-    secret_tag = relationship("SecretTag", back_populates="journal_entries")
+    # secret_tag relationship removed in PBI-4 Stage 2
     tags = relationship("JournalEntryTag", back_populates="entry")
 
 # Import JournalEntryTag from tag.py to avoid duplicate definition

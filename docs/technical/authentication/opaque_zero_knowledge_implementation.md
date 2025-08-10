@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the implementation of a dual authentication system with OPAQUE (Oblivious Pseudorandom Functions) for both **user authentication** and **secret tags**. This system ensures that:
+This document outlines the implementation of a dual authentication system with OPAQUE (Oblivious Pseudorandom Functions) for **user authentication**. Secret-tag functionality has been removed in PBI-4 Stage 2. This system ensures that:
 
 1. **Dual user authentication** - OAuth (Google Sign-in) for convenience, OPAQUE for zero-knowledge security
 2. **Universal secret tag protection** - OPAQUE authentication for all secret tags regardless of user auth method
@@ -25,12 +25,9 @@ This document outlines the implementation of a dual authentication system with O
 | Concept | Fields | Purpose |
 |---------|--------|---------|
 | **User** | `id` (UUID), `google_id` (TEXT NULL), `opaque_envelope` (BYTEA NULL) | Dual authentication support |
-| **Secret Tag** | `id` (UUID), `tag_handle` (32 bytes), `opaque_envelope` (BYTEA) | Clean OPAQUE secret tags |
-| **Tag Session** | `id` (UUID), `user_id`, `tag_id`, `server_ephemeral` | Ephemeral authentication sessions |
-| **Wrapped Key** | `tag_id` (UUID), `vault_id` (UUID), `wrapped_key` (40 bytes) | Maps secret tags to encrypted vaults |
-| **Vault Blob** | `vault_id`, `object_id`, `iv`, `ciphertext`, `auth_tag` | Encrypted journal entries |
+| (Removed) Secret Tag | N/A | Secret-tag encryption removed in PBI-4 Stage 2 |
 
-### 1.3 Database Schema
+### 1.3 Database Schema (Current)
 
 ```sql
 -- Users table with dual authentication support
@@ -58,71 +55,7 @@ CREATE TABLE users (
     )
 );
 
--- Secret tags with clean OPAQUE implementation
-CREATE TABLE secret_tags (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Clean OPAQUE approach - random handle chosen by client
-    tag_handle BYTEA(32) UNIQUE NOT NULL,  -- 32 random bytes, not derived from phrase
-    opaque_envelope BYTEA NOT NULL,        -- OPAQUE registration envelope
-    
-    -- Tag metadata
-    tag_name TEXT NOT NULL,
-    color TEXT NULL,
-    
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes
-    INDEX idx_secret_tags_user (user_id),
-    INDEX idx_secret_tags_handle (tag_handle),
-    CONSTRAINT unique_user_secret_tag UNIQUE (user_id, tag_name)
-);
-
--- Ephemeral tag authentication sessions
-CREATE TABLE tag_sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id),
-    tag_id UUID NOT NULL REFERENCES secret_tags(id),
-    server_ephemeral BYTEA NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    
-    INDEX idx_tag_sessions_user (user_id),
-    INDEX idx_tag_sessions_tag (tag_id),
-    INDEX idx_tag_sessions_created (created_at)
-);
-
--- AES-KW wrapped data encryption keys
-CREATE TABLE wrapped_keys (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tag_id UUID NOT NULL REFERENCES secret_tags(id),
-    vault_id UUID NOT NULL,
-    wrapped_key BYTEA(40) NOT NULL,  -- AES-256 key wrapped with AES-KW
-    key_purpose TEXT NOT NULL DEFAULT 'vault_data',
-    key_version INTEGER NOT NULL DEFAULT 1,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    
-    INDEX idx_wrapped_keys_tag (tag_id),
-    INDEX idx_wrapped_keys_vault (vault_id)
-);
-
--- Encrypted content blobs
-CREATE TABLE vault_blobs (
-    vault_id UUID NOT NULL,
-    object_id UUID NOT NULL,
-    wrapped_key_id UUID NOT NULL REFERENCES wrapped_keys(id),
-    iv BYTEA(12) NOT NULL,           -- AES-GCM IV
-    ciphertext BYTEA NOT NULL,       -- Encrypted content
-    auth_tag BYTEA(16) NOT NULL,     -- AES-GCM authentication tag
-    content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
-    content_size INTEGER NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    
-    PRIMARY KEY (vault_id, object_id),
-    INDEX idx_vault_blobs_vault (vault_id),
-    INDEX idx_vault_blobs_wrapped_key (wrapped_key_id)
-);
+-- Secret-tag related tables were dropped in PBI-4 Stage 2.
 ```
 
 ## 2. Authentication Flows

@@ -18,15 +18,10 @@ from app.models.user import User
 from app.models.journal_entry import JournalEntry
 from app.models.tag import Tag
 from app.models.reminder import Reminder
-from app.models.secret_tag_opaque import (
-    SecretTag,
-    WrappedKey,
-    VaultBlob,
-    OpaqueSession,
-    SecurityAuditLog,
-    SecurityMetrics,
-    SecurityAlert,
-)
+# Secret-tag models removed in PBI-4 Stage 2
+# Only OpaqueSession restored for user authentication
+from app.models.opaque_auth import OpaqueSession
+from app.models.opaque_server_config import OpaqueServerConfig
 from app.models.monitoring import (
     SystemHealth,
     ServiceHealth,

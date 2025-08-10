@@ -10,7 +10,7 @@ import asyncio
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -353,8 +353,8 @@ class AlertManager:
                 description=description,
                 source=source,
                 metadata=metadata or {},
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC)
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
             )
             
             # Store alert
@@ -418,9 +418,9 @@ class AlertManager:
                 
                 # Update alert status
                 alert.status = AlertStatus.ACKNOWLEDGED
-                alert.acknowledged_at = datetime.now(UTC)
+                alert.acknowledged_at = datetime.now(timezone.utc)
                 alert.acknowledged_by = acknowledged_by
-                alert.updated_at = datetime.now(UTC)
+                alert.updated_at = datetime.now(timezone.utc)
                 
                 self.alert_metrics['acknowledged_alerts'] += 1
                 self.alert_metrics['active_alerts'] -= 1
@@ -472,9 +472,9 @@ class AlertManager:
                 
                 # Update alert status
                 alert.status = AlertStatus.RESOLVED
-                alert.resolved_at = datetime.now(UTC)
+                alert.resolved_at = datetime.now(timezone.utc)
                 alert.resolved_by = resolved_by
-                alert.updated_at = datetime.now(UTC)
+                alert.updated_at = datetime.now(timezone.utc)
                 
                 self.alert_metrics['resolved_alerts'] += 1
                 if alert.status == AlertStatus.ACTIVE:
@@ -508,7 +508,7 @@ class AlertManager:
     def _is_suppressed(self, alert_type: str) -> bool:
         """Check if an alert type is currently suppressed"""
         suppression_end = self.suppressed_alerts.get(alert_type)
-        if suppression_end and datetime.now(UTC) < suppression_end:
+        if suppression_end and datetime.now(timezone.utc) < suppression_end:
             return True
         elif suppression_end:
             # Remove expired suppression
@@ -517,13 +517,13 @@ class AlertManager:
     
     def _suppress_alert_type(self, alert_type: str, duration: int):
         """Suppress an alert type for a specified duration"""
-        suppression_end = datetime.now(UTC) + timedelta(seconds=duration)
+        suppression_end = datetime.now(timezone.utc) + timedelta(seconds=duration)
         self.suppressed_alerts[alert_type] = suppression_end
         self.logger.debug(f"Suppressed alert type {alert_type} until {suppression_end}")
     
     def _process_escalations(self):
         """Process alert escalations"""
-        current_time = datetime.now(UTC)
+        current_time = datetime.now(timezone.utc)
         
         with self.lock:
             for alert in self.active_alerts.values():
@@ -543,7 +543,7 @@ class AlertManager:
         """Escalate an alert to higher priority"""
         try:
             alert.escalation_level += 1
-            alert.updated_at = datetime.now(UTC)
+            alert.updated_at = datetime.now(timezone.utc)
             
             # Create escalation alert
             escalation_alert_id = self.create_alert(
@@ -582,7 +582,7 @@ class AlertManager:
             return
         
         alert.delivery_attempts += 1
-        alert.last_delivery_attempt = datetime.now(UTC)
+        alert.last_delivery_attempt = datetime.now(timezone.utc)
         
         for channel in rule.channels:
             try:
@@ -671,7 +671,7 @@ Metadata:
     
     def _cleanup_resolved_alerts(self):
         """Clean up old resolved alerts"""
-        cutoff_time = datetime.now(UTC) - timedelta(hours=24)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
         
         with self.lock:
             resolved_alerts = [
