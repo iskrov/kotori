@@ -3,6 +3,9 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import logger from '../utils/logger';
+import { AppState } from 'react-native';
+import { TranscriptionSegment } from '../types';
+import { getWebSocketUrl } from '../services/api';
 
 export type WebSocketStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -92,12 +95,11 @@ const useWebSocketTranscription = ({
     setWsStatus('connecting');
     logger.info('Attempting WebSocket connection...');
 
-    const apiUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8001';
-    const wsUrl = apiUrl.replace(/^http/, 'ws') + '/ws/transcribe';
-    logger.info(`Connecting to WebSocket: ${wsUrl}`);
+    const socketUrl = getWebSocketUrl();
+    logger.info(`Connecting to WebSocket at ${socketUrl}`);
 
     try {
-      const socket = new WebSocket(wsUrl);
+      const socket = new WebSocket(`${socketUrl}/api/v1/transcribe`);
       ws.current = socket;
 
       socket.onopen = () => {

@@ -179,6 +179,30 @@ PROJECT_ID="kotori-io"  # Was kotori-prod
 - `deploy/rollback.sh`
 - `deploy/GENERATED_SECRETS.md`
 
+### 7. Database Schema Initialization on Private Cloud SQL
+
+**Issue**: Running historical Alembic migrations on a fresh DB took too long and sometimes stalled. Private-only Cloud SQL connectivity complicated job-based approaches.
+
+**Solution (Pragmatic, fast for empty DB)**:
+1. Temporarily enable Public IP on the Cloud SQL instance
+2. Upload `create_tables.sql` to a GCS bucket
+3. Grant the Cloud SQL service account read access to the bucket
+4. Use `gcloud sql import sql` to execute the schema
+5. Stamp Alembic to `head` via Cloud Run Job (`alembic -c alembic.ini stamp head`)
+6. Disable Public IP to return to private-only posture
+
+This created tables immediately and established a clean baseline. Future schema changes should use Alembic migrations and a Cloud Run Job with the Cloud SQL connector (Unix socket) to keep the DB fully private.
+
+### 8. OPAQUE Registration Failing: `No such file or directory: 'node'`
+
+**Issue**: OPAQUE flow uses Node.js `@serenity-kit/opaque` invoked via Python `subprocess` (`node -e ...`). The backend image lacked Node.
+
+**Fix**:
+- Install Node.js 18 and `@serenity-kit/opaque` inside the backend image (see `backend/Dockerfile`)
+- Rebuild and redeploy `kotori-api`
+
+**Result**: Registration succeeds using real OPAQUE protocol.
+
 ## Deployment Architecture
 
 ### Final Working Configuration

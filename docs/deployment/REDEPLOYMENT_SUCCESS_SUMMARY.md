@@ -174,3 +174,59 @@ gcloud beta run domain-mappings create \
 - **Performance**: Auto-scaling and monitoring configured
 
 The Kotori voice journaling application is now successfully deployed in `us-central1` with full domain mapping support and ready for production use with custom domains!
+
+---
+
+## ✅ Final Fix Sequence That Unblocked Production (2025-08-10)
+
+This section documents the exact sequence that resolved the remaining production blockers (schema creation and OPAQUE registration failing due to missing Node.js runtime in the backend image):
+
+1) Temporary public IP on Cloud SQL to allow one-time schema bootstrap
+- Enable public IPv4 temporarily:
+  - `gcloud sql instances patch kotori-db --project=kotori-io --assign-ip --quiet`
+- Upload schema to GCS and import with Cloud SQL Admin:
+  - `gsutil mb -l us-central1 gs://kotori-io-sql-import || true`
+  - `gsutil cp create_tables.sql gs://kotori-io-sql-import/create_tables.sql`
+  - Grant Cloud SQL SA bucket read:
+    - `gcloud sql instances describe kotori-db --project=kotori-io --format="value(serviceAccountEmailAddress)"`
+    - `gsutil iam ch serviceAccount:<SERVICE_ACCOUNT>:roles/storage.objectViewer,roles/storage.legacyBucketReader gs://kotori-io-sql-import`
+  - Import schema:
+    - `gcloud sql import sql kotori-db gs://kotori-io-sql-import/create_tables.sql --database=kotori_prod --project=kotori-io --quiet`
+
+2) Backend image updated to support real OPAQUE flow (Node.js runtime)
+- Changed `backend/Dockerfile` to install Node.js 18 and `@serenity-kit/opaque` so Python can call `node -e ...` via `subprocess`:
+  - Install Node.js and package:
+    - `curl -fsSL https://deb.nodesource.com/setup_18.x | bash -`
+    - `apt-get install -y nodejs`
+    - `npm install --omit=dev --no-fund --no-audit @serenity-kit/opaque`
+- Rebuilt and redeployed backend:
+  - `gcloud builds submit backend --tag us-central1-docker.pkg.dev/kotori-io/kotori-images/kotori-api:latest --project=kotori-io --region=us-central1`
+  - `gcloud run deploy kotori-api --image=us-central1-docker.pkg.dev/kotori-io/kotori-images/kotori-api:latest --region=us-central1 ...`
+
+3) Mark Alembic baseline to current (so future migrations apply cleanly)
+- Deployed and executed a one-time job:
+  - `gcloud run jobs deploy kotori-alembic-stamp --args="alembic,-c,alembic.ini,stamp,head" ...`
+  - `gcloud run jobs execute kotori-alembic-stamp --wait`
+
+4) Re-disable public IP on Cloud SQL (return to private-only stance)
+- `gcloud sql instances patch kotori-db --project=kotori-io --no-assign-ip --quiet`
+
+Result: Registration and login flows now work; app is stable. The DB remains private-only after tightening back.
+
+## 📘 Runbook: One-time Schema Init (reproducible)
+
+If you ever deploy a fresh environment and need to initialize schema quickly:
+1. Temporarily enable public IP on the Cloud SQL instance
+2. Upload `create_tables.sql` to a GCS bucket and import with `gcloud sql import sql`
+3. Stamp Alembic to `head` via a short Cloud Run job: `alembic -c alembic.ini stamp head`
+4. Disable public IP on the instance
+
+This is fast, reliable, and avoids long-running historical migrations for empty databases. For fully private flows, you can alternatively run Alembic via a Cloud Run Job using the Cloud SQL connector and a socket DSN.
+
+## 🔐 Hardening Follow-ups (Recommended)
+- Add Cloud SQL socket binding on `kotori-api` (set instance with `--set-cloudsql-instances`) and store a socket-form DSN secret for future migrations.
+- Lock down the import GCS bucket (or delete it) now that initialization is complete.
+- Principle-of-least-privilege audit for `kotori-api` service account.
+- Monitoring and alerts: verify Cloud Monitoring dashboards and alerting policies.
+- Backups: confirm retention window and export schedule.
+- Document a periodic migration job pattern (Cloud Run Job + Alembic) for future schema changes.

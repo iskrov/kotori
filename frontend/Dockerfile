@@ -8,7 +8,7 @@ RUN apk add --no-cache curl
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy pre-built web assets
-COPY build-output /usr/share/nginx/html
+COPY web-build /usr/share/nginx/html
 
 # Create nginx user and set permissions
 RUN addgroup -g 1001 -S kotori && \

@@ -23,6 +23,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     libpq5 \
     curl \
+    gnupg \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -37,6 +38,15 @@ COPY --from=builder /root/.local /home/kotori/.local
 
 # Copy application code
 COPY . .
+
+# Install Node.js (v18) and the OPAQUE library required by subprocess "node -e ..."
+# This enables backend Python to invoke Node for OPAQUE operations
+RUN set -eux; \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; \
+    apt-get update; \
+    apt-get install -y nodejs; \
+    npm install --omit=dev --no-fund --no-audit @serenity-kit/opaque; \
+    rm -rf /var/lib/apt/lists/*
 
 # Change ownership to non-root user
 RUN chown -R kotori:kotori /app

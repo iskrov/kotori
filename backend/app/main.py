@@ -9,8 +9,10 @@ from fastapi import Request
 from fastapi import status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 from app.api.v1.endpoints import speech as speech_router_module
 from app.api.v1.endpoints import journal as v1_journal_router_module
@@ -108,6 +110,35 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Security middleware configuration (must be first)
 app.add_middleware(SecurityMiddleware)
 logger.info("Security middleware configured with comprehensive protection for Kotori")
+
+# Add proxy headers middleware to handle X-Forwarded-Proto from Cloud Run
+# This ensures HTTPS redirects work correctly behind a reverse proxy
+if settings.ENVIRONMENT == "production":
+    # Trust Cloud Run's proxy headers for HTTPS redirects
+    from starlette.middleware.base import BaseHTTPMiddleware
+    import logging
+    
+    class ProxyHeadersMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            # Honor X-Forwarded-Proto from Cloud Run to fix HTTPS redirects
+            forwarded_proto = request.headers.get("x-forwarded-proto")
+            if forwarded_proto:
+                # Update the request scope to reflect the actual protocol
+                request.scope["scheme"] = forwarded_proto
+            
+            response = await call_next(request)
+            return response
+    
+    app.add_middleware(ProxyHeadersMiddleware)
+    logger.info("Proxy headers middleware configured for production (fixes HTTPS redirects)")
+
+# Add trusted host middleware for production security
+if settings.ENVIRONMENT == "production":
+    app.add_middleware(
+        TrustedHostMiddleware, 
+        allowed_hosts=["api.kotori.io", "kotori-api-412014849981.us-central1.run.app"]
+    )
+    logger.info("Trusted host middleware configured for production")
 
 # CORS middleware configuration
 if settings.ENVIRONMENT == "development":

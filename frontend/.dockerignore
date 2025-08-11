@@ -3,7 +3,7 @@ node_modules/
 npm-debug.log*
 
 # Build outputs (will be generated in container)
-web-build/
+# web-build/  # allow web-build to be included in the build context
 dist/
 build/
 

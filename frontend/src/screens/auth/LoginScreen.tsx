@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, MainStackParamList } from '../../navigation/types';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
@@ -22,6 +23,7 @@ import SafeScrollView from '../../components/SafeScrollView';
 import logger from '../../utils/logger';
 import LogViewer from '../../utils/LogViewer';
 import OpaqueAuthButton from '../../components/OpaqueAuthButton';
+import logo from '../../../assets/logo.png';
 
 // Ensure web browser redirect results are handled
 WebBrowser.maybeCompleteAuthSession();
@@ -74,12 +76,10 @@ const LoginScreen = () => {
         {/* Welcome Card */}
         <View style={styles.welcomeCard}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Ionicons name="mic" size={32} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.appName}>Welcome Back</Text>
-            <Text style={styles.tagline}>Sign in to continue your journey</Text>
+            <Image source={logo} style={styles.logo} resizeMode="contain" />
           </View>
+          <Text style={styles.title}>Kotori</Text>
+          <Text style={styles.subtitle}>Your AI-powered voice journal</Text>
         </View>
 
         {/* Login Form Card */}
@@ -222,23 +222,19 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
   },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: theme.colors.primaryLight + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
+    width: 120,
+    height: 120,
     marginBottom: theme.spacing.lg,
   },
-  appName: {
+  title: {
     fontSize: theme.typography.fontSizes.xxxl,
     fontWeight: 'bold',
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamilies.bold,
     marginBottom: theme.spacing.sm,
   },
-  tagline: {
+  subtitle: {
     fontSize: theme.typography.fontSizes.lg,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.regular,

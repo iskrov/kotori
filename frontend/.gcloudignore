@@ -1,0 +1,17 @@
+# gcloudignore for frontend
+# Ensure the static export is included in build context
+!web-build/**
+
+# Common ignores
+node_modules/
+.git/
+.gitignore
+**/.DS_Store
+npm-debug.log*
+logs/
+.expo/
+coverage/
+cypress/
+__tests__/
+*.test.*
+*.spec.*

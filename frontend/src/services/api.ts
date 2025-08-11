@@ -3,54 +3,115 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { JournalEntryCreate, JournalEntryUpdate, User, Tag } from '../types';
 import logger from '../utils/logger';
+import { OPAQUE_AUTH_API_URL } from '../../constants/opaque';
 
-// Define environment-based API URL
-const getApiUrl = () => {
-  const ENV = process.env.NODE_ENV || 'development';
-  
-  if (ENV === 'production') {
+const getApiUrl = (): string => {
+  const hostname = typeof window !== 'undefined' && window.location.hostname;
+
+  // Always use HTTPS for production domains
+  if (hostname && (hostname === 'app.kotori.io' || hostname === 'kotori.io' || hostname === 'www.kotori.io')) {
     return 'https://api.kotori.io';
-  } else if (ENV === 'staging') {
-    return 'https://staging.api.kotori.io';
-  } else {
-    // Local development - use local IP for the backend
-    const apiUrl = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8001';
-    logger.info(`Using API URL: ${apiUrl}`);
-    return apiUrl;
   }
+  
+  // Check if we're on the Cloud Run URL
+  if (hostname && hostname.includes('run.app')) {
+    return 'https://api.kotori.io';
+  }
+  
+  // For local development, allow environment variable override, but default to localhost
+  return (Constants.expoConfig?.extra?.apiUrl as string | undefined) || 'http://localhost:8001';
 };
 
-// Create axios instance
+export const getWebSocketUrl = (): string => {
+    const hostname = typeof window !== 'undefined' && window.location.hostname;
+
+    // Always use WSS for production domains
+    if (hostname && (hostname === 'app.kotori.io' || hostname === 'kotori.io' || hostname === 'www.kotori.io')) {
+        return 'wss://api.kotori.io';
+    }
+    
+    // Check if we're on the Cloud Run URL
+    if (hostname && hostname.includes('run.app')) {
+        return 'wss://api.kotori.io';
+    }
+
+    // Local development
+    let apiUrl = getApiUrl();
+    // Replace http with ws for websocket connection
+    return apiUrl.replace(/^http/, 'ws');
+};
+
+
+// Create axios instance - always use HTTPS for production
+const initialApiUrl = getApiUrl();
+console.log('[API] Creating axios instance with initial baseURL:', initialApiUrl);
+
+// Create the axios instance
 export const api = axios.create({
-  baseURL: getApiUrl(),
+  withCredentials: true, // Important for cookies
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 10000,
-  // Enable credentials for CORS
-  withCredentials: true, 
 });
 
-// Debug axios configuration (guarded to avoid test-time undefined access)
-try {
-  console.log('API Config:', {
-    baseURL: getApiUrl(),
-    withCredentials: true,
-    defaultHeaders: (api && api.defaults && api.defaults.headers) ? api.defaults.headers : undefined
-  });
-} catch (e) {
-  // Ignore logging failures in non-browser test environments
+// Set the baseURL dynamically based on the current hostname
+if (typeof window !== 'undefined') {
+  const hostname = window.location.hostname;
+  if (hostname === 'app.kotori.io' || hostname === 'kotori.io' || hostname === 'www.kotori.io' || hostname.includes('run.app')) {
+    api.defaults.baseURL = 'https://api.kotori.io';
+    console.log('[API] Set production baseURL:', api.defaults.baseURL);
+  } else {
+    api.defaults.baseURL = initialApiUrl;
+    console.log('[API] Set development baseURL:', api.defaults.baseURL);
+  }
+} else {
+  api.defaults.baseURL = initialApiUrl;
 }
 
-// Add specific debug configuration for handling PUT requests
-api.interceptors.request.use(
-  async (config) => {
-    // If this is a PUT request, add extra debug info
-    if (config.method?.toLowerCase() === 'put') {
-      console.log('Making PUT request to:', config.url);
-      console.log('PUT request headers:', config.headers);
-      console.log('PUT request withCredentials:', config.withCredentials);
+// Interceptor to always enforce HTTPS for the production API.
+// This is a safety net for any case where the baseURL might be http.
+api.interceptors.request.use((config) => {
+    // Log the request for debugging
+    console.log('[API Interceptor] Request config BEFORE:', {
+      baseURL: config.baseURL,
+      url: config.url,
+      fullURL: config.baseURL ? `${config.baseURL}${config.url}` : config.url
+    });
+    
+    // If we're on a production domain, ALWAYS force HTTPS
+    const hostname = typeof window !== 'undefined' && window.location.hostname;
+    if (hostname && (hostname === 'app.kotori.io' || hostname === 'kotori.io' || hostname === 'www.kotori.io' || hostname.includes('run.app'))) {
+      // Force the baseURL to be HTTPS regardless of what it currently is
+      config.baseURL = 'https://api.kotori.io';
+      console.log('[API Interceptor] Forced baseURL to HTTPS for production domain');
     }
+    
+    // Aggressively ensure no HTTP URLs slip through anywhere
+    if (config.baseURL && config.baseURL.includes('api.kotori.io')) {
+      config.baseURL = config.baseURL.replace('http://', 'https://');
+    }
+    if (typeof config.url === 'string' && config.url.includes('http://api.kotori.io')) {
+      config.url = config.url.replace('http://', 'https://');
+    }
+    
+    // Additional safety: if the constructed URL would be HTTP, override it completely
+    const constructedUrl = config.baseURL ? `${config.baseURL}${config.url}` : config.url;
+    if (constructedUrl && constructedUrl.startsWith('http://api.kotori.io')) {
+      console.log('[API Interceptor] DETECTED HTTP URL, forcing full HTTPS override');
+      config.baseURL = 'https://api.kotori.io';
+      // Ensure the URL path doesn't contain the full domain
+      if (config.url && config.url.includes('api.kotori.io')) {
+        config.url = config.url.replace(/^https?:\/\/[^\/]+/, '');
+      }
+    }
+    
+    console.log('[API Interceptor] Request config AFTER:', {
+      baseURL: config.baseURL,
+      url: config.url,
+      fullURL: config.baseURL ? `${config.baseURL}${config.url}` : config.url
+    });
+    
     return config;
   },
   (error) => {
@@ -340,7 +401,7 @@ export const UserAPI = {
 // Journal entries
 export const JournalAPI = {
   getEntries: (params: any) => 
-    api.get('/api/v1/journals', { params }),
+    api.get('/api/v1/journals/', { params }),
   
   getEntry: (id: string) => 
     api.get(`/api/v1/journals/${id}`),

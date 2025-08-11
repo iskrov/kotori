@@ -46,6 +46,7 @@
     "expo-av": "~13.2.1",
     "expo-constants": "~14.2.1",
     "expo-file-system": "~15.2.2",
+    "expo-haptics": "^14.1.4",
     "expo-image-picker": "~14.1.1",
     "expo-linking": "~4.0.1",
     "expo-random": "~13.1.1",

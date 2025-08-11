@@ -164,11 +164,10 @@ const CalendarScreen = () => {
         include_public: true
       });
       
-      // Use entries as-is (server-side filtering handles secret tags)
-      const entries = response.data as JournalEntry[];
-      const filtered = entries;
-      
-      setFilteredEntriesForSelectedDate(filtered);
+      const entries = Array.isArray(response.data)
+        ? response.data
+        : (response.data?.entries ?? []);
+      setFilteredEntriesForSelectedDate(entries as JournalEntry[]);
     } catch (error) {
       console.error(`Error fetching entries for date ${format(date, 'yyyy-MM-dd')}`, error);
       setFilteredEntriesForSelectedDate([]);

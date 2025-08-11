@@ -133,7 +133,10 @@ const HomeScreen = () => {
           sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
         }
       });
-      setRecentEntries(entriesResponse.data);
+      const entries = Array.isArray(entriesResponse.data)
+        ? entriesResponse.data
+        : (entriesResponse.data?.entries ?? []);
+      setRecentEntries(entries);
       
     } catch (error: any) {
       // Log the specific error

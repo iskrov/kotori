@@ -75,7 +75,11 @@ const JournalScreen = () => {
       setIsLoading(true);
       
       const response = await JournalAPI.getEntries({});
-      setEntries(response.data);
+      // Normalize possible response shapes
+      const data = Array.isArray(response.data)
+        ? response.data
+        : (response.data?.entries ?? []);
+      setEntries(data);
     } catch (error) {
       console.error('Error fetching journal entries', error);
       Alert.alert('Error', 'Failed to load journal entries');
