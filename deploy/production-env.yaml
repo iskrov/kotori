@@ -1,0 +1,5 @@
+CORS_ORIGINS: "https://app.kotori.io,https://kotori.io,http://localhost:19000,http://localhost:19006"
+LOG_LEVEL: "INFO"
+NODE_ENV: "production"
+SAVE_TRANSCRIBE_UPLOADS: "0"
+ENVIRONMENT: "production"
