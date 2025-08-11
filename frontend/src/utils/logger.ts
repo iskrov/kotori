@@ -106,10 +106,20 @@ class Logger {
 
   private shouldLog(level: LogLevel): boolean {
     if (!this.enabled) return false;
+    
+    // Always log errors and warnings
     if (level === 'error' || level === 'warn') return true;
+    
+    // Debug logs only when explicitly enabled
     if (level === 'debug' && !this.debugEnabled) return false;
-    if (!this.isDev) return true;
-    return this.debugEnabled;
+    
+    // In production, only log errors and warnings (reduce info/debug noise)
+    if (!this.isDev) {
+      return level === 'error' || level === 'warn';
+    }
+    
+    // In development, log info if debug is enabled or if it's dev mode
+    return this.isDev || this.debugEnabled;
   }
 
   private shouldSuppressMessage(message: string): boolean {
@@ -187,10 +197,21 @@ class Logger {
 
   public enableDebug() {
     this.debugEnabled = true;
+    console.log('Debug logging enabled');
   }
 
   public disableDebug() {
     this.debugEnabled = false;
+    console.log('Debug logging disabled');
+  }
+  
+  public enableVerbose() {
+    this.debugEnabled = true;
+    // Also enable verbose API logging in production if needed
+    if (typeof window !== 'undefined') {
+      (window as any).KOTORI_VERBOSE_LOGGING = true;
+    }
+    console.log('Verbose logging enabled (includes API requests)');
   }
 
   public addSuppressedWarning(warning: string) {
