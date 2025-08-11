@@ -44,7 +44,7 @@ export const getWebSocketUrl = (): string => {
 
 // Create axios instance - always use HTTPS for production
 const initialApiUrl = getApiUrl();
-console.log('[API] Creating axios instance with initial baseURL:', initialApiUrl);
+// API instance created with baseURL: ${initialApiUrl}
 
 // Create the axios instance
 export const api = axios.create({
@@ -60,10 +60,10 @@ if (typeof window !== 'undefined') {
   const hostname = window.location.hostname;
   if (hostname === 'app.kotori.io' || hostname === 'kotori.io' || hostname === 'www.kotori.io' || hostname.includes('run.app')) {
     api.defaults.baseURL = 'https://api.kotori.io';
-    console.log('[API] Set production baseURL:', api.defaults.baseURL);
+
   } else {
     api.defaults.baseURL = initialApiUrl;
-    console.log('[API] Set development baseURL:', api.defaults.baseURL);
+
   }
 } else {
   api.defaults.baseURL = initialApiUrl;
