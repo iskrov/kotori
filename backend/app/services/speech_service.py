@@ -16,8 +16,7 @@ from google.oauth2 import service_account
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from .encryption_service import encryption_service
-from .phrase_processor import SecretPhraseProcessor
+# Secret Tag functionality removed as legacy
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ class SpeechService:
         self.async_client = None
         self.sync_client = None
         self.db = db
-        self.phrase_processor = SecretPhraseProcessor(db) if db else None
+        # Secret Tag functionality removed as legacy
         
         try:
             self.client_options = self._get_client_options()
@@ -174,14 +173,18 @@ class SpeechService:
             
             # Log audio file details for debugging
             logger.info(f"Audio file first 50 bytes (hex): {audio_content[:50].hex()}")
+            
+            # Check audio format
             webm_signature = b'\x1a\x45\xdf\xa3'
-            logger.info(f"Audio file starts with WebM signature: {audio_content.startswith(webm_signature)}")
+            has_webm_signature = audio_content.startswith(webm_signature)
+            logger.info(f"Audio file starts with WebM signature: {has_webm_signature}")
             
             # Log request details
             logger.info(f"Request recognizer: {recognizer_name}")
             logger.info(f"Request config - model: {config.model}, language_codes: {config.language_codes}")
             
             response = self.sync_client.recognize(request=request)
+
             logger.info(f"Transcription received from Google Cloud Speech V2 API - Results count: {len(response.results)}")
 
             # Log detailed response for debugging
@@ -193,24 +196,28 @@ class SpeechService:
             detected_lang_from_response = None
 
             for i, result in enumerate(response.results):
+
                 logger.info(f"Processing result {i+1}/{len(response.results)}")
                 logger.info(f"Result type: {type(result)}, alternatives count: {len(result.alternatives) if result.alternatives else 0}")
                 
                 if result.alternatives:
                     primary_alternative = result.alternatives[0]
+
                     logger.info(f"Primary alternative - transcript: '{primary_alternative.transcript}', confidence: {getattr(primary_alternative, 'confidence', 'N/A')}")
                     
                     transcript_parts.append(primary_alternative.transcript)
                     
-                    # Log all alternatives for debugging
-                    for j, alt in enumerate(result.alternatives):
-                        logger.info(f"Alternative {j}: transcript='{alt.transcript}', confidence={getattr(alt, 'confidence', 'N/A')}")
+                    # Log alternatives for debugging (only first one in production)
+                    if len(result.alternatives) > 1:
+                        logger.info(f"Additional alternatives available: {len(result.alternatives) - 1}")
                     
                     # Capture the language code from the first result that has one, if auto-detecting
                     if is_auto_detect and not detected_lang_from_response and result.language_code:
                         detected_lang_from_response = result.language_code
+
                         logger.info(f"Detected language from result: {detected_lang_from_response}")
                 else:
+
                     logger.warning(f"Result {i+1} has no alternatives")
             
             full_transcript = "".join(transcript_parts)
@@ -232,8 +239,7 @@ class SpeechService:
                         for j, alt in enumerate(result.alternatives):
                             logger.warning(f"  Alt {j}: '{alt.transcript}' (conf: {getattr(alt, 'confidence', 'N/A')})")
 
-            # Note: Code phrase detection requires user context
-            # Use transcribe_audio_with_user_context() for secret phrase detection
+            # Legacy field retained for response shape consistency
             transcription_result["code_phrase_detected"] = None
 
             return transcription_result
@@ -252,41 +258,7 @@ class SpeechService:
                 "Failed to transcribe audio via Google Cloud Speech V2 API"
             ) from e
 
-    def _check_code_phrases(self, transcript: str, user_id: Optional[int] = None) -> Optional[str]:
-        """
-        Check if the transcript contains any secret phrases for the user.
-        Returns the secret tag name if a phrase is detected, None otherwise.
-        
-        This method integrates with the database to:
-        1. Fetch user's stored secret tags from database
-        2. Check against user-specific phrases using OPAQUE authentication
-        3. Return the secret tag name if authentication succeeds
-        """
-        if not transcript or not user_id:
-            return None
-            
-        if not self.phrase_processor:
-            logger.warning("Phrase processor not initialized - database integration not available")
-            return None
-            
-        try:
-            # Use the phrase processor to check for secret phrases
-            # This will handle normalization, database lookup, and OPAQUE authentication
-            success, secret_tag, encrypted_entries, encryption_key = self.phrase_processor.process_entry_for_secret_phrases(
-                content=transcript,
-                user_id=user_id
-            )
-            
-            if success and secret_tag:
-                logger.info(f"Secret phrase detected for user {user_id}: tag '{secret_tag.tag_name}'")
-                return secret_tag.tag_name
-            else:
-                logger.debug(f"No secret phrase detected in transcript for user {user_id}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error checking secret phrases for user {user_id}: {e}")
-            return None
+    # Secret Tag functionality removed as legacy
 
     async def transcribe_audio_with_user_context(
         self, 
@@ -295,20 +267,11 @@ class SpeechService:
         language_codes: Optional[List[str]] = None
     ) -> dict:
         """
-        Enhanced transcription method that includes user-specific code phrase checking.
+        Transcription with user context (legacy no-op for secret tags).
         """
         result = await self.transcribe_audio(audio_content, language_codes)
-
-        # When secret tags are globally disabled, skip any server-side phrase checks
-        if not settings.ENABLE_SECRET_TAGS:
-            result["code_phrase_detected"] = None
-            return result
-
-        # Enhanced code phrase checking with user context
-        transcript_text = result.get("transcript", "").strip()
-        if transcript_text:
-            code_phrase_type = self._check_code_phrases(transcript_text, user_id)
-            result["code_phrase_detected"] = code_phrase_type
+        # Preserve response shape
+        result["code_phrase_detected"] = None
         return result
 
     def _build_streaming_config(self, language_codes: Optional[List[str]] = None) -> dict:
@@ -405,23 +368,6 @@ class SpeechService:
 
                 if is_final:
                     logger.info(f"[{user_id}] Received final transcript segment: '{transcript[:50]}...'")
-                    
-                    # Check for secret phrases in final transcripts
-                    if self.phrase_processor:
-                        try:
-                            # Convert user_id to int for database lookup
-                            user_id_int = int(user_id) if user_id.isdigit() else None
-                            if user_id_int:
-                                secret_tag_name = self._check_code_phrases(transcript, user_id_int)
-                                if secret_tag_name:
-                                    await manager.send_personal_message({
-                                        "type": "secret_phrase_detected",
-                                        "tag_name": secret_tag_name,
-                                        "transcript": transcript,
-                                    }, user_id)
-                                    logger.info(f"[{user_id}] Secret phrase detected in streaming: {secret_tag_name}")
-                        except Exception as e:
-                            logger.error(f"[{user_id}] Error checking secret phrases in streaming: {e}")
 
 
     async def process_audio_stream(

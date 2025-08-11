@@ -6,8 +6,7 @@ import { api as axiosInstance } from './api';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { validateLanguageCode } from '../config/languageConfig';
-import { voicePhraseDetector } from './VoicePhraseDetector';
-import { areSecretTagsEnabled } from '../config/featureFlags';
+// Legacy Secret Tag detection removed
 
 // Enhanced types for multi-language transcription
 interface TranscriptionResult {
@@ -211,13 +210,14 @@ class SpeechToTextService {
       const response = await fetch(audioFilePath);
       const blob = await response.blob();
       const fileName = `recording-${Date.now()}.webm`;
-      const mimeType = 'audio/webm;codecs=opus';
+      // Ensure content-type includes opus for best decoding on server
+      const contentType = blob.type && blob.type.includes('opus') ? blob.type : 'audio/webm;codecs=opus';
       
       formData.append('file', new File([blob], fileName, { 
-        type: mimeType
+        type: contentType
       }));
       
-      logger.info(`Appended blob to FormData: ${fileName}, type: ${mimeType}, size: ${blob.size}`);
+      logger.info(`Appended blob to FormData: ${fileName}, type: ${contentType}, size: ${blob.size}`);
     } else {
       // Native platform handling
       const fileInfo = await FileSystem.getInfoAsync(audioFilePath);
@@ -284,37 +284,8 @@ class SpeechToTextService {
       }
     };
 
-    // Perform OPAQUE-based secret phrase detection only when globally enabled
-    if (areSecretTagsEnabled() && enableSecretTagDetection && processedResult.transcript.trim()) {
-      try {
-        logger.info(`[OPAQUE Voice Detection] Starting detection for transcript: "${processedResult.transcript}"`);
-        
-        // Use new OPAQUE-based voice phrase detector
-        const tagDetection = await voicePhraseDetector.checkForSecretPhrase(processedResult.transcript);
-        processedResult.secret_tag_detected = tagDetection;
-        
-        logger.info(`[OPAQUE Voice Detection] Detection result:`, tagDetection);
-        
-        if (tagDetection.found) {
-          logger.info(`OPAQUE secret phrase authenticated: ${tagDetection.tagName} (${tagDetection.action})`);
-          
-          // Handle the detected secret tag action (session management happens in VoicePhraseDetector)
-          await this._handleOpaqueTagDetection(tagDetection);
-        } else {
-          logger.info(`[OPAQUE Voice Detection] No secret phrases authenticated in: "${processedResult.transcript}"`);
-        }
-      } catch (error) {
-        logger.error('Error during OPAQUE voice detection:', error);
-        // Don't fail the transcription if secret tag detection fails
-        processedResult.secret_tag_detected = { found: false };
-      }
-    } else {
-      processedResult.secret_tag_detected = { found: false };
-      const reason = !areSecretTagsEnabled()
-        ? 'Disabled by global feature flag'
-        : (processedResult.transcript.trim() ? 'Detection disabled by option' : 'Skipped - empty transcript');
-      logger.info(`[OPAQUE Voice Detection] ${reason}`);
-    }
+    // Legacy Secret Tag detection removed; preserve response shape only
+    processedResult.secret_tag_detected = { found: false };
 
     // Log quality metrics
     logger.info(
@@ -331,29 +302,7 @@ class SpeechToTextService {
   /**
    * Handle OPAQUE tag detection results
    */
-  private async _handleOpaqueTagDetection(detection: any): Promise<void> {
-    try {
-      if (detection.action === 'panic') {
-        // Handle panic mode - OPAQUE client handles memory cleanup
-        logger.warn('Panic mode detected via OPAQUE authentication');
-        // Panic mode cleanup is already handled in VoicePhraseDetector
-        return;
-      }
-
-      if (detection.tagId) {
-        if (detection.action === 'activate') {
-          logger.info(`OPAQUE secret tag session activated: ${detection.tagName}`);
-          // Session management is handled in VoicePhraseDetector
-        } else if (detection.action === 'deactivate') {
-          logger.info(`OPAQUE secret tag session deactivated: ${detection.tagName}`);
-          // Session cleanup is handled in VoicePhraseDetector
-        }
-      }
-    } catch (error) {
-      logger.error('Failed to handle OPAQUE tag detection:', error);
-      // Don't throw - this shouldn't fail the transcription
-    }
-  }
+  // Legacy Secret Tag handling removed
 
 
 

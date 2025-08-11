@@ -3,6 +3,7 @@ import { Alert, Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import logger from '../utils/logger';
+import { AudioLevelMonitor } from '../utils/audioLevelMonitor';
 
 export interface AudioRecordingOptions {
   quality?: keyof typeof Audio.RecordingOptionsPresets;
@@ -45,6 +46,7 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
   const recordingInstanceRef = useRef<Audio.Recording | null>(null);
   const isRequestingPermissionRef = useRef(false);
   const autoStartAttemptedRef = useRef(false); // Track if auto-start has been attempted
+  const audioMonitorRef = useRef<AudioLevelMonitor | null>(null);
   
   // Effect to keep recordingInstanceRef updated with the latest recording object
   useEffect(() => {
@@ -134,6 +136,12 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
     logger.info('Stopping audio recording...');
     setIsRecording(false);
     
+    // Stop audio monitor if running
+    if (audioMonitorRef.current) {
+      audioMonitorRef.current.stop();
+      audioMonitorRef.current = null;
+    }
+    
     // Calculate final duration before clearing timer and resetting refs
     const finalDuration = startTimeRef.current ? Math.floor((Date.now() - startTimeRef.current) / 1000) : 0;
     logger.info(`[useAudioRecording] Final duration: ${finalDuration}s`);
@@ -204,13 +212,35 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
       };
       
       if (Platform.OS === 'web') {
-        // Use WebM with Opus codec for better Google Speech-to-Text compatibility
-        options.web = { mimeType: 'audio/webm;codecs=opus' };
+        options.web = { 
+          mimeType: 'audio/webm;codecs=opus',
+          bitsPerSecond: 128000,
+        };
+        logger.info('[useAudioRecording] Web recording options set with opus codec and 128kbps bitrate');
       }
       
       logger.info('[useAudioRecording] Creating recording instance...');
       const { recording: newRecording } = await Audio.Recording.createAsync(options);
       setRecording(newRecording);
+      
+      // Start audio level monitoring on web for debugging (only in development or when explicitly enabled)
+      const enableAudioMonitor = process.env.NODE_ENV === 'development' || 
+                                 (typeof window !== 'undefined' && window.location.search.includes('debug=audio'));
+      
+      if (Platform.OS === 'web' && !audioMonitorRef.current && enableAudioMonitor) {
+        try {
+          audioMonitorRef.current = new AudioLevelMonitor((level) => {
+            // Log every 2 seconds
+            if (Date.now() % 2000 < 100) {
+              logger.info(`[AudioMonitor] Current mic level: ${(level * 100).toFixed(1)}%`);
+            }
+          });
+          await audioMonitorRef.current.start();
+          logger.info('[useAudioRecording] Audio level monitoring enabled for debugging');
+        } catch (monitorError) {
+          logger.warn('[useAudioRecording] Could not start audio monitor:', monitorError);
+        }
+      }
       
       // Reset duration and set start time BEFORE setting isRecording
       setRecordingDuration(0);

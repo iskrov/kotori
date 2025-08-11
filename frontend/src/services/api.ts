@@ -72,22 +72,13 @@ if (typeof window !== 'undefined') {
 // Interceptor to always enforce HTTPS for the production API.
 // This is a safety net for any case where the baseURL might be http.
 api.interceptors.request.use((config) => {
-    // Log the request for debugging
-    console.log('[API Interceptor] Request config BEFORE:', {
-      baseURL: config.baseURL,
-      url: config.url,
-      fullURL: config.baseURL ? `${config.baseURL}${config.url}` : config.url
-    });
-    
     // If we're on a production domain, ALWAYS force HTTPS
     const hostname = typeof window !== 'undefined' && window.location.hostname;
     if (hostname && (hostname === 'app.kotori.io' || hostname === 'kotori.io' || hostname === 'www.kotori.io' || hostname.includes('run.app'))) {
-      // Force the baseURL to be HTTPS regardless of what it currently is
       config.baseURL = 'https://api.kotori.io';
-      console.log('[API Interceptor] Forced baseURL to HTTPS for production domain');
     }
     
-    // Aggressively ensure no HTTP URLs slip through anywhere
+    // Ensure no HTTP URLs slip through anywhere
     if (config.baseURL && config.baseURL.includes('api.kotori.io')) {
       config.baseURL = config.baseURL.replace('http://', 'https://');
     }
@@ -95,22 +86,14 @@ api.interceptors.request.use((config) => {
       config.url = config.url.replace('http://', 'https://');
     }
     
-    // Additional safety: if the constructed URL would be HTTP, override it completely
+    // Final safety check for constructed URLs
     const constructedUrl = config.baseURL ? `${config.baseURL}${config.url}` : config.url;
     if (constructedUrl && constructedUrl.startsWith('http://api.kotori.io')) {
-      console.log('[API Interceptor] DETECTED HTTP URL, forcing full HTTPS override');
       config.baseURL = 'https://api.kotori.io';
-      // Ensure the URL path doesn't contain the full domain
       if (config.url && config.url.includes('api.kotori.io')) {
         config.url = config.url.replace(/^https?:\/\/[^\/]+/, '');
       }
     }
-    
-    console.log('[API Interceptor] Request config AFTER:', {
-      baseURL: config.baseURL,
-      url: config.url,
-      fullURL: config.baseURL ? `${config.baseURL}${config.url}` : config.url
-    });
     
     return config;
   },

@@ -1,5 +1,9 @@
 import logging
 import json
+import os
+import mimetypes
+from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import (
@@ -166,7 +170,27 @@ async def transcribe_audio_endpoint(
 
     try:
         audio_content = await file.read()
-        logger.info(f"Read {len(audio_content)} bytes from uploaded audio file.")
+        logger.info(f"Processing audio file: {len(audio_content)} bytes")
+
+        # Optionally save uploaded audio for diagnostics
+        try:
+            save_flag = os.getenv("SAVE_TRANSCRIBE_UPLOADS", "").lower() in {"1", "true", "yes", "on"}
+            if save_flag:
+                save_dir = os.getenv("TRANSCRIBE_UPLOAD_DIR", "/home/ai/src/kotori/logs/uploads")
+                Path(save_dir).mkdir(parents=True, exist_ok=True)
+                # Determine extension from content type; fallback to .bin
+                guessed_ext = mimetypes.guess_extension(file.content_type or "") or ".bin"
+                ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+                # Use a short prefix of user id to avoid overly long names
+                user_part = str(current_user.id)[:8]
+                out_path = Path(save_dir) / f"upload_{ts}_{user_part}{guessed_ext}"
+                with open(out_path, "wb") as out_f:
+                    out_f.write(audio_content)
+                logger.info(
+                    f"Saved uploaded audio to {out_path} ({len(audio_content)} bytes, content-type={file.content_type})"
+                )
+        except Exception as save_err:
+            logger.warning(f"Failed to save uploaded audio for diagnostics: {save_err}")
 
         # Add more robust validation if necessary (e.g., file size limit)
 
@@ -176,6 +200,8 @@ async def transcribe_audio_endpoint(
             user_id=current_user.id,
             language_codes=effective_language_codes
         )
+        
+        logger.info(f"Transcription completed: {len(transcription_data.get('transcript', ''))} characters")
         
         # Note: Secret tag phrase detection is now handled client-side
         # The server only provides the transcript for client-side processing
