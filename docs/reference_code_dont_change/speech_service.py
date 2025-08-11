@@ -49,12 +49,11 @@ class SpeechService:
         
         try:
             self.client_options = self._get_client_options()
-            # Initialize ONLY the sync client here.
-            # Initializing the async client here can occur on a thread without an event loop (e.g., AnyIO worker),
-            # which raises: "There is no current event loop in thread 'AnyIO worker thread'".
+            # Initialize clients only if client_options are valid
             if self.client_options:
+                self.async_client = self._initialize_client(speech_v2.SpeechAsyncClient, "Async")
                 self.sync_client = self._initialize_client(speech_v2.SpeechClient, "Sync")
-            else:  # Should not happen if _get_client_options raises ConfigurationError
+            else: # Should not happen if _get_client_options raises ConfigurationError
                 logger.error("ClientOptions are None after _get_client_options, clients not initialized.")
         except ConfigurationError as e:
             logger.error(f"Configuration error during SpeechService initialization: {e}")
@@ -120,17 +119,6 @@ class SpeechService:
             # Wrap specific GCloud errors if desired, or keep generic RuntimeError
             raise RuntimeError(f"Could not initialize {client_type_name} Speech V2 client") from e
 
-    async def _ensure_async_client(self):
-        """
-        Lazily initialize the Async Speech client within an active event loop.
-        This avoids initialization on threads without an event loop.
-        """
-        if self.async_client is not None:
-            return self.async_client
-        # Initialize inside coroutine to guarantee an event loop exists
-        self.async_client = self._initialize_client(speech_v2.SpeechAsyncClient, "Async")
-        return self.async_client
-
     async def transcribe_audio(
         self, audio_content: bytes, language_codes: Optional[List[str]] = None
     ) -> dict:
@@ -146,7 +134,7 @@ class SpeechService:
 
         recognizer_name = f"projects/{settings.GOOGLE_CLOUD_PROJECT}/locations/{settings.GOOGLE_CLOUD_LOCATION}/recognizers/{self.DEFAULT_RECOGNIZER_ID}"
 
-        # For V2 API: use ["auto"] for auto-detection when not provided
+        # For V2 API: use ["auto"] for auto-detection, not empty list
         config_language_codes = language_codes if language_codes else ["auto"]
         is_auto_detect = "auto" in config_language_codes
 
@@ -169,68 +157,26 @@ class SpeechService:
 
         try:
             logger.info(
-                f"Sending audio for transcription - Audio size: {len(audio_content)} bytes, Languages: {'auto-detect' if is_auto_detect else ', '.join(config_language_codes)}, Model: {self.CHIRP_2_MODEL}"
+                f"Sending audio for transcription (languages: {'auto-detect' if is_auto_detect else ', '.join(config_language_codes)}, model: {self.CHIRP_2_MODEL})..."
             )
-            
-            # Log audio file details for debugging
-            logger.info(f"Audio file first 50 bytes (hex): {audio_content[:50].hex()}")
-            webm_signature = b'\x1a\x45\xdf\xa3'
-            logger.info(f"Audio file starts with WebM signature: {audio_content.startswith(webm_signature)}")
-            
-            # Log request details
-            logger.info(f"Request recognizer: {recognizer_name}")
-            logger.info(f"Request config - model: {config.model}, language_codes: {config.language_codes}")
-            
             response = self.sync_client.recognize(request=request)
-            logger.info(f"Transcription received from Google Cloud Speech V2 API - Results count: {len(response.results)}")
-
-            # Log detailed response for debugging
-            logger.info(f"Raw response type: {type(response)}")
-            if hasattr(response, 'metadata'):
-                logger.info(f"Response metadata: {response.metadata}")
+            logger.info("Transcription received from Google Cloud Speech V2 API.")
 
             transcript_parts = []
             detected_lang_from_response = None
 
-            for i, result in enumerate(response.results):
-                logger.info(f"Processing result {i+1}/{len(response.results)}")
-                logger.info(f"Result type: {type(result)}, alternatives count: {len(result.alternatives) if result.alternatives else 0}")
-                
+            for result in response.results:
                 if result.alternatives:
-                    primary_alternative = result.alternatives[0]
-                    logger.info(f"Primary alternative - transcript: '{primary_alternative.transcript}', confidence: {getattr(primary_alternative, 'confidence', 'N/A')}")
-                    
-                    transcript_parts.append(primary_alternative.transcript)
-                    
-                    # Log all alternatives for debugging
-                    for j, alt in enumerate(result.alternatives):
-                        logger.info(f"Alternative {j}: transcript='{alt.transcript}', confidence={getattr(alt, 'confidence', 'N/A')}")
-                    
+                    transcript_parts.append(result.alternatives[0].transcript)
                     # Capture the language code from the first result that has one, if auto-detecting
                     if is_auto_detect and not detected_lang_from_response and result.language_code:
                         detected_lang_from_response = result.language_code
-                        logger.info(f"Detected language from result: {detected_lang_from_response}")
-                else:
-                    logger.warning(f"Result {i+1} has no alternatives")
             
-            full_transcript = "".join(transcript_parts)
-            transcription_result["transcript"] = full_transcript
-            
-            logger.info(f"Final transcription result - Transcript: '{full_transcript}', Length: {len(full_transcript)}")
+            transcription_result["transcript"] = "".join(transcript_parts)
             
             if detected_lang_from_response:
                 transcription_result["detected_language_code"] = detected_lang_from_response
-                logger.info(f"Final detected language: {detected_lang_from_response}")
-
-            # Additional debugging if transcript is empty
-            if not full_transcript:
-                logger.warning("Empty transcript detected - this suggests audio processing issues")
-                logger.warning(f"Response results count: {len(response.results)}")
-                for i, result in enumerate(response.results):
-                    logger.warning(f"Result {i}: alternatives={len(result.alternatives) if result.alternatives else 0}")
-                    if result.alternatives:
-                        for j, alt in enumerate(result.alternatives):
-                            logger.warning(f"  Alt {j}: '{alt.transcript}' (conf: {getattr(alt, 'confidence', 'N/A')})")
+                logger.info(f"Detected language: {detected_lang_from_response}")
 
             # Note: Code phrase detection requires user context
             # Use transcribe_audio_with_user_context() for secret phrase detection
@@ -240,11 +186,6 @@ class SpeechService:
 
         except Exception as e:
             logger.error(f"Google Cloud Speech V2 API error: {e}", exc_info=True)
-            logger.error(f"Exception type: {type(e)}")
-            if hasattr(e, 'details'):
-                logger.error(f"Exception details: {e.details}")
-            if hasattr(e, 'code'):
-                logger.error(f"Exception code: {e.code}")
             # Still return the dict structure on error, possibly with empty transcript
             # Or re-raise and let the caller handle the structure if preferred.
             # For now, let's re-raise, as the endpoint expects a successful transcription or HTTP error.
@@ -298,22 +239,18 @@ class SpeechService:
         Enhanced transcription method that includes user-specific code phrase checking.
         """
         result = await self.transcribe_audio(audio_content, language_codes)
-
-        # When secret tags are globally disabled, skip any server-side phrase checks
-        if not settings.ENABLE_SECRET_TAGS:
-            result["code_phrase_detected"] = None
-            return result
-
+        
         # Enhanced code phrase checking with user context
         transcript_text = result.get("transcript", "").strip()
         if transcript_text:
             code_phrase_type = self._check_code_phrases(transcript_text, user_id)
             result["code_phrase_detected"] = code_phrase_type
+            
         return result
 
     def _build_streaming_config(self, language_codes: Optional[List[str]] = None) -> dict:
         """Builds the streaming configuration dictionary for V2 API."""
-        # For V2 API: use ["auto"] for auto-detection when not provided
+        # For V2 API: use ["auto"] for auto-detection, not empty list
         config_language_codes = language_codes if language_codes else ["auto"]
         
         recognition_config = cloud_speech.RecognitionConfig(
@@ -436,11 +373,8 @@ class SpeechService:
         Defaults to automatic language detection if language_codes is None or empty.
         Uses the chirp_2 model for us-central1 compatibility.
         """
-        # Ensure async client is initialized within the event loop
-        try:
-            await self._ensure_async_client()
-        except Exception as e:
-            logger.error(f"Failed to initialize Async Speech V2 client in streaming context: {e}")
+        if not self.async_client:
+            logger.error(f"Async Speech V2 client not initialized for user {user_id}.")
             await manager.send_personal_message({"type": "error", "message": "Speech client unavailable. Check server configuration."}, user_id)
             return
 

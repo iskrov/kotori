@@ -7,7 +7,6 @@ import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { validateLanguageCode } from '../config/languageConfig';
 import { voicePhraseDetector } from './VoicePhraseDetector';
-import { areSecretTagsEnabled } from '../config/featureFlags';
 
 // Enhanced types for multi-language transcription
 interface TranscriptionResult {
@@ -210,14 +209,13 @@ class SpeechToTextService {
       logger.info('Web platform detected, fetching blob data...');
       const response = await fetch(audioFilePath);
       const blob = await response.blob();
-      const fileName = `recording-${Date.now()}.webm`;
-      const mimeType = 'audio/webm;codecs=opus';
+      const fileName = `recording-${Date.now()}.wav`;
       
       formData.append('file', new File([blob], fileName, { 
-        type: mimeType
+        type: blob.type || 'audio/wav'
       }));
       
-      logger.info(`Appended blob to FormData: ${fileName}, type: ${mimeType}, size: ${blob.size}`);
+      logger.info(`Appended blob to FormData: ${fileName}, type: ${blob.type || 'audio/wav'}, size: ${blob.size}`);
     } else {
       // Native platform handling
       const fileInfo = await FileSystem.getInfoAsync(audioFilePath);
@@ -284,8 +282,8 @@ class SpeechToTextService {
       }
     };
 
-    // Perform OPAQUE-based secret phrase detection only when globally enabled
-    if (areSecretTagsEnabled() && enableSecretTagDetection && processedResult.transcript.trim()) {
+    // Perform OPAQUE-based secret phrase detection if enabled and transcript is available
+    if (enableSecretTagDetection && processedResult.transcript.trim()) {
       try {
         logger.info(`[OPAQUE Voice Detection] Starting detection for transcript: "${processedResult.transcript}"`);
         
@@ -310,10 +308,12 @@ class SpeechToTextService {
       }
     } else {
       processedResult.secret_tag_detected = { found: false };
-      const reason = !areSecretTagsEnabled()
-        ? 'Disabled by global feature flag'
-        : (processedResult.transcript.trim() ? 'Detection disabled by option' : 'Skipped - empty transcript');
-      logger.info(`[OPAQUE Voice Detection] ${reason}`);
+      
+      if (enableSecretTagDetection) {
+        logger.info(`[OPAQUE Voice Detection] Skipped - empty transcript`);
+      } else {
+        logger.info(`[OPAQUE Voice Detection] Disabled`);
+      }
     }
 
     // Log quality metrics
@@ -378,7 +378,7 @@ class SpeechToTextService {
       logger.info('Attempting to refresh access token...');
       
       // Call refresh endpoint
-      const refreshResponse = await axios.post('/api/v1/auth/refresh', {
+      const refreshResponse = await axios.post('/api/auth/refresh', {
         refresh_token: refreshToken,
       });
 

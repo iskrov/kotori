@@ -204,8 +204,7 @@ const useAudioRecording = (options?: AudioRecordingOptions): AudioRecordingHook 
       };
       
       if (Platform.OS === 'web') {
-        // Use WebM with Opus codec for better Google Speech-to-Text compatibility
-        options.web = { mimeType: 'audio/webm;codecs=opus' };
+        options.web = { mimeType: 'audio/webm' };
       }
       
       logger.info('[useAudioRecording] Creating recording instance...');

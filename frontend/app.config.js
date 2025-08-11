@@ -6,8 +6,9 @@ const googleCloudProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const googleSpeechApiKey = process.env.GOOGLE_SPEECH_API_KEY;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 
-// Validation for required environment variables
-if (!googleCloudProjectId || !googleSpeechApiKey) {
+// Only warn if explicitly required (frontend does not call Google STT directly)
+const requireFrontendSpeechCreds = process.env.REQUIRE_FRONTEND_SPEECH_CREDS === 'true';
+if (requireFrontendSpeechCreds && (!googleCloudProjectId || !googleSpeechApiKey)) {
   console.warn(
     "Warning: Google Cloud Speech-to-Text configuration is incomplete. " +
     "Make sure to set GOOGLE_CLOUD_PROJECT_ID and GOOGLE_SPEECH_API_KEY in your .env file."
