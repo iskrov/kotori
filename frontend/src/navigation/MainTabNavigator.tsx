@@ -127,9 +127,9 @@ const getNavigatorStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.colors.card, // Clean white background
     borderTopColor: theme.colors.border, // Soft border color
     borderTopWidth: 1,
-    height: Platform.OS === 'ios' ? 88 : 72, // Slightly increased height for better balance
+    height: Platform.OS === 'ios' ? 88 : 80, // Further increased height for more space
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    paddingTop: Platform.OS === 'ios' ? 12 : 16, // Increased top padding for better balance
+    paddingTop: Platform.OS === 'ios' ? 16 : 20, // Even more top padding for better balance
     paddingHorizontal: theme.spacing.sm,
     // Remove heavy shadow, use subtle one instead
     shadowColor: theme.colors.black,
@@ -158,7 +158,7 @@ const getNavigatorStyles = (theme: AppTheme) => StyleSheet.create({
   },
   fabContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 110 : 88, // Adjusted for increased tab bar height
+    bottom: Platform.OS === 'ios' ? 110 : 96, // Adjusted for further increased tab bar height
     alignSelf: 'center',
     zIndex: 1000,
   },
