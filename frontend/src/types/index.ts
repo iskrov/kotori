@@ -69,10 +69,12 @@ export interface JournalEntry {
   encrypted_content?: string;
   encryption_iv?: string;
   encryption_salt?: string; // legacy salt
-  encrypted_key?: string;
+  encrypted_key?: string; // legacy alias for wrapped_key
+  wrapped_key?: string; // per-user encryption wrapped key
   key_derivation_iterations?: number;
   encryption_algorithm?: string;
-  encryption_wrap_iv?: string;
+  encryption_wrap_iv?: string; // legacy alias for wrap_iv
+  wrap_iv?: string; // per-user encryption wrap IV
   // Secret Tags fields
   secret_tag_id?: string | null;  // UUID of the secret tag (if any)
   secret_tag_hash?: string | null; // Hash of secret tag for server-side filtering
@@ -88,10 +90,12 @@ export interface JournalEntryCreate {
   encrypted_content?: string;
   encryption_iv?: string;
   encryption_salt?: string; // legacy salt
-  encrypted_key?: string;
+  encrypted_key?: string; // legacy alias for wrapped_key
+  wrapped_key?: string; // per-user encryption wrapped key
   key_derivation_iterations?: number;
   encryption_algorithm?: string;
-  encryption_wrap_iv?: string;
+  encryption_wrap_iv?: string; // legacy alias for wrap_iv
+  wrap_iv?: string; // per-user encryption wrap IV
   // Secret Tags fields
   secret_tag_id?: string | null;
   secret_tag_hash?: string | null;

@@ -38,6 +38,18 @@ class ClientEncryptionService {
   private static readonly KEY_DERIVATION_PARAMS_KEY = 'key_derivation_params';
 
   /**
+   * Convert a base64 string to a Uint8Array
+   */
+  private base64ToArray(b64: string): Uint8Array {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  /**
    * Check if Web Crypto API is available
    */
   private isWebCryptoAvailable(): boolean {
@@ -253,6 +265,56 @@ class ClientEncryptionService {
     } catch (error) {
       logger.error('Encryption failed:', error);
       throw new Error('Failed to encrypt content');
+    }
+  }
+
+  /**
+   * Decrypt per-user encrypted entry content.
+   * Uses the user's master key (derived from OPAQUE export key) to unwrap
+   * the per-entry key and then decrypts the content.
+   */
+  async decryptPerUser(params: {
+    encryptedContent: string;
+    iv: string;
+    wrappedKey: string;
+    wrapIv: string;
+    algorithm?: string;
+  }): Promise<string> {
+    if (!this.isWebCryptoAvailable()) {
+      throw new Error('Decryption not available on this platform');
+    }
+
+    try {
+      const masterKey = await this.getUserMasterKey();
+
+      // Convert base64 inputs to arrays
+      const wrappedKeyArray = this.base64ToArray(params.wrappedKey);
+      const wrapIvArray = this.base64ToArray(params.wrapIv);
+      const ivArray = this.base64ToArray(params.iv);
+      const encryptedArray = this.base64ToArray(params.encryptedContent);
+
+      // Unwrap (decrypt) the entry key with the master key
+      const entryKey = await crypto.subtle.unwrapKey(
+        'raw',
+        wrappedKeyArray,
+        masterKey,
+        { name: ClientEncryptionService.ALGORITHM, iv: wrapIvArray },
+        { name: ClientEncryptionService.ALGORITHM, length: ClientEncryptionService.KEY_LENGTH },
+        false,
+        ['decrypt']
+      );
+
+      // Decrypt the content
+      const decrypted = await crypto.subtle.decrypt(
+        { name: ClientEncryptionService.ALGORITHM, iv: ivArray },
+        entryKey,
+        encryptedArray
+      );
+
+      return new TextDecoder().decode(decrypted);
+    } catch (error) {
+      logger.error('Per-user decryption failed:', error);
+      throw new Error('Failed to decrypt per-user entry');
     }
   }
 

@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 
 import { JournalAPI } from '../../services/api';
+import { encryptedJournalService } from '../../services/encryptedJournalService';
 import { JournalEntry, Tag } from '../../types';
 import { MainStackParamList } from '../../navigation/types';
 import { useAppTheme } from '../../contexts/ThemeContext';
@@ -115,14 +116,18 @@ const JournalEntryDetailScreen = () => {
   const fetchEntryDetails = async () => {
     try {
       setIsLoading(true);
-      const response = await JournalAPI.getEntry(String(entryId));
-      const entryData = response.data;
-      setEntry(entryData);
+      // Use decryption-aware service to fetch and decrypt if needed
+      const entryData = await encryptedJournalService.getEntry(String(entryId));
+      if (!entryData) {
+        setEntry(null);
+        return;
+      }
+      setEntry(entryData as JournalEntry);
       
       // Initialize edit state
-      setEditTitle(entryData.title || '');
-      setEditContent(entryData.content || '');
-      setEditTags(entryData.tags || []);
+      setEditTitle(entryData?.title || '');
+      setEditContent(entryData?.content || '');
+      setEditTags(entryData?.tags || []);
     } catch (error) {
       console.error('Error fetching entry details', error);
       Alert.alert('Error', 'Failed to load journal entry details');

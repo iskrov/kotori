@@ -1,7 +1,8 @@
 import 'dotenv/config';
 
 // Load environment variables
-const apiUrl = process.env.API_URL || "https://api.kotori.io"; // Production domain
+// Support both EXPO_PUBLIC_API_URL (recommended) and API_URL (legacy) for backwards compatibility
+const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || "https://api.kotori.io"; // Production domain
 const googleCloudProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const googleSpeechApiKey = process.env.GOOGLE_SPEECH_API_KEY;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;

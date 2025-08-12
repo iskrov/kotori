@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { api } from '../../services/api';
+import { encryptedJournalService } from '../../services/encryptedJournalService';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import SafeScrollView from '../../components/SafeScrollView';
@@ -127,16 +128,11 @@ const HomeScreen = () => {
         entriesThisWeek: statsResponse.data.entries_this_week,
       });
       
-      // Fetch recent entries, ensuring descending order by entry_date
-      const entriesResponse = await api.get('/api/journals/', {
-        params: { 
-          limit: 1, // Only show 1 most recent entry on the home screen
-          sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
-        }
+      // Fetch recent entries using decryption-aware service
+      const entries = await encryptedJournalService.getEntries({
+        limit: 1, // Only show 1 most recent entry on the home screen
+        sort: 'entry_date:desc' // Explicitly request sorting if backend supports it
       });
-      const entries = Array.isArray(entriesResponse.data)
-        ? entriesResponse.data
-        : (entriesResponse.data?.entries ?? []);
       setRecentEntries(entries);
       
     } catch (error: any) {

@@ -108,8 +108,8 @@ const RecordScreen: React.FC = () => {
              const loadExistingEntry = async () => {
          try {
            setIsLoadingExistingEntry(true);
-           const response = await JournalAPI.getEntry(parseInt(journalId));
-           const entry = response.data;
+          // Use decryption-aware fetch for preloading existing entry
+          const entry = await encryptedJournalService.getEntry(String(journalId));
            
            logger.info(`[RecordScreen] Loaded existing entry for appending: ${entry.title}`);
            setTitle(entry.title || '');

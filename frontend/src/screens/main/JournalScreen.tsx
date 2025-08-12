@@ -18,7 +18,8 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
-import { JournalAPI, TagsAPI } from '../../services/api';
+import { TagsAPI } from '../../services/api';
+import { encryptedJournalService } from '../../services/encryptedJournalService';
 import JournalCard from '../../components/JournalCard';
 import { JournalCardSkeleton } from '../../components/SkeletonLoader';
 import SafeScrollView from '../../components/SafeScrollView';
@@ -75,12 +76,9 @@ const JournalScreen = () => {
     try {
       setIsLoading(true);
       
-      const response = await JournalAPI.getEntries({});
-      // Normalize possible response shapes
-      const data = Array.isArray(response.data)
-        ? response.data
-        : (response.data?.entries ?? []);
-      setEntries(data);
+      // Use decryption-aware service to ensure content is available for display
+      const data = await encryptedJournalService.getEntries({});
+      setEntries(data as unknown as JournalEntry[]);
     } catch (error) {
       console.error('Error fetching journal entries', error);
       Alert.alert('Error', 'Failed to load journal entries');

@@ -19,6 +19,7 @@ import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDa
 import { Ionicons } from '@expo/vector-icons';
 
 import { JournalAPI } from '../../services/api';
+import { encryptedJournalService } from '../../services/encryptedJournalService';
 import { JournalEntry, Tag } from '../../types';
 import JournalCard from '../../components/JournalCard';
 import SafeScrollView from '../../components/SafeScrollView';
@@ -124,14 +125,11 @@ const CalendarScreen = () => {
     try {
       setIsLoading(true);
       
-      // Fetch all entries for date indicators in the calendar
-      const allEntriesResponse = await JournalAPI.getEntries({
+      // Fetch all entries for date indicators in the calendar using decryption-aware service
+      const entries = await encryptedJournalService.getEntries({
         limit: 100,  // Fetch more entries to show indicators properly
         include_public: true
       });
-      const entries = Array.isArray(allEntriesResponse.data) 
-        ? allEntriesResponse.data 
-        : allEntriesResponse.data.entries || [];
       setAllEntries(entries as JournalEntry[]);
       
       // Also trigger filtering for the selected date
@@ -157,17 +155,14 @@ const CalendarScreen = () => {
       // Format date as YYYY-MM-DD for API query
       const formattedDate = format(date, 'yyyy-MM-dd');
       
-      // Use start_date and end_date parameters to filter by exact date
-      const response = await JournalAPI.getEntries({
+      // Use start_date and end_date parameters to filter by exact date using decryption-aware service
+      const entries = await encryptedJournalService.getEntries({
         // Filter by the specific date using both start_date and end_date
         start_date: formattedDate,
         end_date: formattedDate,
         include_public: true
       });
       
-      const entries = Array.isArray(response.data)
-        ? response.data
-        : (response.data?.entries ?? []);
       setFilteredEntriesForSelectedDate(entries as JournalEntry[]);
     } catch (error) {
       console.error(`Error fetching entries for date ${format(date, 'yyyy-MM-dd')}`, error);

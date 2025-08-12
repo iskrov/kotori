@@ -150,8 +150,9 @@ class EncryptedJournalService {
         tags: entryData.tags || [],
         encrypted_content: enc.encryptedContent,
         encryption_iv: enc.iv,
-        encrypted_key: enc.wrappedKey,
-        encryption_wrap_iv: enc.wrapIv,
+        // Prefer wrapped_key/wrap_iv for per-user encryption, but include legacy aliases for backend normalization
+        wrapped_key: enc.wrappedKey,
+        wrap_iv: enc.wrapIv,
         encryption_algorithm: enc.algorithm || 'AES-GCM',
       } as any);
       logger.info('Created per-user encrypted journal entry');
@@ -296,9 +297,15 @@ class EncryptedJournalService {
   /**
    * Get a specific journal entry by ID, automatically decrypting if it's a secret tag entry
    */
-  async getEntry(id: number): Promise<JournalEntryData | null> {
+  async getEntry(id: string): Promise<JournalEntryData | null> {
     try {
-      const response = await JournalAPI.getEntry(id);
+      const idStr = String(id ?? '').trim();
+      // Guard against invalid IDs (e.g., 'NaN') to avoid 422 from backend UUID validator
+      if (!idStr || idStr.toLowerCase() === 'nan' || idStr.toLowerCase() === 'undefined') {
+        logger.warn(`getEntry: Invalid entry id provided: '${idStr}'`);
+        return null;
+      }
+      const response = await JournalAPI.getEntry(idStr);
       const entry = response.data;
       
       if (!entry) return null;
@@ -325,9 +332,28 @@ class EncryptedJournalService {
     
     const processedEntries = await Promise.all(
       filteredEntries.map(async (entry: any) => {
+        // Secret-tag path
         if (entry.secret_tag_id && activeTagIds.includes(entry.secret_tag_id)) {
           return this.decryptSecretTagEntry(entry);
         }
+
+        // Per-user encryption path: decrypt if encrypted fields present (do not rely solely on is_encrypted flag)
+        if (entry.encrypted_content && (entry.wrapped_key || entry.encrypted_key) && (entry.wrap_iv || entry.encryption_wrap_iv) && entry.encryption_iv) {
+          try {
+            const decrypted = await clientEncryption.decryptPerUser({
+              encryptedContent: entry.encrypted_content,
+              iv: entry.encryption_iv,
+              wrappedKey: entry.wrapped_key || entry.encrypted_key,
+              wrapIv: entry.wrap_iv || entry.encryption_wrap_iv,
+              algorithm: entry.encryption_algorithm,
+            });
+            return { ...entry, content: decrypted };
+          } catch (e) {
+            logger.error('Failed to decrypt per-user entry; leaving content empty', e);
+            return entry;
+          }
+        }
+
         return entry;
       })
     );
@@ -353,18 +379,18 @@ class EncryptedJournalService {
 
     try {
       // Check if we have the necessary encryption fields
-      if (!entry.encrypted_content || !entry.encryption_iv || !entry.encryption_salt) {
+      if (!entry.encrypted_content || !entry.encryption_iv) {
         logger.warn('Entry missing encryption fields, cannot decrypt');
         return null;
       }
 
       const encrypted = {
         encryptedContent: entry.encrypted_content,
-        encryptedKey: entry.encrypted_key || '',
+        encryptedKey: entry.encrypted_key || entry.wrapped_key || '',
         iv: entry.encryption_iv,
         salt: entry.encryption_salt,
         algorithm: entry.encryption_algorithm || 'AES-GCM',
-        wrapIv: entry.encryption_wrap_iv || entry.encryption_iv,
+        wrapIv: entry.encryption_wrap_iv || entry.wrap_iv || entry.encryption_iv,
       };
 
       const decryptedContent = await zeroKnowledgeEncryption.decryptEntryWithSecretPhrase(
@@ -461,8 +487,9 @@ class EncryptedJournalService {
             content: '',
             encrypted_content: enc.encryptedContent,
             encryption_iv: enc.iv,
-            encrypted_key: enc.wrappedKey,
-            encryption_wrap_iv: enc.wrapIv,
+            // Prefer wrapped_key/wrap_iv for per-user encryption, include legacy aliases for backend normalization
+            wrapped_key: enc.wrappedKey,
+            wrap_iv: enc.wrapIv,
             encryption_algorithm: enc.algorithm || 'AES-GCM',
           };
           const response = await JournalAPI.updateEntry(id, encryptedUpdatePayload);

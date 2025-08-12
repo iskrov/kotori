@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { JournalEntryCreate, JournalEntryUpdate, User, Tag } from '../types';
 import logger from '../utils/logger';
-import { OPAQUE_AUTH_API_URL } from '../../constants/opaque';
 
 const getApiUrl = (): string => {
   const hostname = typeof window !== 'undefined' && window.location.hostname;
@@ -213,8 +212,8 @@ api.interceptors.response.use(
         
         // Traditional authentication - attempt token refresh
         logger.info('Attempting token refresh');
-        logger.info(`Calling /api/v1/auth/refresh with refresh token: ${refreshToken ? refreshToken.substring(0, 10) + '...' : 'null'}`);
-        const response = await axios.post(`${getApiUrl()}/api/v1/auth/refresh`, {
+        logger.info(`Calling /api/v1/auth/token/refresh with refresh token: ${refreshToken ? refreshToken.substring(0, 10) + '...' : 'null'}`);
+        const response = await axios.post(`${getApiUrl()}/api/v1/auth/token/refresh`, {
           refresh_token: refreshToken,
         });
         
@@ -341,7 +340,7 @@ export const AuthAPI = {
   
   // OAuth Google Authentication (V1)
   googleAuth: (idToken: string) => 
-    api.post('/api/v1/auth/google', { id_token: idToken }),
+    api.post('/api/v1/auth/google', { token: idToken }),
   
   // Logout (V1)
   logout: () => api.post('/api/v1/auth/logout'),
@@ -393,7 +392,7 @@ export const JournalAPI = {
   createEntry: (data: JournalEntryCreate) => 
     api.post('/api/v1/journals/', data),
 
-  // Enhanced method for creating encrypted secret tag entries (legacy secret tags)
+  // Enhanced method for creating encrypted entries (per-user encryption)
   createEncryptedEntry: (data: {
     title?: string;
     encrypted_content: string;    // Base64 encrypted content
@@ -405,23 +404,19 @@ export const JournalAPI = {
     entry_date?: string;
     audio_url?: string;
     tags?: string[];
-    secret_tag_id?: string;       // Secret tag ID
-    secret_tag_hash?: string;     // Secret tag hash for server filtering
   }) => api.post('/api/journals', {
     title: data.title || '',
-    content: "",  // No plaintext content for secret tag entries
+    content: "",  // No plaintext content for encrypted entries
     encrypted_content: data.encrypted_content,
     encryption_iv: data.iv,
     encryption_salt: data.salt,
     encrypted_key: data.encrypted_key,
-    key_derivation_iterations: 100000,  // Default iterations (legacy)
+    key_derivation_iterations: 100000,  // Default iterations
     encryption_algorithm: data.algorithm,
     encryption_wrap_iv: data.wrapIv,
     entry_date: data.entry_date || new Date().toISOString(),
     audio_url: data.audio_url,
     tags: data.tags || [],
-    secret_tag_id: data.secret_tag_id,
-    secret_tag_hash: data.secret_tag_hash,
   }),
   
   updateEntry: (id: string, data: JournalEntryUpdate) => 
@@ -432,10 +427,6 @@ export const JournalAPI = {
   
   searchEntries: (query: string) => 
     api.get('/api/v1/journals/search', { params: { q: query } }),
-
-  // Get entries by secret tag (for specific tag filtering)
-  getEntriesBySecretTag: (secretTagHash: string, params?: { skip?: number, limit?: number }) =>
-    api.get(`/api/journals/secret-tag/${secretTagHash}`, { params }),
 };
 
 // Reminders
@@ -485,12 +476,17 @@ export const TagsAPI = {
 
 // Audio transcription
 export const TranscriptionAPI = {
-  transcribeAudio: (audioFile: any) => {
+  transcribeAudio: (audioFile: any, languageCodes?: string[]) => {
     // Create form data for file upload
     const formData = new FormData();
-    formData.append('audio_file', audioFile);
+    formData.append('file', audioFile);
     
-    return api.post('/api/transcriptions', formData, {
+    // Add language codes if provided
+    if (languageCodes && languageCodes.length > 0) {
+      formData.append('language_codes_json', JSON.stringify(languageCodes));
+    }
+    
+    return api.post('/api/speech/transcribe', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -498,12 +494,7 @@ export const TranscriptionAPI = {
   },
 };
 
-export const SecretTagAPI = {
-  delete: (tagId: string) => {
-    logger.info(`Sending API request to delete secret tag: ${tagId}`);
-    return api.delete(`/api/v1/secret-tags/${tagId}`);
-  },
-};
+// Secret tags feature has been removed from the application
 
 export default {
   auth: AuthAPI,
@@ -512,5 +503,4 @@ export default {
   tags: TagsAPI,
   transcription: TranscriptionAPI,
   reminder: ReminderAPI,
-  secretTag: SecretTagAPI,
 };

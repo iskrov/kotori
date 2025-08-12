@@ -16,7 +16,6 @@ from fastapi import (
     status,
     Header,
 )
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -27,14 +26,7 @@ from app.models.user import User
 from app.services.speech_service import SpeechService, create_speech_service
 from app.core.config import settings
 from app.services.user_service import user_service
-from app.schemas.speech import (
-    SpeechTranscriptionResponse,
-    SecretTagActivationRequest,
-    SecretTagActivationResponse,
-    SpeechErrorResponse,
-    SpeechHealthResponse
-)
-from app.core.config import settings
+from app.schemas.speech import SpeechTranscriptionResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -49,7 +41,7 @@ async def manual_get_user_from_header(authorization: str | None = Header(None), 
         
     scheme, _, token = authorization.partition(' ')
     if not scheme or scheme.lower() != 'bearer' or not token:
-         raise HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
@@ -84,7 +76,7 @@ async def manual_get_user_from_header(authorization: str | None = Header(None), 
             raise credentials_exception
         
     if user is None:
-        logger.warning(f"User with ID {user_id} from token not found in DB.")
+        logger.warning(f"User with ID {user_id_str} from token not found in DB.")
         raise credentials_exception
         
     if not user.is_active:
@@ -97,11 +89,6 @@ async def manual_get_user_from_header(authorization: str | None = Header(None), 
 class TranscribeRequestParams(BaseModel):
     # Use Field to allow empty list or list of strings, default to None for auto-detect
     language_codes: Optional[List[str]] = Field(None)
-
-# Input model for secret tag activation
-class SecretTagActivationRequest(BaseModel):
-    tag_id: str = Field(..., description="Secret tag ID to activate")
-    action: str = Field(..., description="Action to perform: 'activate' or 'deactivate'")
 
 @router.post("/transcribe", response_model=SpeechTranscriptionResponse)
 async def transcribe_audio_endpoint(
@@ -131,10 +118,10 @@ async def transcribe_audio_endpoint(
                 language_codes = parsed_codes
             elif parsed_codes is None:
                 # Allow explicit null/None to trigger auto-detect
-                 language_codes = None
+                language_codes = None
             else:
-                 logger.warning(f"Invalid format for language_codes received: {language_codes_json}")
-                 raise HTTPException(
+                logger.warning(f"Invalid format for language_codes received: {language_codes_json}")
+                raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="Invalid format for language_codes. Must be a JSON array of strings or null."
                 )
@@ -243,57 +230,4 @@ async def transcribe_audio_endpoint(
     finally:
         await file.close()
 
-@router.post("/secret-tag/activate", response_model=SecretTagActivationResponse)
-async def activate_secret_tag_endpoint(
-    request: SecretTagActivationRequest,
-    authorization: str | None = Header(None),
-    db: Session = Depends(get_db),
-):
-    """
-    Endpoint for client-side secret tag activation/deactivation.
-    This is called by the client after it detects a secret tag phrase locally.
-    """
-    current_user = await manual_get_user_from_header(authorization, db)
-    
-    try:
-        if not settings.ENABLE_SECRET_TAGS:
-            return SecretTagActivationResponse(
-                success=False,
-                message="Secret tags are disabled",
-                tag_name=None,
-                session_token=None
-            )
-        # Validate that the secret tag belongs to the user (if tag_name is provided)
-        if request.tag_name:
-            from app.models import SecretTag
-            secret_tag = db.query(SecretTag).filter(
-                SecretTag.tag_name == request.tag_name,
-                SecretTag.user_id == current_user.id
-            ).first()
-            
-            if not secret_tag:
-                logger.warning(f"Secret tag '{request.tag_name}' not found or not owned by user {current_user.id}")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Secret tag not found"
-                )
-        
-        # Log the activation/deactivation
-        logger.info(f"Secret tag {request.action} requested for user {current_user.email}: {request.tag_name}")
-        
-        # Return success - actual activation is handled client-side
-        return SecretTagActivationResponse(
-            success=True,
-            message=f"Secret tag {request.action} processed successfully",
-            tag_name=request.tag_name,
-            session_token=None  # Could be generated if needed
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error processing secret tag activation for user {current_user.email}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process secret tag activation"
-        ) from e
+# Secret tag activation endpoint removed - feature has been deprecated

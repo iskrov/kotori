@@ -11,7 +11,7 @@
 | 6 | Admin | As a maintainer, I want permanent removal of secret-tag code after migration. | Done | Secret-tag code and tests removed after Stage 2; OPAQUE and per-user encryption intact. |
 | 7 | Admin | As a maintainer, I want documentation and hygiene maintained. | Done | READMEs and technical docs updated; `todo.md`/`done.md` maintained; Decision Log added. |
 | 8 | User | As a user, I want the entire Kotori app to have a calm, low-stimulation visual design matching the website aesthetic. | Done | All screens use consistent teal color system; soft shadows and proper spacing throughout; accessible calendar selection states; proper touch targets (48px minimum); WCAG AA contrast compliance; no functionality regressions. |
-
+| 9 | User | As a user, I want my journal entries properly encrypted and decrypted so I can see my content after saving. | Proposed | Client-side encryption/decryption works seamlessly; entries show content not just titles; OPAQUE-derived keys used; backward compatibility maintained; secure key management implemented. |
 | 10 | Admin | As a maintainer, I want the temporary GCS import bucket locked down or removed after schema bootstrap. | Proposed | Import bucket access removed (or bucket deleted); no SQL files exposed; documentation updated to reflect cleanup. |
 | 11 | Admin | As a maintainer, I want a least-privilege IAM audit for the `kotori-api` service account. | Proposed | Only required roles (Cloud SQL Client, Secret Manager access, Logging, Monitoring) retained; any excess roles removed; changes documented. |
 | 12 | Admin | As a maintainer, I want production monitoring and alerting configured for API, frontend, and Cloud SQL. | Proposed | Dashboards created; uptime checks and error/latency alerts in place; Cloud SQL CPU/storage alerts configured; docs include runbooks. |
@@ -45,3 +45,4 @@
 | 2025-08-10 22:50:00 | 15 | create_pbi | API network posture review and hardening (LB/internal or public+WAF) | ai-agent |
 | 2025-08-11 23:30:00 | 8 | start_implementation | Began app-wide visual refresh implementation with Task 8-1 | ai-agent |
 | 2025-08-11 23:45:00 | 8 | approve | PBI-8 completed successfully; all 7 tasks done; comprehensive visual refresh achieved | user |
+| 2025-08-12 03:00:00 | 9 | create_pbi | Fix encryption/decryption for journal entries to show content properly | ai-agent |
