@@ -404,7 +404,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.secondary,
   },
   totalValue: {
-    color: theme.colors.text,
+    color: theme.colors.accent,
   },
   statLabel: {
     fontSize: theme.typography.fontSizes.xs,

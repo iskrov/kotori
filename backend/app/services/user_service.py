@@ -391,11 +391,14 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         logger.info(f"Calculated longest_streak: {longest_streak}")
         return longest_streak
 
-    def _get_entries_today(self, unique_entry_days: List[date], today_reference_date: date) -> int:
-        """Calculates the number of entries today."""
-        entries_today = sum(
-            1 for entry_day in unique_entry_days if entry_day == today_reference_date
-        )
+    def _get_entries_today(self, entry_datetime_stamps: List[datetime], today_reference_date: date) -> int:
+        """Calculates the number of entries today using the entry's original timezone."""
+        entries_today = 0
+        for entry_dt in entry_datetime_stamps:
+            # Convert the entry datetime to its local date (preserving original timezone)
+            entry_local_date = entry_dt.date()
+            if entry_local_date == today_reference_date:
+                entries_today += 1
         logger.info(f"Calculated entries_today: {entries_today}")
         return entries_today
 
@@ -472,14 +475,15 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
                  days_since_registration=days_since_registration
              )
 
-        # Use current timezone.utc date as the reference for calculations
-        today_utc = datetime.now(timezone.utc).date()
-        logger.debug(f"Today (timezone.utc): {today_utc} for stat calculations.")
+        # Use current local date as the reference for calculations
+        # This ensures "today" matches what the user expects in their timezone
+        today_local = datetime.now().date()
+        logger.debug(f"Today (local): {today_local} for stat calculations.")
 
-        current_streak = self._calculate_current_streak(unique_entry_days_utc, today_utc)
+        current_streak = self._calculate_current_streak(unique_entry_days_utc, today_local)
         longest_streak = self._calculate_longest_streak(unique_entry_days_utc)
-        entries_today = self._get_entries_today(unique_entry_days_utc, today_utc)
-        entries_this_week = self._get_entries_this_week(unique_entry_days_utc, today_utc)
+        entries_today = self._get_entries_today(entry_datetime_stamps, today_local)
+        entries_this_week = self._get_entries_this_week(unique_entry_days_utc, today_local)
 
         stats_result = UserStats(
             total_entries=total_entries,
