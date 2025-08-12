@@ -27,6 +27,7 @@ import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { logger } from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import { componentStyles, accessibilityTokens } from '../../styles/theme';
 import { getDynamicGreeting, GreetingData } from '../../services/greetingService';
 
 // --- Special Tag for Hidden Entries (Client-Side) ---
@@ -248,8 +249,10 @@ const HomeScreen = () => {
             style={styles.vibeButton}
             onPress={() => handleVibePress('grateful', 'gratitude')}
             activeOpacity={0.7}
+            accessibilityLabel="Grateful mood - Record what you're thankful for"
+            accessibilityRole="button"
           >
-            <Ionicons name="heart-outline" size={24} color="#B39DFF" style={styles.vibeIcon} />
+            <Ionicons name="heart-outline" size={24} color={theme.colors.primary} style={styles.vibeIcon} />
             <Text style={styles.vibeLabel}>Grateful</Text>
           </TouchableOpacity>
           
@@ -257,8 +260,10 @@ const HomeScreen = () => {
             style={styles.vibeButton}
             onPress={() => handleVibePress('reflect', 'reflection')}
             activeOpacity={0.7}
+            accessibilityLabel="Reflective mood - Record your thoughts"
+            accessibilityRole="button"
           >
-            <Ionicons name="book-outline" size={24} color="#6E7CFF" style={styles.vibeIcon} />
+            <Ionicons name="book-outline" size={24} color={theme.colors.primary} style={styles.vibeIcon} />
             <Text style={styles.vibeLabel}>Reflective</Text>
           </TouchableOpacity>
           
@@ -266,8 +271,10 @@ const HomeScreen = () => {
             style={styles.vibeButton}
             onPress={() => handleVibePress('inspired', 'idea')}
             activeOpacity={0.7}
+            accessibilityLabel="Inspired mood - Capture your ideas"
+            accessibilityRole="button"
           >
-            <Ionicons name="bulb-outline" size={24} color="#FFD966" style={styles.vibeIcon} />
+            <Ionicons name="bulb-outline" size={24} color={theme.colors.primary} style={styles.vibeIcon} />
             <Text style={styles.vibeLabel}>Inspired</Text>
           </TouchableOpacity>
           
@@ -275,8 +282,10 @@ const HomeScreen = () => {
             style={styles.vibeButton}
             onPress={() => handleVibePress('stressed', 'stress')}
             activeOpacity={0.7}
+            accessibilityLabel="Stressed mood - Unload what's weighing you down"
+            accessibilityRole="button"
           >
-            <Ionicons name="rainy-outline" size={24} color="#8CBFFF" style={styles.vibeIcon} />
+            <Ionicons name="rainy-outline" size={24} color={theme.colors.primary} style={styles.vibeIcon} />
             <Text style={styles.vibeLabel}>Stressed</Text>
           </TouchableOpacity>
           
@@ -284,16 +293,25 @@ const HomeScreen = () => {
             style={styles.vibeButton}
             onPress={() => handleVibePress('plan', 'plan')}
             activeOpacity={0.7}
+            accessibilityLabel="Planning mood - Record your goals and next steps"
+            accessibilityRole="button"
           >
-            <Ionicons name="radio-button-on-outline" size={24} color="#51C1C1" style={styles.vibeIcon} />
+            <Ionicons name="radio-button-on-outline" size={24} color={theme.colors.primary} style={styles.vibeIcon} />
             <Text style={styles.vibeLabel}>Planning</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Last Entry</Text>
-        <TouchableOpacity onPress={navigateToJournalList}>
+        <View style={styles.sectionTitleContainer}>
+          <Text style={styles.sectionTitle}>Last Entry</Text>
+          <Text style={styles.sectionDate}>{format(new Date(), 'EEE, MMM d, yyyy')}</Text>
+        </View>
+        <TouchableOpacity 
+          onPress={navigateToJournalList}
+          accessibilityLabel="View all journal entries"
+          accessibilityRole="button"
+        >
           <Text style={styles.seeAllText}>See All</Text>
         </TouchableOpacity>
       </View>
@@ -311,6 +329,8 @@ const HomeScreen = () => {
           <TouchableOpacity 
             style={styles.startButton}
             onPress={navigateToRecord}
+            accessibilityLabel="Start journaling - Create your first entry"
+            accessibilityRole="button"
           >
             <Text style={styles.startButtonText}>Start Journaling</Text>
           </TouchableOpacity>
@@ -342,16 +362,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     paddingBottom: theme.spacing.lg,
   },
   greetingCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.xl,
+    ...componentStyles.card,
     padding: theme.spacing.lg,
-    elevation: theme.isDarkMode ? 1 : 2,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
-    shadowOpacity: theme.isDarkMode ? 0.15 : 0.08,
-    shadowRadius: theme.isDarkMode ? 2 : 4,
-    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
-    borderWidth: theme.isDarkMode ? 1 : 0,
   },
   greetingContent: {
     alignItems: 'flex-start',
@@ -380,18 +392,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: theme.spacing.md,
   },
   statCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 12,
+    ...componentStyles.card,
     padding: theme.spacing.lg,
     alignItems: 'center',
     width: '30%',
-    elevation: theme.isDarkMode ? 2 : 3,
-    shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: theme.isDarkMode ? 2 : 3 },
-    shadowOpacity: theme.isDarkMode ? 0.2 : 0.08,
-    shadowRadius: theme.isDarkMode ? 3 : 4,
-    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
-    borderWidth: theme.isDarkMode ? 1 : 0,
+    minHeight: accessibilityTokens.minTouchTarget,
   },
   streakCard: {
     backgroundColor: theme.isDarkMode ? theme.colors.card : '#FFF8F5',
@@ -430,11 +435,20 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing.sm,
   },
+  sectionTitleContainer: {
+    flex: 1,
+  },
   sectionTitle: {
     fontSize: theme.typography.fontSizes.xl,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    fontFamily: theme.typography.fontFamilies.bold,
+    fontWeight: '600',
+    color: theme.colors.textSecondary, // Using textSecondary for softer appearance
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  },
+  sectionDate: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textMuted,
+    fontFamily: theme.typography.fontFamilies.regular,
+    marginTop: 2,
   },
   seeAllText: {
     fontSize: theme.typography.fontSizes.md,
@@ -456,17 +470,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
   },
   startButton: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xl,
-    borderRadius: 25,
+    ...componentStyles.primaryButton,
     marginTop: theme.spacing.md,
   },
   startButtonText: {
-    color: theme.isDarkMode ? theme.colors.background : theme.colors.white,
+    color: theme.colors.white,
     fontSize: theme.typography.fontSizes.md,
-    fontWeight: 'bold',
-    fontFamily: theme.typography.fontFamilies.bold,
+    fontWeight: '600',
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   // Vibe section styles
   vibeContainer: {
@@ -487,19 +498,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
   },
   vibeButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 12,
+    ...componentStyles.card,
     padding: theme.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     width: '18%',
-    elevation: theme.isDarkMode ? 1 : 2,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: theme.isDarkMode ? 1 : 2 },
-    shadowOpacity: theme.isDarkMode ? 0.15 : 0.08,
-    shadowRadius: theme.isDarkMode ? 2 : 3,
-    borderColor: theme.isDarkMode ? theme.colors.border : 'transparent',
-    borderWidth: theme.isDarkMode ? 1 : 0,
+    minHeight: accessibilityTokens.minTouchTarget,
   },
   vibeIcon: {
     marginBottom: theme.spacing.xs,

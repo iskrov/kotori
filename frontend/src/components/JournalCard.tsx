@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { JournalEntry, Tag } from '../types';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
+import { componentStyles } from '../styles/theme';
 
 // Helper to determine if native driver should be used
 const useNativeDriver = Platform.OS !== 'web';
@@ -83,6 +84,9 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         testID="journal-card"
+        accessibilityLabel={`Journal entry from ${formattedDate}${entry.title ? `: ${entry.title}` : ''}`}
+        accessibilityRole="button"
+        accessibilityHint="Tap to view full journal entry"
       >
         {/* Header with date and audio indicator */}
         <View style={styles.header}>
@@ -138,14 +142,10 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.xl,
+    ...componentStyles.card,
     padding: theme.spacing.lg,
     marginVertical: theme.spacing.sm,
     marginHorizontal: theme.spacing.xs,
-    ...theme.shadows.md,
-    borderColor: theme.colors.borderLight,
-    borderWidth: theme.isDarkMode ? 1 : 0,
     overflow: 'hidden',
   },
   pressed: {
@@ -200,18 +200,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   tag: {
-    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.primaryLight + '20',
+    backgroundColor: theme.colors.chipBackground,
     borderRadius: theme.borderRadius.full,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     marginRight: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.isDarkMode ? theme.colors.gray600 : theme.colors.primaryLight + '40',
   },
   tagText: {
     fontSize: theme.typography.fontSizes.xs,
-    color: theme.isDarkMode ? theme.colors.text : theme.colors.primary,
+    color: theme.colors.chipText,
     fontFamily: theme.typography.fontFamilies.medium,
     fontWeight: '500',
   },

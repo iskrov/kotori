@@ -9,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
+import { accessibilityTokens } from '../styles/theme';
 import hapticService from '../services/hapticService';
 
 interface FloatingActionButtonProps {
@@ -141,6 +142,10 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
             disabled={disabled}
             activeOpacity={0.8}
             testID={testID}
+            accessibilityLabel="Start voice recording"
+            accessibilityRole="button"
+            accessibilityHint="Tap to start recording a new journal entry"
+            accessibilityState={{ disabled }}
           >
             <Ionicons
               name={icon}
@@ -183,8 +188,8 @@ const getStyles = (theme: AppTheme, size: number, variant: 'primary' | 'secondar
     },
     shadowContainer: {
       borderRadius: size / 2,
-      ...theme.shadows.lg,
-      shadowColor: variantColors.shadowColor,
+      ...theme.shadows.md, // Use softer shadow consistent with design system
+      shadowColor: theme.colors.black, // Use consistent shadow color
     },
     button: {
       width: size,

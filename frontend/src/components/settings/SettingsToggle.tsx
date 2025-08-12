@@ -36,11 +36,11 @@ const SettingsToggle: React.FC<SettingsToggleProps> = ({
   const switchElement = (
     <Switch
       trackColor={{ 
-        false: theme.colors.gray300, 
-        true: theme.colors.primary + '80' 
+        false: theme.colors.border, // Softer inactive track
+        true: theme.colors.chipBackground // Light teal for active track
       }}
-      thumbColor={value ? theme.colors.primary : theme.colors.gray100}
-      ios_backgroundColor={theme.colors.gray300}
+      thumbColor={value ? theme.colors.primary : theme.colors.white} // Teal thumb when active
+      ios_backgroundColor={theme.colors.border}
       onValueChange={onValueChange}
       value={value}
       disabled={disabled}

@@ -28,6 +28,7 @@ import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { voicePhraseDetector } from '../../services/VoicePhraseDetector';
 import { AppTheme } from '../../config/theme';
+import { componentStyles, accessibilityTokens } from '../../styles/theme';
 
 type CalendarScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Calendar'>,
@@ -206,7 +207,7 @@ const CalendarScreen = () => {
   
   const renderDay = (day: Date) => {
     const dayString = format(day, 'd');
-    const hasEntriesOnDay = visibleEntries.some(entry => {
+    const entriesOnDay = visibleEntries.filter(entry => {
       try {
         const entryDate = parseISO(entry.entry_date);
         return entryDate.getFullYear() === day.getFullYear() &&
@@ -218,12 +219,19 @@ const CalendarScreen = () => {
       }
     });
     
-    const isSelected = isSameDay(day, selectedDate); 
+    const hasEntriesOnDay = entriesOnDay.length > 0;
+    const isSelected = isSameDay(day, selectedDate);
+    const isToday = isSameDay(day, new Date());
+    
+    const entryCountText = hasEntriesOnDay 
+      ? ` — ${entriesOnDay.length} ${entriesOnDay.length === 1 ? 'entry' : 'entries'}`
+      : '';
     
     return (
       <TouchableOpacity 
         style={[
           styles.dayContainer,
+          isToday && styles.todayContainer,
           isSelected && styles.selectedDayContainer
         ]} 
         onPress={() => {
@@ -231,9 +239,14 @@ const CalendarScreen = () => {
           // Fetch entries immediately for better user experience
           fetchEntriesForSelectedDate(day);
         }}
+        accessibilityLabel={`${format(day, 'EEEE, MMMM d, yyyy')}${entryCountText}`}
+        accessibilityRole="button"
+        accessibilityState={{ selected: isSelected }}
+        accessibilityHint="Tap to view entries for this date"
       >
         <Text style={[
           styles.dayText,
+          isToday && styles.todayText,
           isSelected && styles.selectedDayText
         ]}>
           {dayString}
@@ -278,7 +291,12 @@ const CalendarScreen = () => {
         ref={scrollViewRef}
       >
         <View style={styles.calendarHeader}>
-          <TouchableOpacity onPress={goToPreviousMonth}>
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={goToPreviousMonth}
+            accessibilityLabel={`Go to previous month, ${format(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1), 'MMMM yyyy')}`}
+            accessibilityRole="button"
+          >
             <Ionicons name="chevron-back" size={theme.typography.fontSizes.xxl} color={theme.colors.text} />
           </TouchableOpacity>
           
@@ -286,7 +304,12 @@ const CalendarScreen = () => {
             {format(currentMonth, 'MMMM yyyy')}
           </Text>
           
-          <TouchableOpacity onPress={goToNextMonth}>
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={goToNextMonth}
+            accessibilityLabel={`Go to next month, ${format(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1), 'MMMM yyyy')}`}
+            accessibilityRole="button"
+          >
             <Ionicons name="chevron-forward" size={theme.typography.fontSizes.xxl} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
@@ -315,6 +338,8 @@ const CalendarScreen = () => {
           <TouchableOpacity 
             style={styles.addButton}
             onPress={handleCreateEntry}
+            accessibilityLabel={`Create new journal entry for ${format(selectedDate, 'MMMM d, yyyy')}`}
+            accessibilityRole="button"
           >
             <Ionicons name="add" size={theme.typography.fontSizes.xxl} color={theme.isDarkMode ? theme.colors.background : theme.colors.white} />
           </TouchableOpacity>
@@ -338,6 +363,8 @@ const CalendarScreen = () => {
                 <TouchableOpacity 
                   style={styles.createButton}
                   onPress={handleCreateEntry}
+                  accessibilityLabel={`Create journal entry for ${format(selectedDate, 'MMMM d, yyyy')}`}
+                  accessibilityRole="button"
                 >
                   <Text style={styles.createButtonText}>Create Entry</Text>
                 </TouchableOpacity>
@@ -364,6 +391,8 @@ const CalendarScreen = () => {
           style={styles.scrollToTopButton}
           onPress={scrollToTop}
           activeOpacity={0.8}
+          accessibilityLabel="Scroll to top of calendar"
+          accessibilityRole="button"
         >
           <Ionicons 
             name="chevron-up" 
@@ -412,16 +441,15 @@ const getStyles = (theme: AppTheme) => {
     },
     monthText: {
       fontSize: theme.typography.fontSizes.lg,
-      fontWeight: 'bold',
-      color: theme.colors.text,
-      fontFamily: theme.typography.fontFamilies.bold,
+      fontWeight: '600',
+      color: theme.colors.textSecondary, // Using textSecondary for softer appearance
+      fontFamily: theme.typography.fontFamilies.semiBold,
     },
     calendar: {
+      ...componentStyles.card,
       paddingHorizontal: theme.spacing.sm,
       paddingVertical: theme.spacing.md,
-      backgroundColor: theme.colors.card,
       margin: theme.spacing.md,
-      borderRadius: 8,
       maxWidth: calendarMaxWidth,
       alignSelf: 'center',
       width: isDesktop ? calendarMaxWidth : '100%',
@@ -433,7 +461,7 @@ const getStyles = (theme: AppTheme) => {
     },
     weekDayText: {
       fontSize: isDesktop ? theme.typography.fontSizes.sm : theme.typography.fontSizes.xs,
-      color: theme.colors.textSecondary,
+      color: theme.colors.textMuted, // Using textMuted for weekday headers
       fontFamily: theme.typography.fontFamilies.semiBold,
       width: dayCellSize,
       textAlign: 'center',
@@ -450,34 +478,46 @@ const getStyles = (theme: AppTheme) => {
       alignItems: 'center',
       borderWidth: 1,
       borderColor: 'transparent',
-      borderRadius: 5,
+      borderRadius: theme.borderRadius.md,
       margin: 1,
+      minHeight: accessibilityTokens.minTouchTarget,
+    },
+    todayContainer: {
+      borderColor: theme.colors.primary,
+      borderStyle: 'dashed',
+      borderWidth: 1,
     },
     selectedDayContainer: {
-      backgroundColor: theme.colors.primary,
+      backgroundColor: theme.colors.chipBackground, // Light teal background
       borderColor: theme.colors.primary,
-      borderRadius: 20,
+      borderWidth: 2,
+      borderStyle: 'solid',
     },
     dayText: {
       fontSize: isDesktop ? theme.typography.fontSizes.sm : theme.typography.fontSizes.xs,
-      color: theme.colors.text,
+      color: theme.colors.textSecondary, // Softer default text
       fontFamily: theme.typography.fontFamilies.regular,
     },
+    todayText: {
+      color: theme.colors.primary,
+      fontWeight: '600',
+      fontFamily: theme.typography.fontFamilies.semiBold,
+    },
     selectedDayText: {
-      color: theme.isDarkMode ? theme.colors.background : theme.colors.white,
-      fontWeight: 'bold',
-      fontFamily: theme.typography.fontFamilies.bold,
+      color: theme.colors.chipText, // Teal text on light teal background
+      fontWeight: '600',
+      fontFamily: theme.typography.fontFamilies.semiBold,
     },
     entryIndicator: {
-      width: 4,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: theme.colors.secondary,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.colors.primary, // Teal indicator dot
       position: 'absolute',
       bottom: isDesktop ? 6 : 4,
     },
     selectedEntryIndicator: {
-      backgroundColor: theme.isDarkMode ? theme.colors.background : theme.colors.white,
+      backgroundColor: theme.colors.primary, // Keep teal even when selected
     },
     selectedDateContainer: {
       padding: theme.spacing.md,
@@ -492,16 +532,28 @@ const getStyles = (theme: AppTheme) => {
       alignSelf: 'center',
       width: isDesktop ? calendarMaxWidth : '100%',
     },
+    navButton: {
+      padding: theme.spacing.sm,
+      borderRadius: theme.borderRadius.md,
+      minWidth: accessibilityTokens.minTouchTarget,
+      minHeight: accessibilityTokens.minTouchTarget,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     selectedDateText: {
       fontSize: theme.typography.fontSizes.md,
-      fontWeight: 'bold',
-      color: theme.colors.text,
-      fontFamily: theme.typography.fontFamilies.bold,
+      fontWeight: '600',
+      color: theme.colors.textSecondary, // Softer appearance
+      fontFamily: theme.typography.fontFamilies.semiBold,
     },
     addButton: {
       backgroundColor: theme.colors.primary,
       padding: theme.spacing.sm,
-      borderRadius: 20,
+      borderRadius: theme.borderRadius.full,
+      minWidth: accessibilityTokens.minTouchTarget,
+      minHeight: accessibilityTokens.minTouchTarget,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     loaderContainer: {
       flex: 1,
@@ -535,16 +587,13 @@ const getStyles = (theme: AppTheme) => {
       fontFamily: theme.typography.fontFamilies.regular,
     },
     createButton: {
-      backgroundColor: theme.colors.primary,
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.xl,
-      borderRadius: 25,
+      ...componentStyles.primaryButton,
     },
     createButtonText: {
-      color: theme.isDarkMode ? theme.colors.background : theme.colors.white,
+      color: theme.colors.white,
       fontSize: theme.typography.fontSizes.md,
-      fontWeight: 'bold',
-      fontFamily: theme.typography.fontFamilies.bold,
+      fontWeight: '600',
+      fontFamily: theme.typography.fontFamilies.semiBold,
     },
     listContent: {
       padding: theme.spacing.md,
@@ -563,17 +612,13 @@ const getStyles = (theme: AppTheme) => {
       position: 'absolute',
       bottom: Platform.OS === 'ios' ? 120 : 105, // Above the tab bar
       right: theme.spacing.lg,
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: accessibilityTokens.minTouchTarget,
+      height: accessibilityTokens.minTouchTarget,
+      borderRadius: accessibilityTokens.minTouchTarget / 2,
       backgroundColor: theme.colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
-      elevation: 8,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
+      ...theme.shadows.md, // Using new soft shadows
       zIndex: 1000,
     },
   });

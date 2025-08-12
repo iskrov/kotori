@@ -10,14 +10,15 @@
 | 5 | Admin | As a maintainer, I want GCP infra provisioned for Kotori. | Done | Cloud Run deployed in us-central1; Cloud SQL PG17; Secret Manager wired; Speech-to-Text enabled; ready for domains `api.kotori.io` and `app.kotori.io` with TLS. |
 | 6 | Admin | As a maintainer, I want permanent removal of secret-tag code after migration. | Done | Secret-tag code and tests removed after Stage 2; OPAQUE and per-user encryption intact. |
 | 7 | Admin | As a maintainer, I want documentation and hygiene maintained. | Done | READMEs and technical docs updated; `todo.md`/`done.md` maintained; Decision Log added. |
-|| 8 | User | As a user, I want graceful error handling so I don't see raw database errors on the frontend. | Proposed | Database connection errors, missing table errors, and SQL exceptions should show user-friendly messages; error logging should capture technical details for debugging; frontend should handle API errors gracefully. |
-| 9 | Admin | As a maintainer, I want the backend to use the Cloud SQL socket and a socket-DSN migration job so the database remains private-only. | Proposed | Cloud Run service bound to the Cloud SQL instance via `--set-cloudsql-instances`; secrets include a socket-form DSN for Alembic; migration job succeeds without public IP or TCP host; docs updated. |
+| 8 | User | As a user, I want the entire Kotori app to have a calm, low-stimulation visual design matching the website aesthetic. | Proposed | All screens use consistent teal color system; soft shadows and proper spacing throughout; accessible calendar selection states; proper touch targets (48px minimum); WCAG AA contrast compliance; no functionality regressions. |
+
 | 10 | Admin | As a maintainer, I want the temporary GCS import bucket locked down or removed after schema bootstrap. | Proposed | Import bucket access removed (or bucket deleted); no SQL files exposed; documentation updated to reflect cleanup. |
 | 11 | Admin | As a maintainer, I want a least-privilege IAM audit for the `kotori-api` service account. | Proposed | Only required roles (Cloud SQL Client, Secret Manager access, Logging, Monitoring) retained; any excess roles removed; changes documented. |
 | 12 | Admin | As a maintainer, I want production monitoring and alerting configured for API, frontend, and Cloud SQL. | Proposed | Dashboards created; uptime checks and error/latency alerts in place; Cloud SQL CPU/storage alerts configured; docs include runbooks. |
 | 13 | Admin | As a maintainer, I want Cloud SQL backups and retention verified with a test restore plan. | Proposed | Backup schedule confirmed; retention window set; PITR considered (if supported); test restore documented. |
 | 14 | Admin | As a maintainer, I want CI/CD to run Alembic migrations via a Cloud Run Job during deploys. | Proposed | Pipeline step triggers a migrations job with proper IAM; safe rollout ordering documented; failure handling defined. |
-| 15 | Admin | As a maintainer, I want API network posture reviewed (public vs. internal behind HTTPS LB) and hardened. | Proposed | Decision documented; if internal, set up HTTPS LB + serverless NEG (and access for frontend); if public, ensure WAF/CSP/HSTS/CORS; verification documented. |
+| 15 | Admin | As a maintainer, I want the backend to use the Cloud SQL socket and a socket-DSN migration job so the database remains private-only. | Proposed | Cloud Run service bound to the Cloud SQL instance via `--set-cloudsql-instances`; secrets include a socket-form DSN for Alembic; migration job succeeds without public IP or TCP host; docs updated. |
+| 16 | Admin | As a maintainer, I want API network posture reviewed (public vs. internal behind HTTPS LB) and hardened. | Proposed | Decision documented; if internal, set up HTTPS LB + serverless NEG (and access for frontend); if public, ensure WAF/CSP/HSTS/CORS; verification documented. |
 
 ## History
 
@@ -33,7 +34,8 @@
 | 2025-08-09 11:05:00 | 3 | approve | PBI-3 accepted; marking as Done | user |
 | 2025-08-10 01:25:00 | 5 | start_implementation | Began GCP infrastructure deployment | ai-agent |
 | 2025-08-10 01:25:00 | 5 | submit_for_review | All infrastructure deployed successfully in us-central1; ready for domain mapping | ai-agent |
-|| 2025-08-10 16:50:00 | 8 | create_pbi | User-friendly error handling for database errors | ai-agent |
+| 2025-08-11 10:00:00 | 8 | create_pbi | App-wide visual refresh for calm, low-stimulation design | ai-agent |
+| 2025-08-11 10:45:00 | 8 | propose_for_backlog | PBI-8 fully documented with 7 implementation tasks | ai-agent |
 | 2025-08-10 22:50:00 | 9 | create_pbi | Backend uses Cloud SQL socket and socket-DSN migration job to keep DB private | ai-agent |
 | 2025-08-10 22:50:00 | 10 | create_pbi | Lock down or remove temporary GCS import bucket used for schema bootstrap | ai-agent |
 | 2025-08-10 22:50:00 | 11 | create_pbi | Least-privilege IAM audit for `kotori-api` service account | ai-agent |

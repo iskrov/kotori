@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import { componentStyles } from '../../styles/theme';
 
 interface SettingsSectionProps {
   title: string;
@@ -74,12 +75,10 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
     container: {
+      ...componentStyles.card,
       marginVertical: theme.spacing.sm,
       marginHorizontal: theme.spacing.md,
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.lg,
       overflow: 'hidden',
-      ...theme.shadows.sm,
     },
     header: {
       flexDirection: 'row',
@@ -103,15 +102,16 @@ const getStyles = (theme: AppTheme) =>
     },
     title: {
       fontSize: theme.typography.fontSizes.lg,
-      fontFamily: theme.typography.fontFamilies.bold,
-      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamilies.semiBold,
+      fontWeight: '600',
+      color: theme.colors.textSecondary, // Using textSecondary for softer appearance
     },
     headerAction: {
       marginLeft: theme.spacing.md,
     },
     subtitle: {
       fontSize: theme.typography.fontSizes.sm,
-      color: theme.colors.textSecondary,
+      color: theme.colors.textMuted, // Using textMuted for descriptions
       marginLeft: theme.spacing.sm,
       padding: theme.spacing.xs,
     },
@@ -123,7 +123,7 @@ const getStyles = (theme: AppTheme) =>
       width: 40,
       height: 40,
       borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.primaryLight + '20',
+      backgroundColor: theme.colors.chipBackground, // Using chip background
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: theme.spacing.md,

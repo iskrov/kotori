@@ -2,7 +2,8 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance } from 'react-native';
 
-import { AppTheme, lightModeColors, darkModeColors, typography, spacing, borderRadius, shadows, animations } from '../config/theme';
+import { AppTheme } from '../config/theme';
+import { lightModeColors, darkModeColors, typography, spacing, borderRadius, shadows, animations } from '../styles/theme';
 
 interface ThemeContextProps {
   theme: AppTheme;

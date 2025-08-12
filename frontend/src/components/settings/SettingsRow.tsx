@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import { accessibilityTokens } from '../../styles/theme';
 import hapticService from '../../services/hapticService';
 
 interface SettingsRowProps {
@@ -125,7 +126,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
-    minHeight: 64,
+    minHeight: accessibilityTokens.minTouchTarget, // Ensure proper touch target
   },
   containerDisabled: {
     opacity: 0.6,
@@ -142,7 +143,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.primaryLight + '20',
+    backgroundColor: theme.colors.chipBackground, // Using chip background
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: theme.spacing.md,
@@ -162,7 +163,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   subtitle: {
     fontSize: theme.typography.fontSizes.sm,
     fontFamily: theme.typography.fontFamilies.regular,
-    color: theme.colors.textSecondary,
+    color: theme.colors.textMuted, // Using textMuted for subtitles
     lineHeight: 18,
   },
   subtitleDisabled: {

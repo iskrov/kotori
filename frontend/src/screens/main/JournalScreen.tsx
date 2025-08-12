@@ -29,6 +29,7 @@ import { MainStackParamList, MainTabParamList, JournalStackParamList } from '../
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { AppTheme } from '../../config/theme';
+import { componentStyles, accessibilityTokens } from '../../styles/theme';
 
 // --- Special Tag for Hidden Entries (Client-Side) ---
 // TODO: Move this to a shared constants file
@@ -265,9 +266,15 @@ const JournalScreen = () => {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor={theme.colors.textSecondary}
+            accessibilityLabel="Search journal entries"
+            accessibilityHint="Type to search through your journal entries"
           />
           {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity 
+              onPress={() => setSearchQuery('')}
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+            >
               <Ionicons name="close-circle" size={theme.typography.fontSizes.xl} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           ) : null}
@@ -285,6 +292,9 @@ const JournalScreen = () => {
                   selectedTags.includes(tag) && styles.tagChipSelected
                 ]}
                 onPress={() => toggleTag(tag)}
+                accessibilityLabel={`Filter by ${tag} tag`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: selectedTags.includes(tag) }}
               >
                 <Text 
                   style={[
@@ -358,6 +368,9 @@ const JournalScreen = () => {
           style={styles.scrollToTopButton}
           onPress={scrollToTop}
           activeOpacity={0.8}
+          accessibilityLabel="Scroll to top"
+          accessibilityRole="button"
+          accessibilityHint="Scroll to the top of the journal entries list"
         >
           <Ionicons 
             name="chevron-up" 
@@ -385,13 +398,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   searchBar: {
+    ...componentStyles.input,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.inputBackground,
-    borderRadius: theme.spacing.sm,
     paddingHorizontal: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   searchIcon: {
     marginRight: theme.spacing.sm,
@@ -411,13 +421,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   tagChip: {
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.spacing.lg,
+    ...componentStyles.chip,
+    marginRight: theme.spacing.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.isDarkMode ? theme.colors.gray700 : theme.colors.gray100,
-    marginRight: theme.spacing.sm,
   },
   tagChipSelected: {
     backgroundColor: theme.colors.primary,
@@ -472,12 +479,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   monthTitle: {
     fontSize: theme.typography.fontSizes.lg,
-    fontWeight: 'bold',
-    color: theme.colors.text,
+    fontWeight: '600',
+    color: theme.colors.textSecondary, // Using textSecondary for softer appearance
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.gray100,
-    fontFamily: theme.typography.fontFamilies.bold,
+    backgroundColor: 'transparent', // Remove background for cleaner look
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    marginTop: theme.spacing.md,
   },
   safeBottomPadding: {
     // Base padding plus extra for navigation elements
@@ -488,17 +496,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 120 : 105, // Above the tab bar
     right: theme.spacing.lg,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: accessibilityTokens.minTouchTarget,
+    height: accessibilityTokens.minTouchTarget,
+    borderRadius: accessibilityTokens.minTouchTarget / 2,
     backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: theme.colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    ...theme.shadows.md, // Using new soft shadows
     zIndex: 1000,
   },
 });

@@ -6,6 +6,7 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
+import { accessibilityTokens } from '../styles/theme';
 import { MainTabParamList, MainStackParamList } from './types';
 import logger from '../utils/logger';
 import audioPrewarmService from '../services/audioPrewarmService';
@@ -73,8 +74,8 @@ const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
-          tabBarActiveTintColor: theme.colors.tabBarActive,
-          tabBarInactiveTintColor: theme.colors.tabBarInactive,
+          tabBarActiveTintColor: theme.colors.primary, // Teal for active tabs
+          tabBarInactiveTintColor: theme.colors.textMuted, // Soft gray for inactive
           tabBarStyle: styles.tabBarStyle,
           tabBarLabelStyle: styles.tabBarLabelStyle,
           tabBarItemStyle: styles.tabBarItemStyle,
@@ -86,8 +87,16 @@ const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
             else if (route.name === 'Settings') iconName = focused ? 'cog' : 'cog-outline';
 
             if (!iconName) return <View style={{width:size, height:size}}/>;
-            return <Ionicons name={iconName} size={focused ? size + 2 : size} color={color} />;
+            return (
+              <Ionicons 
+                name={iconName} 
+                size={24} // Fixed size for consistency
+                color={color} 
+                accessibilityElementsHidden={true} // Icon is decorative, label provides context
+              />
+            );
           },
+          tabBarAccessibilityLabel: route.name,
         })}
       >
         <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home'}} />
@@ -115,19 +124,21 @@ const getNavigatorStyles = (theme: AppTheme) => StyleSheet.create({
     flex: 1,
   },
   tabBarStyle: {
-    backgroundColor: theme.colors.card,
-    borderTopColor: theme.colors.borderLight,
+    backgroundColor: theme.colors.card, // Clean white background
+    borderTopColor: theme.colors.border, // Soft border color
     borderTopWidth: 1,
-    height: Platform.OS === 'ios' ? 88 : 75,
+    height: Platform.OS === 'ios' ? 88 : 64, // Proper height for touch targets
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
     paddingTop: 8,
     paddingHorizontal: theme.spacing.sm,
-    ...theme.shadows.lg,
-    // Modern floating tab bar effect
-    marginHorizontal: theme.spacing.md,
-    marginBottom: Platform.OS === 'ios' ? theme.spacing.lg : theme.spacing.md,
-    borderRadius: theme.borderRadius.xl,
-    position: 'absolute',
+    // Remove heavy shadow, use subtle one instead
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
+    // Clean, non-floating design
+    position: 'relative', // Remove floating effect
     left: 0,
     right: 0,
     bottom: 0,
@@ -141,10 +152,13 @@ const getNavigatorStyles = (theme: AppTheme) => StyleSheet.create({
   tabBarItemStyle: {
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.md,
+    minHeight: accessibilityTokens.minTouchTarget, // Ensure proper touch targets
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fabContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 100 : 85, // Position above tab bar
+    bottom: Platform.OS === 'ios' ? 110 : 80, // Position above fixed tab bar
     alignSelf: 'center',
     zIndex: 1000,
   },

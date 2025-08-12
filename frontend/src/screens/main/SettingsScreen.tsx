@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { AppTheme } from '../../config/theme';
+import { componentStyles, accessibilityTokens } from '../../styles/theme';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { SUPPORTED_LANGUAGES } from '../../config/languageConfig';
 import logger from '../../utils/logger';
@@ -360,8 +361,11 @@ const SettingsScreen: React.FC = () => {
         style={styles.scrollToTopButtonInner}
         onPress={scrollToTop}
         activeOpacity={0.7}
+        accessibilityLabel="Scroll to top of settings"
+        accessibilityRole="button"
+        accessibilityHint="Scroll to the top of the settings screen"
       >
-        <Ionicons name="chevron-up" size={24} color={theme.colors.background} />
+        <Ionicons name="chevron-up" size={24} color={theme.colors.white} />
       </TouchableOpacity>
     </Animated.View>
   </View>
@@ -421,12 +425,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.chipBackground, // Soft border
   },
   profileBadgeText: {
     fontSize: theme.typography.fontSizes.md,
-    fontWeight: 'bold',
-    color: theme.colors.background,
-    fontFamily: theme.typography.fontFamilies.bold,
+    fontWeight: '600',
+    color: theme.colors.white,
+    fontFamily: theme.typography.fontFamilies.semiBold,
   },
   statusText: {
     fontSize: theme.typography.fontSizes.sm,
@@ -452,13 +458,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     zIndex: 1000,
   },
   scrollToTopButtonInner: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: accessibilityTokens.minTouchTarget,
+    height: accessibilityTokens.minTouchTarget,
+    borderRadius: accessibilityTokens.minTouchTarget / 2,
     backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.lg,
+    ...theme.shadows.md, // Using consistent soft shadows
   },
 });
 
