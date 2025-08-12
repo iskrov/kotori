@@ -53,6 +53,7 @@ const HomeScreen = () => {
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
   const [stats, setStats] = useState({
     totalEntries: 0,
+    entriesToday: 0,
     entriesThisWeek: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -114,6 +115,7 @@ const HomeScreen = () => {
       const statsResponse = await api.get('/api/users/me/stats');
       setStats({
         totalEntries: statsResponse.data.total_entries,
+        entriesToday: statsResponse.data.entries_today,
         entriesThisWeek: statsResponse.data.entries_this_week,
       });
       
@@ -207,15 +209,20 @@ const HomeScreen = () => {
         </View>
 
               <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Ionicons name="book" size={24} color={theme.colors.primary} style={styles.statIcon} />
-          <Text style={styles.statValue}>{stats.totalEntries}</Text>
-          <Text style={styles.statLabel}>Entries</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="calendar" size={24} color={theme.colors.secondary} style={styles.statIcon} />
-          <Text style={[styles.statValue, styles.weekValue]}>{stats.entriesThisWeek}</Text>
-          <Text style={styles.statLabel}>This Week</Text>
+        <Text style={styles.statsTitle}>Moments Captured</Text>
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats.entriesToday}</Text>
+            <Text style={styles.statLabel}>Today</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, styles.weekValue]}>{stats.entriesThisWeek}</Text>
+            <Text style={styles.statLabel}>This Week</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statValue, styles.totalValue]}>{stats.totalEntries}</Text>
+            <Text style={styles.statLabel}>Total</Text>
+          </View>
         </View>
       </View>
 
@@ -362,25 +369,32 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.lg,
   },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
-    gap: theme.spacing.md,
+  },
+  statsTitle: {
+    fontSize: theme.typography.fontSizes.xl,
+    fontWeight: '600',
+    color: theme.colors.text,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
   },
   statCard: {
     ...componentStyles.card,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
     alignItems: 'center',
-    width: '30%',
-    minHeight: accessibilityTokens.minTouchTarget,
-  },
-  statIcon: {
-    marginBottom: theme.spacing.sm,
+    flex: 1,
+    minHeight: 80,
   },
   statValue: {
-    fontSize: theme.typography.fontSizes.xxl,
+    fontSize: theme.typography.fontSizes.xl,
     fontWeight: 'bold',
     color: theme.colors.primary,
     fontFamily: theme.typography.fontFamilies.bold,
@@ -388,6 +402,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   weekValue: {
     color: theme.colors.secondary,
+  },
+  totalValue: {
+    color: theme.colors.text,
   },
   statLabel: {
     fontSize: theme.typography.fontSizes.xs,

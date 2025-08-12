@@ -12,7 +12,7 @@ from ..core.security import verify_password
 from ..models.user import User
 from ..models.journal_entry import JournalEntry
 from ..schemas.user import (
-    UserCreate, UserUpdate, UserStats, UserProfile, UserPreferences, 
+    UserCreate, UserUpdate, UserStats, UserProfile, UserPreferences,
     UserSubscription, UserSecurity, ReferralInfo, OnboardingUpdate
 )
 from .base import BaseService
@@ -38,16 +38,16 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         """Create new user with hashed password and enhanced mobile app fields"""
         # Generate unique referral code
         referral_code = self._generate_referral_code(db)
-        
+
         # Hash IP address for privacy
         ip_hash = None
         if hasattr(obj_in, 'user_agent') and obj_in.user_agent:
             # Extract IP from user agent or use a placeholder
             ip_hash = self._hash_ip_address("127.0.0.1")  # Placeholder - should be passed from request
-        
+
         db_obj = User(
             email=obj_in.email,
-            
+
             # Personal Information
             first_name=obj_in.first_name,
             last_name=obj_in.last_name,
@@ -56,38 +56,38 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             bio=obj_in.bio,
             phone=obj_in.phone,
             date_of_birth=obj_in.date_of_birth,
-            
+
             # User Preferences & Localization
             timezone=obj_in.timezone,
             language_code=obj_in.language_code,
             theme_preference=obj_in.theme_preference,
             notification_preferences=obj_in.notification_preferences,
             privacy_settings=obj_in.privacy_settings,
-            
+
             # Authentication
             hashed_password=get_password_hash(obj_in.password) if obj_in.password else None,
             google_id=obj_in.google_id,
-            
+
             # Enhanced User Experience
             avatar_url=obj_in.avatar_url,
             cover_image_url=obj_in.cover_image_url,
             login_count=0,
-            
+
             # Security & Compliance
             terms_accepted_at=obj_in.terms_accepted_at,
             privacy_policy_accepted_at=obj_in.privacy_policy_accepted_at,
-            
+
             # Analytics & Insights
             registration_source=obj_in.registration_source,
             referral_code=referral_code,
             referred_by_user_id=obj_in.referred_by_user_id,
             user_agent=obj_in.user_agent,
             ip_address_hash=ip_hash,
-            
+
             # Legacy fields
             is_superuser=obj_in.is_superuser,
             is_active=True,
-            
+
             # Timestamps
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
@@ -95,10 +95,10 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
-        
+
         # Update login count for new user
         self._update_login_activity(db, db_obj)
-        
+
         return db_obj
 
     def update(
@@ -140,7 +140,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             "onboarding_completed": onboarding_data.onboarding_completed,
             "updated_at": datetime.now(timezone.utc)
         }
-        
+
         # Store onboarding step data in tier_metadata if provided
         if onboarding_data.onboarding_step or onboarding_data.onboarding_data:
             tier_metadata = db_obj.tier_metadata.copy() if db_obj.tier_metadata else {}
@@ -150,7 +150,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
                 "completed_at": datetime.now(timezone.utc).isoformat()
             }
             update_data["tier_metadata"] = tier_metadata
-        
+
         return self.update(db, db_obj=db_obj, obj_in=update_data)
 
     def verify_email(self, db: Session, *, db_obj: User) -> User:
@@ -169,7 +169,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         """Disable two-factor authentication for user"""
         return self.update(db, db_obj=db_obj, obj_in={"two_factor_enabled": False})
 
-    def update_subscription(self, db: Session, *, db_obj: User, tier: str, status: str, 
+    def update_subscription(self, db: Session, *, db_obj: User, tier: str, status: str,
                           expires_at: Optional[datetime] = None, metadata: Optional[Dict] = None) -> User:
         """Update user subscription information"""
         update_data = {
@@ -177,12 +177,12 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             "subscription_status": status,
             "subscription_expires_at": expires_at,
         }
-        
+
         if metadata:
             current_metadata = db_obj.tier_metadata.copy() if db_obj.tier_metadata else {}
             current_metadata.update(metadata)
             update_data["tier_metadata"] = current_metadata
-        
+
         return self.update(db, db_obj=db_obj, obj_in=update_data)
 
     def record_login(self, db: Session, *, db_obj: User) -> User:
@@ -212,10 +212,10 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         user = self.get(db, id=user_id)
         if not user:
             raise ValueError("User not found")
-        
+
         # Count users referred by this user
         referred_count = db.query(User).filter(User.referred_by_user_id == user_id).count()
-        
+
         return ReferralInfo(
             referral_code=user.referral_code or "",
             referred_users_count=referred_count,
@@ -227,7 +227,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         user = self.get(db, id=user_id)
         if not user:
             raise ValueError("User not found")
-        
+
         return UserProfile(
             first_name=user.first_name,
             last_name=user.last_name,
@@ -244,7 +244,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         user = self.get(db, id=user_id)
         if not user:
             raise ValueError("User not found")
-        
+
         return UserPreferences(
             timezone=user.timezone,
             language_code=user.language_code,
@@ -258,7 +258,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         user = self.get(db, id=user_id)
         if not user:
             raise ValueError("User not found")
-        
+
         return UserSubscription(
             account_tier=user.account_tier,
             tier_metadata=user.tier_metadata,
@@ -271,7 +271,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         user = self.get(db, id=user_id)
         if not user:
             raise ValueError("User not found")
-        
+
         return UserSecurity(
             email_verified=user.email_verified,
             phone_verified=user.phone_verified,
@@ -287,7 +287,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             return None
         if not verify_password(password, user.hashed_password):
             return None
-        
+
         # Record login activity
         self._update_login_activity(db, user)
         return user
@@ -337,10 +337,10 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         """Check if user has an active subscription"""
         if user.subscription_status != "active":
             return False
-        
+
         if user.subscription_expires_at and user.subscription_expires_at < datetime.now(timezone.utc):
             return False
-        
+
         return True
 
     def _calculate_current_streak(self, unique_entry_days: List[date], today_reference_date: date) -> int:
@@ -391,6 +391,14 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         logger.info(f"Calculated longest_streak: {longest_streak}")
         return longest_streak
 
+    def _get_entries_today(self, unique_entry_days: List[date], today_reference_date: date) -> int:
+        """Calculates the number of entries today."""
+        entries_today = sum(
+            1 for entry_day in unique_entry_days if entry_day == today_reference_date
+        )
+        logger.info(f"Calculated entries_today: {entries_today}")
+        return entries_today
+
     def _get_entries_this_week(self, unique_entry_days: List[date], today_reference_date: date) -> int:
         """Calculates the number of unique entry days this week (Monday to Sunday)."""
         start_of_week = today_reference_date - timedelta(days=today_reference_date.weekday()) # Monday
@@ -428,9 +436,10 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
         if not entry_datetime_stamps:
             logger.info("No entries found, returning zero stats.")
             return UserStats(
-                total_entries=0, 
-                current_streak=0, 
-                longest_streak=0, 
+                total_entries=0,
+                current_streak=0,
+                longest_streak=0,
+                entries_today=0,
                 entries_this_week=0,
                 login_count=user.login_count,
                 last_seen_at=user.last_seen_at,
@@ -449,11 +458,12 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
             unique_entry_days_utc = []
 
         if not unique_entry_days_utc: # Could be empty if conversion failed
-             logger.warning("Unique entry days list is empty after conversion, returning zero for streak/week stats.")
-             return UserStats(
-                 total_entries=total_entries, 
-                 current_streak=0, 
-                 longest_streak=0, 
+            logger.warning("Unique entry days list is empty after conversion, returning zero for streak/week stats.")
+            return UserStats(
+                 total_entries=total_entries,
+                 current_streak=0,
+                 longest_streak=0,
+                 entries_today=0,
                  entries_this_week=0,
                  login_count=user.login_count,
                  last_seen_at=user.last_seen_at,
@@ -468,12 +478,14 @@ class UserService(BaseService[User, UserCreate, UserUpdate]):
 
         current_streak = self._calculate_current_streak(unique_entry_days_utc, today_utc)
         longest_streak = self._calculate_longest_streak(unique_entry_days_utc)
+        entries_today = self._get_entries_today(unique_entry_days_utc, today_utc)
         entries_this_week = self._get_entries_this_week(unique_entry_days_utc, today_utc)
 
         stats_result = UserStats(
             total_entries=total_entries,
             current_streak=current_streak,
             longest_streak=longest_streak,
+            entries_today=entries_today,
             entries_this_week=entries_this_week,
             login_count=user.login_count,
             last_seen_at=user.last_seen_at,
