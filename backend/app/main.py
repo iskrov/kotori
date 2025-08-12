@@ -21,6 +21,9 @@ from app.api.v1.endpoints import vault as vault_router_module
 # from app.api.v1.endpoints import session as session_router_module
 from app.api.v1.endpoints import audit as audit_router_module
 from app.api.v1.endpoints import maintenance as maintenance_router_module
+from app.api.v1.endpoints import share_templates as share_templates_router_module
+from app.api.v1.endpoints import shares as shares_router_module
+from app.api.v1.endpoints import template_import as template_import_router_module
 from app.api.v1 import monitoring as monitoring_router_module
 # New v1 authentication routers
 from app.api.v1 import auth as v1_auth_router
@@ -221,6 +224,15 @@ app.include_router(speech_router_module.router, prefix="/api/speech", tags=["Spe
 
 # New v1 journals endpoints
 app.include_router(v1_journal_router_module.router, prefix="/api/v1/journals", tags=["Journals v1"])
+
+# Share templates endpoints
+app.include_router(share_templates_router_module.router, prefix="/api/v1/share-templates", tags=["Share Templates"])
+
+# Shares endpoints
+app.include_router(shares_router_module.router, prefix="/api/v1/shares", tags=["Shares"])
+
+# Template import endpoints
+app.include_router(template_import_router_module.router, prefix="/api/v1/template-import", tags=["Template Import"])
 
 # Legacy OPAQUE endpoints removed - replaced by V1 implementation
 

@@ -76,6 +76,7 @@ class User(Base, TimestampMixin):
     reminders = relationship("Reminder", back_populates="user")
     # secret_tags relationship removed in PBI-4 Stage 2
     tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan")
+    shares = relationship("Share", back_populates="user", cascade="all, delete-orphan")
     
     # Self-referential relationship for referrals
     referred_users = relationship("User", backref="referred_by", remote_side=[id])

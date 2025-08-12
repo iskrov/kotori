@@ -22,6 +22,7 @@ export type JournalStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Journal: NavigatorScreenParams<JournalStackParamList>;
+  Share: undefined;
   Calendar: undefined;
   Settings: undefined;
 };

@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     GOOGLE_SPEECH_API_KEY: Optional[str] = os.getenv("GOOGLE_SPEECH_API_KEY")
     GOOGLE_CLOUD_PROJECT: str = get_required_env("GOOGLE_CLOUD_PROJECT")
     GOOGLE_CLOUD_LOCATION: str = get_required_env("GOOGLE_CLOUD_LOCATION")
+    
+    # Gemini API settings - REQUIRED for sharing features
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
 
     # Google Cloud Speech V2 Settings (with safe defaults)
     SPEECH_MAX_ALTERNATIVES: int = int(os.getenv("SPEECH_MAX_ALTERNATIVES", "3"))

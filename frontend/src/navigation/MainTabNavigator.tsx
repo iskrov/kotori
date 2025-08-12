@@ -16,6 +16,7 @@ import FloatingActionButton from '../components/FloatingActionButton';
 
 import HomeScreen from '../screens/main/HomeScreen';
 import JournalScreen from '../screens/main/JournalScreen';
+import ShareScreen from '../screens/ShareScreen';
 import CalendarScreen from '../screens/main/CalendarScreen';
 import SettingsScreen from '../screens/main/SettingsScreen';
 
@@ -83,6 +84,7 @@ const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
             let iconName: keyof typeof Ionicons.glyphMap | undefined;
             if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
             else if (route.name === 'Journal') iconName = focused ? 'book' : 'book-outline';
+            else if (route.name === 'Share') iconName = focused ? 'share' : 'share-outline';
             else if (route.name === 'Calendar') iconName = focused ? 'calendar' : 'calendar-outline';
             else if (route.name === 'Settings') iconName = focused ? 'cog' : 'cog-outline';
 
@@ -101,6 +103,7 @@ const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
       >
         <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home'}} />
         <Tab.Screen name="Journal" component={JournalScreen} options={{ tabBarLabel: 'Journal'}} />
+        <Tab.Screen name="Share" component={ShareScreen} options={{ tabBarLabel: 'Share', tabBarAccessibilityLabel: 'Share journal summaries'}} />
         <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendar'}} />
         <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings'}}/>
       </Tab.Navigator>
