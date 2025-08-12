@@ -37,7 +37,12 @@ class JournalEntry(Base, TimestampMixin):
     # Relationships
     user = relationship("User", back_populates="journal_entries")
     # secret_tag relationship removed in PBI-4 Stage 2
-    tags = relationship("JournalEntryTag", back_populates="entry")
+    # Ensure association rows are removed when an entry is deleted
+    tags = relationship(
+        "JournalEntryTag",
+        back_populates="entry",
+        cascade="all, delete-orphan",
+    )
 
 # Import JournalEntryTag from tag.py to avoid duplicate definition
 from .tag import JournalEntryTag

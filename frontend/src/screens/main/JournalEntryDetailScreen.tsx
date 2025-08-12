@@ -57,6 +57,7 @@ const JournalEntryDetailScreen = () => {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [isFloatingHeaderInteractive, setIsFloatingHeaderInteractive] = useState(false);
   
   // Text input refs to handle focus issues
   const titleInputRef = useRef<TextInput>(null);
@@ -84,6 +85,8 @@ const JournalEntryDetailScreen = () => {
         fadeAnim.setValue(0);
         slideAnim.setValue(50);
         scaleAnim.setValue(0.95);
+        scrollY.removeAllListeners();
+        setIsFloatingHeaderInteractive(false);
       };
     }, [entryId])
   );
@@ -112,6 +115,16 @@ const JournalEntryDetailScreen = () => {
       ]).start();
     }
   }, [entry]);
+
+  // Make floating header ignore touches until it's visible (prevents blocking main header buttons)
+  useEffect(() => {
+    const sub = scrollY.addListener(({ value }) => {
+      setIsFloatingHeaderInteractive(value > 20);
+    });
+    return () => {
+      scrollY.removeListener(sub);
+    };
+  }, [scrollY]);
   
   const fetchEntryDetails = async () => {
     try {
@@ -283,6 +296,7 @@ const JournalEntryDetailScreen = () => {
             transform: [{ scale: headerScale }]
           }
         ]}
+        pointerEvents={isFloatingHeaderInteractive ? 'auto' : 'none'}
       >
         <TouchableOpacity 
           style={styles.headerBackButton}

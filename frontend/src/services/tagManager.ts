@@ -139,13 +139,13 @@ class LegacyTagManager implements TagManagerInterface {
    */
   async getActiveSecretTags(): Promise<any[]> {
     try {
-      logger.info('Legacy tagManager: Getting active secret tags');
+      // When secret tags are disabled, return immediately with no logging noise
       if (!areSecretTagsEnabled()) {
         return [];
       }
       // TODO: Implement active secret tags retrieval from backend
-      // For now, return empty array to avoid breaking the interface
-      logger.warn('getActiveSecretTags not yet implemented - returning empty array');
+      // Kept at debug to avoid noisy logs in production
+      logger.debug('tagManager.getActiveSecretTags: feature enabled but not implemented; returning []');
       return [];
     } catch (error) {
       logger.error('Failed to get active secret tags:', error);
@@ -158,13 +158,11 @@ class LegacyTagManager implements TagManagerInterface {
    */
   async checkForSecretTagPhrases(content: string): Promise<{ found: boolean; tagId?: string; tagName?: string; action?: string }> {
     try {
-      logger.info('Legacy tagManager: Checking for secret tag phrases');
       if (!areSecretTagsEnabled()) {
         return { found: false };
       }
       // TODO: Implement phrase detection logic with backend
-      // For now, return not found to avoid breaking the interface
-      logger.warn('checkForSecretTagPhrases not yet implemented - returning not found');
+      logger.debug('tagManager.checkForSecretTagPhrases: feature enabled but not implemented; returning not found');
       return { found: false };
     } catch (error) {
       logger.error('Failed to check for secret tag phrases:', error);
@@ -177,13 +175,11 @@ class LegacyTagManager implements TagManagerInterface {
    */
   async getSecretTags(): Promise<any[]> {
     try {
-      logger.info('Legacy tagManager: Getting all secret tags');
       if (!areSecretTagsEnabled()) {
         return [];
       }
       // TODO: Implement secret tags retrieval from backend API
-      // For now, return empty array to avoid breaking the interface
-      logger.warn('getSecretTags not yet implemented - returning empty array');
+      logger.debug('tagManager.getSecretTags: feature enabled but not implemented; returning []');
       return [];
     } catch (error) {
       logger.error('Failed to get secret tags:', error);
@@ -196,13 +192,11 @@ class LegacyTagManager implements TagManagerInterface {
    */
   async activateSecretTag(tagId: string): Promise<void> {
     try {
-      logger.info('Legacy tagManager: Activating secret tag:', { tagId });
       if (!areSecretTagsEnabled()) {
         return;
       }
       // TODO: Implement secret tag activation with backend API
-      // For now, just log to avoid breaking the interface
-      logger.warn('activateSecretTag not yet implemented - no action taken');
+      logger.debug('tagManager.activateSecretTag: feature enabled but not implemented');
     } catch (error) {
       logger.error('Failed to activate secret tag:', error);
       throw error;

@@ -16,7 +16,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
-import { useAuth } from '../../contexts/AuthContext';
+// import { useAuth } from '../../contexts/AuthContext';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { api } from '../../services/api';
 import { encryptedJournalService } from '../../services/encryptedJournalService';
@@ -29,7 +29,7 @@ import { logger } from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import { componentStyles, accessibilityTokens } from '../../styles/theme';
-import { getDynamicGreeting, GreetingData } from '../../services/greetingService';
+// Greeting removed for calmer UI
 
 // --- Special Tag for Hidden Entries (Client-Side) ---
 // TODO: Move this to a shared constants file
@@ -43,32 +43,22 @@ type HomeScreenNavigationProp = CompositeNavigationProp<
 
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const { user } = useAuth();
+  // Greeting removed: no need to read user name here
   const { theme } = useAppTheme();
   const { isHiddenMode } = useHiddenMode();
   const styles = getStyles(theme);
   
-  // Extract first name for greeting
-  const getFirstName = () => {
-    if (user?.full_name) {
-      return user.full_name.split(' ')[0]; // Get first part of the name
-    }
-    return 'there'; // Fallback greeting
-  };
+  // Personalized greeting removed for calmer UI
   
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
   const [stats, setStats] = useState({
     totalEntries: 0,
-    currentStreak: 0,
     entriesThisWeek: 0,
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Get dynamic greeting based on time and user name
-  const greetingData: GreetingData = useMemo(() => {
-    return getDynamicGreeting(getFirstName());
-  }, [user?.full_name]);
+  // Greeting removed; only show date
 
   // Filter entries based on hidden mode
   const displayedEntries = useMemo(() => {
@@ -124,7 +114,6 @@ const HomeScreen = () => {
       const statsResponse = await api.get('/api/users/me/stats');
       setStats({
         totalEntries: statsResponse.data.total_entries,
-        currentStreak: statsResponse.data.current_streak,
         entriesThisWeek: statsResponse.data.entries_this_week,
       });
       
@@ -172,19 +161,18 @@ const HomeScreen = () => {
   };
 
   const handleVibePress = (vibeId: string, tag: string) => {
-    // Define vibe prompts based on evidence-driven recommendations
-    const vibePrompts: Record<string, string> = {
-      grateful: "What are you thankful for?",
-      reflect: "What's been on your mind?", 
-      inspired: "Capture that idea before it fades!",
-      stressed: "Want to unload what's weighing you down?",
-      plan: "What's your next step or goal?"
+    // Calm, non-gamified prompts (no emoji, neutral tone)
+    const prompts: Record<string, string> = {
+      grateful: 'What are you thankful for today?',
+      reflect: 'What thoughts would you like to note?',
+      inspired: 'Capture your idea in a few sentences.',
+      stressed: 'Write down what feels heavy right now.',
+      plan: 'Outline your next small step.',
     };
 
-    // Navigate to Record modal with vibe parameters and prompt
-    const prompt = vibePrompts[vibeId];
+    const prompt = prompts[vibeId];
     navigation.navigate('Record', {
-      vibeEmoji: vibeId, // Keep the same parameter name for compatibility
+      // Do not send any emoji-related param
       vibeTag: tag,
       prefilledPrompt: prompt,
     });
@@ -213,7 +201,6 @@ const HomeScreen = () => {
         <View style={styles.greetingContainer}>
           <View style={styles.greetingCard}>
             <View style={styles.greetingContent}>
-              <Text style={styles.greeting}>{greetingData.mainGreeting}</Text>
               <Text style={styles.date}>{format(new Date(), 'EEEE, MMMM d')}</Text>
             </View>
           </View>
@@ -225,21 +212,16 @@ const HomeScreen = () => {
           <Text style={styles.statValue}>{stats.totalEntries}</Text>
           <Text style={styles.statLabel}>Entries</Text>
         </View>
-        <View style={[styles.statCard, styles.streakCard]}>
-          <Ionicons name="flame" size={24} color="#FF6B35" style={styles.statIcon} />
-          <Text style={[styles.statValue, styles.streakValue]}>{stats.currentStreak}</Text>
-          <Text style={styles.statLabel}>Streak</Text>
-        </View>
         <View style={styles.statCard}>
           <Ionicons name="calendar" size={24} color={theme.colors.secondary} style={styles.statIcon} />
           <Text style={[styles.statValue, styles.weekValue]}>{stats.entriesThisWeek}</Text>
-          <Text style={styles.statLabel}>Week</Text>
+          <Text style={styles.statLabel}>This Week</Text>
         </View>
       </View>
 
-      {/* Current Vibe Section */}
+      {/* Quick Prompts Section */}
       <View style={styles.vibeContainer}>
-        <Text style={styles.vibeTitle}>Your Current Vibe 💫</Text>
+        <Text style={styles.vibeTitle}>Quick Prompts</Text>
         <View style={styles.vibeButtonsContainer}>
           <TouchableOpacity 
             style={styles.vibeButton}
@@ -394,11 +376,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: '30%',
     minHeight: accessibilityTokens.minTouchTarget,
   },
-  streakCard: {
-    backgroundColor: theme.isDarkMode ? theme.colors.card : '#FFF8F5',
-    borderColor: theme.isDarkMode ? theme.colors.border : '#FFE5D9',
-    borderWidth: 1,
-  },
   statIcon: {
     marginBottom: theme.spacing.sm,
   },
@@ -408,9 +385,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.primary,
     fontFamily: theme.typography.fontFamilies.bold,
     marginBottom: theme.spacing.xs,
-  },
-  streakValue: {
-    color: '#FF6B35',
   },
   weekValue: {
     color: theme.colors.secondary,

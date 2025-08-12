@@ -327,13 +327,14 @@ class EncryptedJournalService {
     const filteredEntries = entries;
     
     // Decrypt secret tag entries if we have the keys loaded
-    const activeTags = await tagManager.getActiveSecretTags();
-    const activeTagIds = activeTags.map((tag: any) => tag.id);
+      const activeTagIds = areSecretTagsEnabled()
+        ? (await tagManager.getActiveSecretTags()).map((tag: any) => tag.id)
+        : [];
     
     const processedEntries = await Promise.all(
       filteredEntries.map(async (entry: any) => {
         // Secret-tag path
-        if (entry.secret_tag_id && activeTagIds.includes(entry.secret_tag_id)) {
+        if (areSecretTagsEnabled() && entry.secret_tag_id && activeTagIds.includes(entry.secret_tag_id)) {
           return this.decryptSecretTagEntry(entry);
         }
 
