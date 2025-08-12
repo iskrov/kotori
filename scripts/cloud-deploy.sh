@@ -1,0 +1,299 @@
+#!/bin/bash
+
+# Kotori Cloud Deployment Script
+# This script deploys both frontend and backend to Google Cloud Platform
+# Usage: ./scripts/cloud-deploy.sh [--frontend-only] [--backend-only] [--tag TAG]
+
+set -e  # Exit on any error
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Get the directory of the script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Configuration
+PROJECT_ID="kotori-io"
+REGION="us-central1"
+FRONTEND_SERVICE="kotori-app"
+BACKEND_SERVICE="kotori-api"
+REGISTRY="us-central1-docker.pkg.dev/kotori-io/kotori-images"
+
+# Default values
+DEPLOY_FRONTEND=true
+DEPLOY_BACKEND=true
+TAG="deploy-$(date +%Y%m%d-%H%M%S)"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --frontend-only)
+            DEPLOY_BACKEND=false
+            shift
+            ;;
+        --backend-only)
+            DEPLOY_FRONTEND=false
+            shift
+            ;;
+        --tag)
+            TAG="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --frontend-only    Deploy only the frontend"
+            echo "  --backend-only     Deploy only the backend"
+            echo "  --tag TAG          Use custom tag (default: deploy-YYYYMMDD-HHMMSS)"
+            echo "  --help, -h         Show this help message"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option: $1${NC}"
+            exit 1
+            ;;
+    esac
+done
+
+# Helper functions
+print_step() {
+    echo -e "${BLUE}==== $1 ====${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+# Check prerequisites
+check_prerequisites() {
+    print_step "Checking Prerequisites"
+    
+    # Check if gcloud is installed and authenticated
+    if ! command -v gcloud &> /dev/null; then
+        print_error "gcloud CLI is not installed"
+        exit 1
+    fi
+    
+    # Check if authenticated
+    if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q "@"; then
+        print_error "Not authenticated with gcloud. Run: gcloud auth login"
+        exit 1
+    fi
+    
+    # Check if project is set
+    CURRENT_PROJECT=$(gcloud config get-value project 2>/dev/null)
+    if [[ "$CURRENT_PROJECT" != "$PROJECT_ID" ]]; then
+        print_warning "Current project is '$CURRENT_PROJECT', switching to '$PROJECT_ID'"
+        gcloud config set project "$PROJECT_ID"
+    fi
+    
+    # Check if we're in the right directory
+    if [[ ! -f "$PROJECT_ROOT/package.json" ]] && [[ ! -f "$PROJECT_ROOT/frontend/package.json" ]]; then
+        print_error "Not in Kotori project root directory"
+        exit 1
+    fi
+    
+    print_success "Prerequisites check passed"
+}
+
+# Check for uncommitted changes
+check_git_status() {
+    print_step "Checking Git Status"
+    
+    cd "$PROJECT_ROOT"
+    
+    if [[ -n $(git status --porcelain) ]]; then
+        print_warning "You have uncommitted changes:"
+        git status --short
+        echo ""
+        read -p "Do you want to continue? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_error "Deployment cancelled"
+            exit 1
+        fi
+    fi
+    
+    # Push any committed changes
+    if [[ -n $(git log origin/main..HEAD) ]]; then
+        print_warning "You have unpushed commits. Pushing to GitHub..."
+        git push origin main
+        print_success "Changes pushed to GitHub"
+    fi
+    
+    print_success "Git status check completed"
+}
+
+# Build and deploy frontend
+deploy_frontend() {
+    print_step "Deploying Frontend"
+    
+    cd "$PROJECT_ROOT/frontend"
+    
+    # Build the web app
+    print_step "Building Frontend Web App"
+    npx expo export:web
+    print_success "Frontend build completed"
+    
+    # Build Docker image
+    print_step "Building Frontend Docker Image"
+    FRONTEND_IMAGE="$REGISTRY/kotori-app:$TAG"
+    gcloud builds submit --tag "$FRONTEND_IMAGE"
+    print_success "Frontend image built: $FRONTEND_IMAGE"
+    
+    # Deploy to Cloud Run
+    print_step "Deploying Frontend to Cloud Run"
+    gcloud run deploy "$FRONTEND_SERVICE" \
+        --image "$FRONTEND_IMAGE" \
+        --platform managed \
+        --region "$REGION" \
+        --allow-unauthenticated \
+        --port 8080 \
+        --memory 256Mi \
+        --cpu 1 \
+        --max-instances 10 \
+        --project "$PROJECT_ID"
+    
+    FRONTEND_URL=$(gcloud run services describe "$FRONTEND_SERVICE" --region="$REGION" --format="value(status.url)")
+    print_success "Frontend deployed: $FRONTEND_URL"
+}
+
+# Build and deploy backend
+deploy_backend() {
+    print_step "Deploying Backend"
+    
+    cd "$PROJECT_ROOT/backend"
+    
+    # Build Docker image
+    print_step "Building Backend Docker Image"
+    BACKEND_IMAGE="$REGISTRY/kotori-api:$TAG"
+    gcloud builds submit --tag "$BACKEND_IMAGE"
+    print_success "Backend image built: $BACKEND_IMAGE"
+    
+    # Deploy to Cloud Run
+    print_step "Deploying Backend to Cloud Run"
+    gcloud run deploy "$BACKEND_SERVICE" \
+        --image "$BACKEND_IMAGE" \
+        --platform managed \
+        --region "$REGION" \
+        --allow-unauthenticated \
+        --port 8001 \
+        --memory 1Gi \
+        --cpu 1 \
+        --max-instances 10 \
+        --env-vars-file "../deploy/production-env.yaml" \
+        --set-secrets "GOOGLE_SPEECH_API_KEY=GOOGLE_SPEECH_API_KEY:latest,SECRET_KEY=SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest" \
+        --project "$PROJECT_ID"
+    
+    BACKEND_URL=$(gcloud run services describe "$BACKEND_SERVICE" --region="$REGION" --format="value(status.url)")
+    print_success "Backend deployed: $BACKEND_URL"
+}
+
+# Health check
+run_health_checks() {
+    print_step "Running Health Checks"
+    
+    if [[ "$DEPLOY_BACKEND" == true ]]; then
+        BACKEND_URL=$(gcloud run services describe "$BACKEND_SERVICE" --region="$REGION" --format="value(status.url)")
+        echo "Checking backend health: $BACKEND_URL/api/health"
+        
+        # Wait a moment for service to be ready
+        sleep 10
+        
+        if curl -f -s "$BACKEND_URL/api/health" > /dev/null; then
+            print_success "Backend health check passed"
+        else
+            print_warning "Backend health check failed (service might still be starting)"
+        fi
+    fi
+    
+    if [[ "$DEPLOY_FRONTEND" == true ]]; then
+        FRONTEND_URL=$(gcloud run services describe "$FRONTEND_SERVICE" --region="$REGION" --format="value(status.url)")
+        echo "Checking frontend: $FRONTEND_URL"
+        
+        if curl -f -s "$FRONTEND_URL" > /dev/null; then
+            print_success "Frontend health check passed"
+        else
+            print_warning "Frontend health check failed (service might still be starting)"
+        fi
+    fi
+}
+
+# Main deployment flow
+main() {
+    echo -e "${GREEN}"
+    echo "╔══════════════════════════════════════╗"
+    echo "║        Kotori Cloud Deployment       ║"
+    echo "╚══════════════════════════════════════╝"
+    echo -e "${NC}"
+    
+    echo "Configuration:"
+    echo "  Project ID: $PROJECT_ID"
+    echo "  Region: $REGION"
+    echo "  Tag: $TAG"
+    echo "  Deploy Frontend: $DEPLOY_FRONTEND"
+    echo "  Deploy Backend: $DEPLOY_BACKEND"
+    echo ""
+    
+    # Confirmation
+    read -p "Do you want to proceed with deployment? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_error "Deployment cancelled"
+        exit 1
+    fi
+    
+    check_prerequisites
+    check_git_status
+    
+    if [[ "$DEPLOY_FRONTEND" == true ]]; then
+        deploy_frontend
+    fi
+    
+    if [[ "$DEPLOY_BACKEND" == true ]]; then
+        deploy_backend
+    fi
+    
+    run_health_checks
+    
+    # Summary
+    echo ""
+    print_step "Deployment Summary"
+    
+    if [[ "$DEPLOY_FRONTEND" == true ]]; then
+        FRONTEND_URL=$(gcloud run services describe "$FRONTEND_SERVICE" --region="$REGION" --format="value(status.url)")
+        echo "Frontend: $FRONTEND_URL"
+        echo "Custom Domain: https://app.kotori.io"
+    fi
+    
+    if [[ "$DEPLOY_BACKEND" == true ]]; then
+        BACKEND_URL=$(gcloud run services describe "$BACKEND_SERVICE" --region="$REGION" --format="value(status.url)")
+        echo "Backend: $BACKEND_URL"
+        echo "Custom Domain: https://api.kotori.io"
+    fi
+    
+    echo ""
+    print_success "🚀 Deployment completed successfully!"
+    echo ""
+    echo "Next steps:"
+    echo "1. Test the application at https://app.kotori.io"
+    echo "2. Monitor logs with: gcloud logging read 'resource.type=\"cloud_run_revision\"'"
+    echo "3. Check service status: gcloud run services list --region=$REGION"
+}
+
+# Run main function
+main "$@"
