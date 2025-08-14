@@ -1,0 +1,76 @@
+# Cloud Build configuration for database migrations
+# This runs migrations from within Google Cloud where database is accessible
+
+steps:
+  # Install Python dependencies
+  - name: 'python:3.12-slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cd backend
+        pip install -r requirements.txt
+        echo "Dependencies installed"
+
+  # Create database backup before migration
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Creating database backup..."
+        BACKUP_DESCRIPTION="pre-migration-$(date +%Y%m%d-%H%M%S)"
+        gcloud sql backups create \
+          --instance=kotori-db-instance \
+          --description="$BACKUP_DESCRIPTION" \
+          --project=kotori-io
+        echo "Backup created: $BACKUP_DESCRIPTION"
+
+  # Run database migrations
+  - name: 'python:3.12-slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cd backend
+        pip install -r requirements.txt
+        
+        # Get database URL from secrets
+        export DATABASE_URL="postgresql://kotori_user:$$DATABASE_PASSWORD@$$DATABASE_HOST:5432/kotori_prod"
+        
+        # Check current migration status
+        echo "Current migration status:"
+        alembic current || echo "No current revision (fresh database)"
+        
+        # Show target revision
+        echo "Target revision:"
+        alembic heads
+        
+        # Preview migrations
+        echo "Migration preview:"
+        alembic upgrade head --sql | head -20 || true
+        
+        # Execute migrations
+        echo "Executing migrations..."
+        alembic upgrade head
+        
+        # Verify success
+        echo "Post-migration status:"
+        alembic current
+        
+        echo "Migrations completed successfully!"
+    secretEnv:
+      - 'DATABASE_PASSWORD'
+      - 'DATABASE_HOST'
+
+# Define secrets
+availableSecrets:
+  secretManager:
+    - versionName: projects/kotori-io/secrets/database-url/versions/latest
+      env: 'DATABASE_URL'
+
+# Timeout and options
+timeout: '1200s'
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

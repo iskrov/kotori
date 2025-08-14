@@ -185,75 +185,39 @@ deploy_frontend() {
     print_success "Frontend deployed: $FRONTEND_URL"
 }
 
-# Run database migrations
+# Run database migrations using Cloud Build
 run_database_migrations() {
-    print_step "Running Database Migrations"
+    print_step "Running Database Migrations via Cloud Build"
     
-    cd "$PROJECT_ROOT/backend"
+    cd "$PROJECT_ROOT"
     
-    # Check if we have migrations to run
-    if ! command -v alembic &> /dev/null; then
-        print_error "Alembic not found. Install with: pip install alembic"
-        exit 1
-    fi
-    
-    # Get database URL from Google Cloud Secret
+    # Get secrets for Cloud Build substitutions
     print_step "Retrieving database credentials"
-    export DATABASE_URL=$(gcloud secrets versions access latest --secret="database-url" --project="$PROJECT_ID")
+    DATABASE_URL=$(gcloud secrets versions access latest --secret="database-url" --project="$PROJECT_ID")
+    SECRET_KEY=$(gcloud secrets versions access latest --secret="secret-key" --project="$PROJECT_ID")
+    GOOGLE_CLOUD_PROJECT=$(gcloud secrets versions access latest --secret="google-cloud-project" --project="$PROJECT_ID")
+    GOOGLE_CLOUD_LOCATION=$(gcloud secrets versions access latest --secret="google-cloud-location" --project="$PROJECT_ID")
+    ENCRYPTION_MASTER_SALT=$(gcloud secrets versions access latest --secret="encryption-master-salt" --project="$PROJECT_ID")
     
     if [[ -z "$DATABASE_URL" ]]; then
         print_error "Failed to retrieve DATABASE_URL from secrets"
         exit 1
     fi
     
-    # Check current migration status
-    print_step "Checking current migration status"
-    CURRENT_REVISION=$(alembic current 2>/dev/null | grep -v "INFO" | head -1 || echo "none")
-    print_step "Current database revision: $CURRENT_REVISION"
+    print_success "Database credentials retrieved successfully"
     
-    # Check if migrations are needed
-    HEAD_REVISION=$(alembic heads 2>/dev/null | grep -v "INFO" | head -1)
-    print_step "Target revision: $HEAD_REVISION"
-    
-    if [[ "$CURRENT_REVISION" == "$HEAD_REVISION" ]]; then
-        print_success "Database is already up to date"
-        return 0
-    fi
-    
-    # Create backup before migration
-    print_step "Creating database backup"
-    BACKUP_DESCRIPTION="pre-migration-$(date +%Y%m%d-%H%M%S)"
-    if ! gcloud sql backups create \
-        --instance=kotori-db-instance \
-        --description="$BACKUP_DESCRIPTION" \
-        --project="$PROJECT_ID"; then
-        print_warning "Backup creation failed, but continuing with migration"
+    # Run migrations using Cloud Build
+    print_step "Executing migrations via Cloud Build"
+    if gcloud builds submit \
+        --config=deploy/run-migrations.yaml \
+        --substitutions="_DATABASE_URL=$DATABASE_URL,_SECRET_KEY=$SECRET_KEY,_GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,_GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,_ENCRYPTION_MASTER_SALT=$ENCRYPTION_MASTER_SALT" \
+        --project="$PROJECT_ID" \
+        .; then
+        print_success "Database migrations completed successfully via Cloud Build"
     else
-        print_success "Backup created: $BACKUP_DESCRIPTION"
-    fi
-    
-    # Preview migrations to be applied
-    print_step "Previewing migrations"
-    echo "Migrations to be applied:"
-    alembic upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
-    
-    # Execute migrations
-    print_step "Executing database migrations"
-    if alembic upgrade head; then
-        NEW_REVISION=$(alembic current 2>/dev/null | grep -v "INFO" | head -1)
-        print_success "Database migrations completed successfully"
-        print_success "Database updated to revision: $NEW_REVISION"
-    else
-        print_error "Database migration failed"
-        print_error "Backup available for restore: $BACKUP_DESCRIPTION"
-        print_error "To restore: gcloud sql backups restore BACKUP_ID --restore-instance=kotori-db-instance"
-        exit 1
-    fi
-    
-    # Verify migration success
-    print_step "Verifying migration success"
-    if ! alembic current > /dev/null 2>&1; then
-        print_error "Migration verification failed"
+        print_error "Database migration failed in Cloud Build"
+        print_error "Check Cloud Build logs for detailed error information"
+        print_error "Backup was created before migration attempt"
         exit 1
     fi
     
