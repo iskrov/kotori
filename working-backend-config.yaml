@@ -1,0 +1,82 @@
+apiVersion: serving.knative.dev/v1
+kind: Revision
+metadata:
+  annotations:
+    autoscaling.knative.dev/maxScale: '10'
+    run.googleapis.com/startup-cpu-boost: 'true'
+    run.googleapis.com/vpc-access-connector: kotori-connector
+    run.googleapis.com/vpc-access-egress: private-ranges-only
+  labels:
+    client.knative.dev/nonce: cloqjxtemv
+    cloud.googleapis.com/location: us-central1
+    run.googleapis.com/startupProbeType: Default
+    serving.knative.dev/configuration: kotori-api
+    serving.knative.dev/configurationGeneration: '28'
+    serving.knative.dev/route: kotori-api
+    serving.knative.dev/service: kotori-api
+    serving.knative.dev/serviceUid: dff5b3bf-4f7b-414d-a15a-0da68f4d89ad
+  name: kotori-api-00028-btn
+  namespace: '412014849981'
+  ownerReferences:
+  - apiVersion: serving.knative.dev/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Configuration
+    name: kotori-api
+    uid: cef41784-a277-4907-9629-4ae906ff20c1
+spec:
+  containerConcurrency: 100
+  containers:
+  - env:
+    - name: CORS_ORIGINS
+      value: https://app.kotori.io,https://kotori.io,http://localhost:19000,http://localhost:19006
+    - name: LOG_LEVEL
+      value: INFO
+    - name: NODE_ENV
+      value: production
+    - name: SAVE_TRANSCRIBE_UPLOADS
+      value: '0'
+    - name: ENVIRONMENT
+      value: production
+    - name: SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          key: latest
+          name: secret-key
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          key: latest
+          name: database-url
+    - name: GOOGLE_CLOUD_PROJECT
+      valueFrom:
+        secretKeyRef:
+          key: latest
+          name: google-cloud-project
+    - name: GOOGLE_CLOUD_LOCATION
+      valueFrom:
+        secretKeyRef:
+          key: latest
+          name: google-cloud-location
+    - name: ENCRYPTION_MASTER_SALT
+      valueFrom:
+        secretKeyRef:
+          key: latest
+          name: encryption-master-salt
+    image: us-central1-docker.pkg.dev/kotori-io/kotori-images/kotori-api@sha256:a803b089e41c945776c3b1c058d5576055af4b996d4e0f5863b390c3fd14a15e
+    name: kotori-api-1
+    ports:
+    - containerPort: 8001
+      name: http1
+    resources:
+      limits:
+        cpu: '1'
+        memory: 1Gi
+    startupProbe:
+      failureThreshold: 1
+      periodSeconds: 240
+      tcpSocket:
+        port: 8001
+      timeoutSeconds: 240
+  serviceAccountName: kotori-api@kotori-io.iam.gserviceaccount.com
+  timeoutSeconds: 300
