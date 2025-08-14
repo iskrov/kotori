@@ -101,11 +101,11 @@ const MainTabNavigator = ({ navigation }: MainTabNavigatorProps) => {
           tabBarAccessibilityLabel: route.name,
         })}
       >
-        <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home'}} />
-        <Tab.Screen name="Journal" component={JournalScreen} options={{ tabBarLabel: 'Journal'}} />
-        <Tab.Screen name="Share" component={ShareScreen} options={{ tabBarLabel: 'Share', tabBarAccessibilityLabel: 'Share journal summaries'}} />
-        <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendar'}} />
-        <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings'}}/>
+        <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home', title: 'Home - Kotori' }} />
+        <Tab.Screen name="Journal" component={JournalScreen} options={{ tabBarLabel: 'Journal', title: 'Journal - Kotori' }} />
+        <Tab.Screen name="Share" component={ShareScreen} options={{ tabBarLabel: 'Share', tabBarAccessibilityLabel: 'Share journal summaries', title: 'Share - Kotori' }} />
+        <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: 'Calendar', title: 'Calendar - Kotori' }} />
+        <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings', title: 'Settings - Kotori' }}/>
       </Tab.Navigator>
       
       {/* Floating Action Button positioned over the tab bar */}
@@ -130,10 +130,10 @@ const getNavigatorStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.colors.card, // Clean white background
     borderTopColor: theme.colors.border, // Soft border color
     borderTopWidth: 1,
-    height: Platform.OS === 'ios' ? 88 : 80, // Further increased height for more space
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    paddingTop: Platform.OS === 'ios' ? 16 : 20, // Even more top padding for better balance
-    paddingHorizontal: theme.spacing.sm,
+    height: Platform.OS === 'ios' ? 90 : 85, // Increased height for better icon/text layout
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16, // Balanced padding for vertical layout
+    paddingHorizontal: theme.spacing.xs, // Reduced horizontal padding to give more space to tabs
     // Remove heavy shadow, use subtle one instead
     shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: -2 },
@@ -149,19 +149,20 @@ const getNavigatorStyles = (theme: AppTheme) => StyleSheet.create({
   tabBarLabelStyle: {
     fontSize: theme.typography.fontSizes.xs,
     fontFamily: theme.typography.fontFamilies.medium,
-    marginBottom: Platform.OS === 'ios' ? 0 : theme.spacing.xs,
-    marginTop: theme.spacing.xs,
+    marginBottom: Platform.OS === 'ios' ? 2 : 4,
+    marginTop: 4,
   },
   tabBarItemStyle: {
     paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.md,
     minHeight: accessibilityTokens.minTouchTarget, // Ensure proper touch targets
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'column', // Force vertical layout (icon on top, text below)
+    gap: 2, // Small gap between icon and text
   },
   fabContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 110 : 96, // Adjusted for further increased tab bar height
+    bottom: Platform.OS === 'ios' ? 112 : 100, // Adjusted for new tab bar height
     alignSelf: 'center',
     zIndex: 1000,
   },

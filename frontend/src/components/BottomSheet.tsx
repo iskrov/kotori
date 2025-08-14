@@ -171,6 +171,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
     onClose();
   };
 
+  // Always render container so backdrop fully covers and avoids layout flashes on web
   if (!visible) {
     return null;
   }
@@ -180,7 +181,6 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
 
   const content = (
     <View style={styles.container}>
-      
       <TouchableWithoutFeedback onPress={handleBackdropPress}>
         <Animated.View
           style={[
@@ -188,7 +188,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
             {
               opacity: backdropOpacity_.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, backdropOpacity],
+                outputRange: [0, 1],
               }),
             },
           ]}
@@ -210,15 +210,13 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
           ]}
         >
           <View style={styles.handle} />
-          <View style={styles.content}>
-            {children}
-          </View>
+          <View style={styles.content}>{children}</View>
         </Animated.View>
       </PanGestureHandler>
     </View>
   );
 
-  if (Platform.OS === 'ios') {
+  if (Platform.OS === 'ios' || Platform.OS === 'web') {
     return (
       <Modal
         transparent
@@ -231,6 +229,7 @@ const BottomSheet = forwardRef<BottomSheetRef, BottomSheetProps>(({
     );
   }
 
+  // For Android, render directly
   return content;
 });
 
@@ -238,10 +237,27 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'flex-end',
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web' && {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 99999, // Much higher z-index to ensure it's above all other elements
+    }),
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.overlay,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Use explicit transparent black instead of theme overlay
+    ...(Platform.OS === 'web' && {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 99998, // High z-index for backdrop
+    }),
   },
   bottomSheet: {
     backgroundColor: theme.colors.surface,
@@ -249,6 +265,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderTopRightRadius: theme.borderRadius.xxl,
     minHeight: SCREEN_HEIGHT * 0.3,
     maxHeight: SCREEN_HEIGHT * 0.95,
+    zIndex: 99999, // Ensure the sheet itself is on top
     ...theme.shadows.xl,
   },
   handle: {

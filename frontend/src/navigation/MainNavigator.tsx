@@ -25,7 +25,10 @@ const MainNavigator = () => {
       <Stack.Screen 
         name="MainTabs" 
         component={MainTabNavigator}
-        options={{ headerShown: false }}
+        options={{ 
+          headerShown: false,
+          title: 'Kotori' // Set a proper title for web
+        }}
       />
       <Stack.Screen
         name="Record"
@@ -88,6 +91,7 @@ const MainNavigator = () => {
         options={{
           headerShown: false, // Custom header in component
           presentation: 'card',
+          title: 'Share Preview - Kotori',
         }}
       />
       <Stack.Screen
@@ -96,6 +100,7 @@ const MainNavigator = () => {
         options={{
           headerShown: false, // Custom header in component
           presentation: 'card',
+          title: 'Share History - Kotori',
         }}
       />
     </Stack.Navigator>

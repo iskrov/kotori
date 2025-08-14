@@ -15,8 +15,16 @@ const AuthNavigator = () => {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen 
+        name="Login" 
+        component={LoginScreen} 
+        options={{ title: 'Sign In - Kotori' }}
+      />
+      <Stack.Screen 
+        name="Register" 
+        component={RegisterScreen} 
+        options={{ title: 'Sign Up - Kotori' }}
+      />
     </Stack.Navigator>
   );
 };

@@ -35,6 +35,7 @@ export type SharePreviewParams = {
   shareId?: string;
   fromHistory?: boolean;
   enableReshare?: boolean;
+  target_language?: string; // desired output language for the report
 };
 
 export type ShareHistoryParams = undefined;

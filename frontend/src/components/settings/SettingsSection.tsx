@@ -53,21 +53,46 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        {icon && (
-          <Ionicons name={icon} size={20} color={theme.colors.textSecondary} style={styles.headerIcon} />
-        )}
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-        </View>
-        {headerAction && (
-          <View style={styles.headerAction}>
-            {headerAction}
+      {collapsible ? (
+        <TouchableOpacity style={styles.header} onPress={toggleExpanded}>
+          {icon && (
+            <Ionicons name={icon} size={20} color={theme.colors.textSecondary} style={styles.headerIcon} />
+          )}
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
           </View>
-        )}
-      </View>
-      <View style={styles.childrenContainer}>{children}</View>
+          {headerAction && (
+            <View style={styles.headerAction}>
+              {headerAction}
+            </View>
+          )}
+          <Ionicons 
+            name={isExpanded ? "chevron-up" : "chevron-down"} 
+            size={20} 
+            color={theme.colors.textSecondary}
+            style={styles.chevron}
+          />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.header}>
+          {icon && (
+            <Ionicons name={icon} size={20} color={theme.colors.textSecondary} style={styles.headerIcon} />
+          )}
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          </View>
+          {headerAction && (
+            <View style={styles.headerAction}>
+              {headerAction}
+            </View>
+          )}
+        </View>
+      )}
+      {(!collapsible || isExpanded) && (
+        <View style={styles.childrenContainer}>{children}</View>
+      )}
     </View>
   );
 };
@@ -132,6 +157,9 @@ const getStyles = (theme: AppTheme) =>
       paddingHorizontal: theme.spacing.md,
       paddingBottom: theme.spacing.sm,
       backgroundColor: theme.colors.card,
+    },
+    chevron: {
+      marginLeft: theme.spacing.sm,
     },
   });
 

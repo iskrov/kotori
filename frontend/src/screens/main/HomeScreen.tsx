@@ -7,7 +7,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Platform
+  Platform,
+  Animated
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -29,6 +30,7 @@ import { logger } from '../../utils/logger';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
 import { componentStyles, accessibilityTokens } from '../../styles/theme';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 // Greeting removed for calmer UI
 
 // --- Special Tag for Hidden Entries (Client-Side) ---
@@ -48,6 +50,9 @@ const HomeScreen = () => {
   const { isHiddenMode } = useHiddenMode();
   const styles = getStyles(theme);
   
+  // Set document title for web browsers
+  useDocumentTitle('Home');
+  
   // Personalized greeting removed for calmer UI
   
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
@@ -58,6 +63,11 @@ const HomeScreen = () => {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Scroll to top functionality
+  const scrollViewRef = React.useRef<any>(null);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const scrollToTopOpacity = React.useRef(new Animated.Value(0)).current;
 
   // Greeting removed; only show date
 
@@ -106,6 +116,24 @@ const HomeScreen = () => {
       }
     }
   }, [displayedEntries]);
+
+  const handleScroll = (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const shouldShow = scrollY > 200;
+    
+    if (shouldShow !== showScrollToTop) {
+      setShowScrollToTop(shouldShow);
+      Animated.timing(scrollToTopOpacity, {
+        toValue: shouldShow ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false, // Changed to false for web compatibility
+      }).start();
+    }
+  };
+  
+  const scrollToTop = () => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   const fetchData = async () => {
     try {
@@ -193,7 +221,11 @@ const HomeScreen = () => {
       <ScreenHeader title="Home" />
       
       <SafeScrollView 
+        ref={scrollViewRef}
         style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           Platform.OS !== 'web' ? (
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} tintColor={theme.colors.primary} />
@@ -322,6 +354,34 @@ const HomeScreen = () => {
         </View>
       )}
       </SafeScrollView>
+      
+      {/* Scroll to top button */}
+      <Animated.View 
+        style={[
+          styles.scrollToTopButton,
+          {
+            opacity: scrollToTopOpacity,
+            transform: [{
+              scale: scrollToTopOpacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1],
+              })
+            }]
+          }
+        ]}
+        pointerEvents={showScrollToTop ? 'auto' : 'none'}
+      >
+        <TouchableOpacity
+          style={styles.scrollToTopButtonInner}
+          onPress={scrollToTop}
+          activeOpacity={0.7}
+          accessibilityLabel="Scroll to top of home screen"
+          accessibilityRole="button"
+          accessibilityHint="Scroll to the top of the home screen"
+        >
+          <Ionicons name="chevron-up" size={24} color={theme.colors.white} />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
@@ -334,6 +394,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 120, // Consistent spacing for scroll-to-top button
   },
   loadingContainer: {
     flex: 1,
@@ -351,7 +414,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     padding: theme.spacing.lg,
   },
   greetingContent: {
-    alignItems: 'flex-start',
+    alignItems: 'center', // Center the content horizontally
   },
   greeting: {
     fontSize: theme.typography.fontSizes.xl,
@@ -367,6 +430,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginTop: theme.spacing.sm,
     fontFamily: theme.typography.fontFamilies.regular,
     lineHeight: theme.typography.lineHeights.normal * theme.typography.fontSizes.lg,
+    textAlign: 'center', // Center the date text
   },
   statsContainer: {
     paddingHorizontal: theme.spacing.lg,
@@ -500,6 +564,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamilies.medium,
     textAlign: 'center',
+  },
+  scrollToTopButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    zIndex: 1000,
+  },
+  scrollToTopButtonInner: {
+    width: accessibilityTokens.minTouchTarget,
+    height: accessibilityTokens.minTouchTarget,
+    borderRadius: accessibilityTokens.minTouchTarget / 2,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.md, // Using consistent soft shadows
   },
   
 });

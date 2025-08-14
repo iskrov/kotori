@@ -60,7 +60,7 @@ export interface ShareRequest {
     end: string;
   };
   period?: 'daily' | 'weekly' | 'monthly';
-  language?: string;
+  target_language?: string;
 }
 
 export interface PDFDownloadResult {

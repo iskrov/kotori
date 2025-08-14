@@ -120,7 +120,7 @@ const SharePreviewScreenContent: React.FC = () => {
           entries: entriesForShare,
           consent_acknowledged: true,
           period: params.period,
-          language: 'en',
+          target_language: params.target_language || 'en',
         };
 
         // Step 3: Mapping answers (actual API call happens here)

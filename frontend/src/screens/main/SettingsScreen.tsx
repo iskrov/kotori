@@ -20,6 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { AppTheme } from '../../config/theme';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { componentStyles, accessibilityTokens } from '../../styles/theme';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import { SUPPORTED_LANGUAGES } from '../../config/languageConfig';
@@ -27,6 +28,7 @@ import logger from '../../utils/logger';
 import SafeScrollView from '../../components/SafeScrollView';
 import { SettingsSkeleton } from '../../components/SkeletonLoader';
 import ScreenHeader from '../../components/ScreenHeader';
+import LanguageSelector from '../../components/LanguageSelector';
 
 // Settings components
 import SettingsRow from '../../components/settings/SettingsRow';
@@ -34,11 +36,7 @@ import SettingsToggle from '../../components/settings/SettingsToggle';
 import SettingsSelector from '../../components/settings/SettingsSelector';
 import SettingsSection from '../../components/settings/SettingsSection';
 
-interface SettingsOption {
-  value: string;
-  label: string;
-  subtitle?: string;
-}
+// Removed SettingsOption interface - no longer needed with universal LanguageSelector
 
 type SettingsScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Settings'>,
@@ -51,6 +49,9 @@ const SettingsScreen: React.FC = () => {
   const { theme, toggleTheme, isSystemTheme, setUseSystemTheme } = useAppTheme();
   const { settings, updateSetting, isLoading } = useSettings();
   const styles = getStyles(theme);
+  
+  // Set document title for web browsers
+  useDocumentTitle('Settings');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Scroll to top functionality
@@ -85,12 +86,12 @@ const SettingsScreen: React.FC = () => {
     );
   }
 
-  // Language options for selector
-  const languageOptions: SettingsOption[] = SUPPORTED_LANGUAGES.map(lang => ({
-    value: lang.code,
-    label: lang.name,
-    subtitle: lang.region ? `${lang.region}` : undefined,
-  }));
+  // Language options for selector (no longer needed - LanguageSelector handles this internally)
+  // const languageOptions: SettingsOption[] = SUPPORTED_LANGUAGES.map(lang => ({
+  //   value: lang.code,
+  //   label: lang.name,
+  //   subtitle: lang.region ? `${lang.region}` : undefined,
+  // }));
 
   const handleSignOut = async () => {
     // For web platform, use window.confirm instead of Alert.alert
@@ -168,13 +169,9 @@ const SettingsScreen: React.FC = () => {
         title="Language & Transcription"
         icon="language"
       >
-        <SettingsSelector
-          title="Default Language"
-          subtitle="Language for voice transcription"
-          leftIcon="globe"
-          options={languageOptions}
-          selectedValue={settings.defaultLanguage}
-          onValueChange={(value) => updateSetting('defaultLanguage', value)}
+        <LanguageSelector
+          selectedLanguage={settings.defaultLanguage}
+          onLanguageChange={(value) => updateSetting('defaultLanguage', value)}
         />
       </SettingsSection>
 
@@ -378,7 +375,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120, // Consistent spacing for scroll-to-top button
   },
   centerContent: {
     justifyContent: 'center',

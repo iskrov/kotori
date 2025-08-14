@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -30,6 +31,7 @@ import { useAppTheme } from '../../contexts/ThemeContext';
 import { voicePhraseDetector } from '../../services/VoicePhraseDetector';
 import { AppTheme } from '../../config/theme';
 import { componentStyles, accessibilityTokens } from '../../styles/theme';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 type CalendarScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Calendar'>,
@@ -40,6 +42,9 @@ const CalendarScreen = () => {
   const navigation = useNavigation<CalendarScreenNavigationProp>();
   const { theme } = useAppTheme();
   const styles = getStyles(theme);
+  
+  // Set document title for web browsers
+  useDocumentTitle('Calendar');
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -52,14 +57,23 @@ const CalendarScreen = () => {
   // Scroll to top functionality
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const scrollViewRef = useRef<any>(null);
+  const scrollToTopOpacity = React.useRef(new Animated.Value(0)).current;
   
   // Handle scroll events to show/hide scroll-to-top button
   const handleScroll = useCallback((event: any) => {
     const { contentOffset } = event.nativeEvent;
     
     // Show scroll-to-top button when scrolled down more than 200px
-    setShowScrollToTop(contentOffset.y > 200);
-  }, []);
+    const shouldShow = contentOffset.y > 200;
+    if (shouldShow !== showScrollToTop) {
+      setShowScrollToTop(shouldShow);
+      Animated.timing(scrollToTopOpacity, {
+        toValue: shouldShow ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false, // Changed to false for web compatibility
+      }).start();
+    }
+  }, [showScrollToTop, scrollToTopOpacity]);
 
   // Scroll to top function
   const scrollToTop = useCallback(() => {
@@ -272,8 +286,11 @@ const CalendarScreen = () => {
       />
       
       <SafeScrollView 
+        ref={scrollViewRef}
         style={{ flex: 1 }} 
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -381,21 +398,32 @@ const CalendarScreen = () => {
       </SafeScrollView>
       
       {/* Scroll to Top Button */}
-      {showScrollToTop && (
+      <Animated.View 
+        style={[
+          styles.scrollToTopButton,
+          {
+            opacity: scrollToTopOpacity,
+            transform: [{
+              scale: scrollToTopOpacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1],
+              })
+            }]
+          }
+        ]}
+        pointerEvents={showScrollToTop ? 'auto' : 'none'}
+      >
         <TouchableOpacity
-          style={styles.scrollToTopButton}
+          style={styles.scrollToTopButtonInner}
           onPress={scrollToTop}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
           accessibilityLabel="Scroll to top of calendar"
           accessibilityRole="button"
+          accessibilityHint="Scroll to the top of the calendar screen"
         >
-          <Ionicons 
-            name="chevron-up" 
-            size={24} 
-            color={theme.colors.white} 
-          />
+          <Ionicons name="chevron-up" size={24} color={theme.colors.white} />
         </TouchableOpacity>
-      )}
+      </Animated.View>
     </View>
   );
 };
@@ -599,22 +627,25 @@ const getStyles = (theme: AppTheme) => {
     },
     scrollContent: {
       flexGrow: 1,
+      paddingBottom: 120, // Consistent spacing for scroll-to-top button
     },
     entriesListContainer: {
       minHeight: isDesktop ? 300 : 200,
     },
     scrollToTopButton: {
       position: 'absolute',
-      bottom: Platform.OS === 'ios' ? 120 : 105, // Above the tab bar
-      right: theme.spacing.lg,
+      bottom: 30, // Consistent with other screens
+      right: 20,  // Consistent with other screens
+      zIndex: 1000,
+    },
+    scrollToTopButtonInner: {
       width: accessibilityTokens.minTouchTarget,
       height: accessibilityTokens.minTouchTarget,
       borderRadius: accessibilityTokens.minTouchTarget / 2,
       backgroundColor: theme.colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
-      ...theme.shadows.md, // Using new soft shadows
-      zIndex: 1000,
+      ...theme.shadows.md, // Using consistent soft shadows
     },
   });
 };

@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import { accessibilityTokens } from '../../styles/theme';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { MainStackParamList } from '../../navigation/types';
 import logger from '../../utils/logger';
 import { Period, DateRange, Template, TemplateListProps, ButtonProps } from './types';
 import { PeriodSelector, TemplateSelector } from './components';
 import { AnimatedButton, FadeInView, SlideInView } from '../../components/animated';
+import LanguageSelector from '../../components/LanguageSelector';
+import ScreenHeader from '../../components/ScreenHeader';
+import SettingsSection from '../../components/settings/SettingsSection';
+import SafeScrollView from '../../components/SafeScrollView';
 import { ANIMATION_DURATIONS } from '../../styles/animations';
 
 // Template component is now implemented as TemplateSelector
@@ -66,13 +72,40 @@ const ShareScreen: React.FC = () => {
   const { theme } = useAppTheme();
   const styles = getShareScreenStyles(theme);
   
+  // Set document title for web browsers
+  useDocumentTitle('Share');
+  
   const [period, setPeriod] = useState<Period>('weekly');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>();
+  const [targetLanguage, setTargetLanguage] = useState<string>('en');
+  
+  // Scroll to top functionality
+  const scrollViewRef = React.useRef<any>(null);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const scrollToTopOpacity = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     logger.info('[ShareScreen] ShareScreen mounted');
   }, []);
+
+  const handleScroll = (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const shouldShow = scrollY > 200;
+    
+    if (shouldShow !== showScrollToTop) {
+      setShowScrollToTop(shouldShow);
+      Animated.timing(scrollToTopOpacity, {
+        toValue: shouldShow ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false, // Changed to false for web compatibility
+      }).start();
+    }
+  };
+  
+  const scrollToTop = () => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   const handleGenerateShare = () => {
     if (!selectedTemplate || !dateRange) {
@@ -96,6 +129,7 @@ const ShareScreen: React.FC = () => {
         end: dateRange.end.toISOString(),
       },
       period,
+      target_language: targetLanguage,
     });
   };
 
@@ -105,63 +139,67 @@ const ShareScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <FadeInView duration={ANIMATION_DURATIONS.STANDARD}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.colors.text }]}>
-              Share Summary
-            </Text>
-            <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-              Create a summary to share with your care team
-            </Text>
-          </View>
-        </FadeInView>
-
-        <SlideInView 
-          direction="up" 
-          delay={ANIMATION_DURATIONS.STAGGER_DELAY}
-          duration={ANIMATION_DURATIONS.STANDARD}
+    <View style={styles.container}>
+      <ScreenHeader title="Share" />
+      <SafeScrollView 
+        ref={scrollViewRef}
+        style={styles.container} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
+        {/* Time Range Section */}
+        <SettingsSection
+          title="Time Range"
+          subtitle="Select the period for your summary"
+          icon="calendar"
         >
           <PeriodSelector
             value={period}
             onChange={setPeriod}
             onDateRangeChange={setDateRange}
           />
-        </SlideInView>
-
-        {dateRange && (
-          <FadeInView 
-            duration={ANIMATION_DURATIONS.FAST}
-            delay={ANIMATION_DURATIONS.STAGGER_DELAY}
-          >
+          {dateRange && (
             <View style={styles.dateDisplay}>
               <Text style={[styles.dateText, { color: theme.colors.textMuted }]}>
-                Selected range: {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+                {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
               </Text>
             </View>
-          </FadeInView>
-        )}
+          )}
+        </SettingsSection>
 
-        <SlideInView 
-          direction="up" 
-          delay={ANIMATION_DURATIONS.STAGGER_DELAY * 2}
-          duration={ANIMATION_DURATIONS.STANDARD}
+        {/* Template Section */}
+        <SettingsSection
+          title="Summary Template"
+          subtitle="Choose the type of summary to generate"
+          icon="document-text"
         >
           <TemplateSelector
             selectedId={selectedTemplate}
             onSelect={setSelectedTemplate}
             onError={(error) => {
               logger.error('[ShareScreen] Template selector error', error);
-              // Could show a toast or alert here
             }}
           />
-        </SlideInView>
+        </SettingsSection>
 
-        <SlideInView 
-          direction="up" 
-          delay={ANIMATION_DURATIONS.STAGGER_DELAY * 3}
-          duration={ANIMATION_DURATIONS.STANDARD}
+        {/* Language Section */}
+        <SettingsSection
+          title="Output Language"
+          subtitle="Language for the generated summary"
+          icon="language"
+        >
+          <LanguageSelector
+            selectedLanguage={targetLanguage}
+            onLanguageChange={setTargetLanguage}
+          />
+        </SettingsSection>
+
+        {/* Actions Section */}
+        <SettingsSection
+          title="Actions"
+          icon="play"
         >
           <View style={styles.actions}>
             <AnimatedButton
@@ -187,9 +225,37 @@ const ShareScreen: React.FC = () => {
               accessibilityHint="View previously created shares"
             />
           </View>
-        </SlideInView>
-      </ScrollView>
-    </SafeAreaView>
+        </SettingsSection>
+      </SafeScrollView>
+      
+      {/* Scroll to top button */}
+      <Animated.View 
+        style={[
+          styles.scrollToTopButton,
+          {
+            opacity: scrollToTopOpacity,
+            transform: [{
+              scale: scrollToTopOpacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1],
+              })
+            }]
+          }
+        ]}
+        pointerEvents={showScrollToTop ? 'auto' : 'none'}
+      >
+        <TouchableOpacity
+          style={styles.scrollToTopButtonInner}
+          onPress={scrollToTop}
+          activeOpacity={0.7}
+          accessibilityLabel="Scroll to top of share screen"
+          accessibilityRole="button"
+          accessibilityHint="Scroll to the top of the share screen"
+        >
+          <Ionicons name="chevron-up" size={24} color={theme.colors.white} />
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 };
 
@@ -198,32 +264,23 @@ const getShareScreenStyles = (theme: AppTheme) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  header: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-  },
-  title: {
-    fontSize: theme.typography.fontSizes.xl,
-    fontFamily: theme.typography.fontFamilies.semiBold,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    fontSize: theme.typography.fontSizes.sm,
-    fontFamily: theme.typography.fontFamilies.regular,
-    opacity: 0.7,
+  scrollContent: {
+    paddingBottom: 120, // Increase padding for better navigation space and visual consistency
   },
   dateDisplay: {
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    paddingHorizontal: theme.spacing.sm,
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.chipBackground,
+    borderRadius: theme.borderRadius.sm,
+    marginHorizontal: theme.spacing.sm,
   },
   dateText: {
     fontSize: theme.typography.fontSizes.sm,
-    fontFamily: theme.typography.fontFamilies.regular,
+    fontFamily: theme.typography.fontFamilies.medium,
     textAlign: 'center',
   },
   actions: {
-    paddingBottom: theme.spacing.xl,
     gap: theme.spacing.md,
   },
   generateButton: {
@@ -231,6 +288,21 @@ const getShareScreenStyles = (theme: AppTheme) => StyleSheet.create({
   },
   historyButton: {
     // Secondary button styling handled by AnimatedButton
+  },
+  scrollToTopButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    zIndex: 1000,
+  },
+  scrollToTopButtonInner: {
+    width: accessibilityTokens.minTouchTarget,
+    height: accessibilityTokens.minTouchTarget,
+    borderRadius: accessibilityTokens.minTouchTarget / 2,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.md, // Using consistent soft shadows
   },
 });
 

@@ -10,6 +10,7 @@ import {
   ScrollView,
   Platform,
   FlatList,
+  Animated,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -31,6 +32,7 @@ import { useAppTheme } from '../../contexts/ThemeContext';
 import { useHiddenMode } from '../../contexts/HiddenModeContext';
 import { AppTheme } from '../../config/theme';
 import { componentStyles, accessibilityTokens } from '../../styles/theme';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 
 // --- Special Tag for Hidden Entries (Client-Side) ---
 // TODO: Move this to a shared constants file
@@ -48,6 +50,9 @@ const JournalScreen = () => {
   const { theme } = useAppTheme();
   const { isHiddenMode } = useHiddenMode();
   const styles = getStyles(theme);
+  
+  // Set document title for web browsers
+  useDocumentTitle('Journal');
   
   // State
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -231,6 +236,7 @@ const JournalScreen = () => {
   
   // Scroll to top functionality
   const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const scrollToTopOpacity = React.useRef(new Animated.Value(0)).current;
 
   // Handle scroll events to save position and show/hide scroll-to-top button
   const handleScroll = useCallback((event: any) => {
@@ -238,8 +244,16 @@ const JournalScreen = () => {
     scrollPosition.current.offset = contentOffset.y;
     
     // Show scroll-to-top button when scrolled down more than 200px
-    setShowScrollToTop(contentOffset.y > 200);
-  }, []);
+    const shouldShow = contentOffset.y > 200;
+    if (shouldShow !== showScrollToTop) {
+      setShowScrollToTop(shouldShow);
+      Animated.timing(scrollToTopOpacity, {
+        toValue: shouldShow ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false, // Changed to false for web compatibility
+      }).start();
+    }
+  }, [showScrollToTop, scrollToTopOpacity]);
 
   // Scroll to top function
   const scrollToTop = useCallback(() => {
@@ -309,8 +323,11 @@ const JournalScreen = () => {
       )}
       
       <SafeScrollView 
+        ref={scrollViewRef}
         style={{ flex: 1 }} 
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -361,22 +378,32 @@ const JournalScreen = () => {
       </SafeScrollView>
       
       {/* Scroll to Top Button */}
-      {showScrollToTop && (
+      <Animated.View 
+        style={[
+          styles.scrollToTopButton,
+          {
+            opacity: scrollToTopOpacity,
+            transform: [{
+              scale: scrollToTopOpacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1],
+              })
+            }]
+          }
+        ]}
+        pointerEvents={showScrollToTop ? 'auto' : 'none'}
+      >
         <TouchableOpacity
-          style={styles.scrollToTopButton}
+          style={styles.scrollToTopButtonInner}
           onPress={scrollToTop}
-          activeOpacity={0.8}
-          accessibilityLabel="Scroll to top"
+          activeOpacity={0.7}
+          accessibilityLabel="Scroll to top of journal"
           accessibilityRole="button"
           accessibilityHint="Scroll to the top of the journal entries list"
         >
-          <Ionicons 
-            name="chevron-up" 
-            size={24} 
-            color={theme.colors.white} 
-          />
+          <Ionicons name="chevron-up" size={24} color={theme.colors.white} />
         </TouchableOpacity>
-      )}
+      </Animated.View>
     </View>
   );
 };
@@ -485,6 +512,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.semiBold,
     marginTop: theme.spacing.md,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 120, // Consistent spacing for scroll-to-top button
+  },
   safeBottomPadding: {
     // Base padding plus extra for navigation elements
     paddingTop: theme.spacing.lg,
@@ -492,16 +523,18 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   scrollToTopButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 120 : 105, // Above the tab bar
-    right: theme.spacing.lg,
+    bottom: 30, // Consistent with other screens
+    right: 20,  // Consistent with other screens
+    zIndex: 1000,
+  },
+  scrollToTopButtonInner: {
     width: accessibilityTokens.minTouchTarget,
     height: accessibilityTokens.minTouchTarget,
     borderRadius: accessibilityTokens.minTouchTarget / 2,
     backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.md, // Using new soft shadows
-    zIndex: 1000,
+    ...theme.shadows.md, // Using consistent soft shadows
   },
 });
 

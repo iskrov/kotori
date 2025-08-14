@@ -1,17 +1,20 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  SectionList,
   TextInput,
+  Modal,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../contexts/ThemeContext';
 import { AppTheme } from '../config/theme';
-import { LanguageOption, SUPPORTED_LANGUAGES, getLanguageName } from '../config/languageConfig';
-import BottomSheet, { BottomSheetRef } from './BottomSheet';
+import { LanguageOption, SUPPORTED_LANGUAGES, POPULAR_LANGUAGES, getLanguageName } from '../config/languageConfig';
 
 interface LanguageSelectorProps {
   selectedLanguage: string;
@@ -28,21 +31,63 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const styles = getStyles(theme);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const bottomSheetRef = useRef<BottomSheetRef>(null);
 
   const selectedLanguageName = getLanguageName(selectedLanguage) || 'Auto-detect';
 
-  // Filter languages based on search query
-  const filteredLanguages = SUPPORTED_LANGUAGES.filter(language => {
-    if (!searchQuery.trim()) return true;
+  // Filter languages based on search query and organize by sections
+  const getFilteredSections = () => {
+    const query = searchQuery.trim().toLowerCase();
     
-    const query = searchQuery.toLowerCase();
-    return (
-      language.name.toLowerCase().includes(query) ||
-      language.code.toLowerCase().includes(query) ||
-      (language.region && language.region.toLowerCase().includes(query))
-    );
-  });
+    if (!query) {
+      // No search - show sections: Popular and All Languages
+      const popularLanguages = POPULAR_LANGUAGES;
+      const otherLanguages = SUPPORTED_LANGUAGES.filter(lang => !lang.popular);
+      
+      return [
+        {
+          title: 'Popular Languages',
+          data: popularLanguages,
+        },
+        {
+          title: 'All Languages',
+          data: otherLanguages.sort((a, b) => a.name.localeCompare(b.name)),
+        }
+      ];
+    }
+    
+    // With search - filter all languages and show in single section
+    const filtered = SUPPORTED_LANGUAGES.filter(language => {
+      return (
+        language.name.toLowerCase().includes(query) ||
+        language.code.toLowerCase().includes(query) ||
+        (language.region && language.region.toLowerCase().includes(query))
+      );
+    });
+    
+    // Sort filtered results: popular first, then alphabetical
+    const sortedFiltered = filtered.sort((a, b) => {
+      if (a.popular && !b.popular) return -1;
+      if (!a.popular && b.popular) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    
+    if (filtered.length === 0) {
+      return [];
+    }
+    
+    return [{
+      title: `${filtered.length} ${filtered.length === 1 ? 'language' : 'languages'} found`,
+      data: sortedFiltered,
+    }];
+  };
+
+  const languageSections = getFilteredSections();
+  
+  // Debug logging for development
+  if (__DEV__ && searchQuery.trim()) {
+    console.log('[LanguageSelector] Search query:', searchQuery);
+    console.log('[LanguageSelector] Sections:', languageSections.map(s => ({ title: s.title, count: s.data.length })));
+  }
 
   const handleLanguageSelect = (languageCode: string) => {
     onLanguageChange(languageCode);
@@ -77,13 +122,15 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           item.code === selectedLanguage && styles.selectedLanguageName
         ]}>
           {item.region ? `${item.name} (${item.region})` : item.name}
-        </Text><Text style={[
+        </Text>
+        <Text style={[
           styles.languageCode,
           item.code === selectedLanguage && styles.selectedLanguageCode
         ]}>
           {item.code}
         </Text>
-      </View>{item.code === selectedLanguage && (
+      </View>
+      {item.code === selectedLanguage && (
         <View style={styles.checkmarkContainer}>
           <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
         </View>
@@ -91,9 +138,17 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     </TouchableOpacity>
   );
 
+  const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionHeaderText}>{title}</Text>
+    </View>
+  );
+
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="search-outline" size={48} color={theme.colors.textDisabled} /><Text style={styles.emptyStateText}>No languages found</Text><Text style={styles.emptyStateSubtext}>Try a different search term</Text>
+      <Ionicons name="search-outline" size={48} color={theme.colors.textDisabled} />
+      <Text style={styles.emptyStateText}>No languages found</Text>
+      <Text style={styles.emptyStateSubtext}>Try a different search term</Text>
     </View>
   );
 
@@ -114,38 +169,60 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               size={22} 
               color={disabled ? theme.colors.disabled : theme.colors.primary} 
             />
-          </View><View style={styles.textContainer}>
-            <Text style={styles.selectorLabel}>Language</Text><Text style={[
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={styles.selectorLabel}>Language</Text>
+            <Text style={[
               styles.selectorText,
               disabled && styles.selectorTextDisabled
             ]}>
               {selectedLanguageName}
             </Text>
           </View>
-        </View><Ionicons 
-          name="chevron-down" 
-          size={20} 
-          color={disabled ? theme.colors.disabled : theme.colors.textSecondary} 
-        />
-      </TouchableOpacity><BottomSheet
+          <Ionicons 
+            name="chevron-down" 
+            size={20} 
+            color={disabled ? theme.colors.disabled : theme.colors.textSecondary} 
+          />
+        </View>
+      </TouchableOpacity>
+
+      <Modal
         visible={modalVisible}
-        onClose={handleCloseSelector}
-        snapPoints={[0.7, 0.9]}
-        initialSnapPoint={0}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={handleCloseSelector}
       >
-        <View style={styles.modalContent}>
+        <SafeAreaView style={styles.modalContainer}>
+          <StatusBar barStyle={theme.colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
+          
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Language</Text><Text style={styles.modalSubtitle}>
-              Choose your preferred language for voice transcription
-            </Text>
-          </View><View style={styles.searchContainer}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleCloseSelector}
+              accessibilityLabel="Close language selector"
+              accessibilityRole="button"
+            >
+              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            
+            <View style={styles.headerContent}>
+              <Text style={styles.modalTitle}>Select Language</Text>
+              <Text style={styles.modalSubtitle}>Choose your preferred language for voice transcription</Text>
+            </View>
+          </View>
+
+          {/* Search */}
+          <View style={styles.searchContainer}>
             <View style={styles.searchInputWrapper}>
               <Ionicons 
                 name="search" 
                 size={20} 
                 color={theme.colors.textSecondary} 
                 style={styles.searchIcon}
-              /><TextInput
+              />
+              <TextInput
                 style={styles.searchInput}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -154,7 +231,8 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                 returnKeyType="search"
                 autoCorrect={false}
                 autoCapitalize="none"
-              />{searchQuery.length > 0 && (
+              />
+              {searchQuery.length > 0 && (
                 <TouchableOpacity
                   onPress={() => setSearchQuery('')}
                   style={styles.clearButton}
@@ -164,29 +242,49 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                 </TouchableOpacity>
               )}
             </View>
-          </View>{searchQuery.trim() && (
-            <Text style={styles.resultsCount}>
-              {filteredLanguages.length} language{filteredLanguages.length === 1 ? '' : 's'} found
-            </Text>
-          )}<FlatList
-            data={filteredLanguages}
-            keyExtractor={(item) => item.code}
-            renderItem={renderLanguageItem}
-            style={styles.languageList}
-            showsVerticalScrollIndicator={true}
-            ListEmptyComponent={renderEmptyState}
-            keyboardShouldPersistTaps="handled"
-            getItemLayout={(data, index) => ({
-              length: 72,
-              offset: 72 * index,
-              index,
-            })}
-            initialNumToRender={10}
-            maxToRenderPerBatch={10}
-            windowSize={10}
-          />
-        </View>
-      </BottomSheet>
+          </View>
+
+          {/* Language List */}
+          {searchQuery.trim() ? (
+            // Use FlatList for search results (single section)
+            <FlatList
+              data={languageSections[0]?.data || []}
+              keyExtractor={(item) => item.code}
+              renderItem={renderLanguageItem}
+              style={styles.languageList}
+              showsVerticalScrollIndicator={true}
+              ListEmptyComponent={renderEmptyState}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+              windowSize={21}
+              ListHeaderComponent={() => (
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionHeaderText}>
+                    {languageSections[0]?.title || 'No results'}
+                  </Text>
+                </View>
+              )}
+            />
+          ) : (
+            // Use SectionList for no search (multiple sections)
+            <SectionList
+              sections={languageSections}
+              keyExtractor={(item) => item.code}
+              renderItem={renderLanguageItem}
+              renderSectionHeader={renderSectionHeader}
+              style={styles.languageList}
+              showsVerticalScrollIndicator={true}
+              ListEmptyComponent={renderEmptyState}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+              windowSize={21}
+              stickySectionHeadersEnabled={true}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 };
@@ -243,11 +341,25 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   selectorTextDisabled: {
     color: theme.colors.disabled,
   },
-  modalContent: {
+  modalContainer: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   modalHeader: {
-    marginBottom: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  backButton: {
+    padding: theme.spacing.sm,
+    marginRight: theme.spacing.md,
+  },
+  headerContent: {
+    flex: 1,
   },
   modalTitle: {
     fontSize: theme.typography.fontSizes.xl,
@@ -262,7 +374,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
   },
   searchContainer: {
-    marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
   },
   searchInputWrapper: {
     flexDirection: 'row',
@@ -297,21 +411,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   languageList: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   languageItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.xs,
-    minHeight: 72,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    minHeight: 64,
   },
   selectedLanguageItem: {
     backgroundColor: theme.colors.primaryLight + '20',
-    borderWidth: 1,
-    borderColor: theme.colors.primaryLight + '40',
   },
   languageInfo: {
     flex: 1,
@@ -352,6 +466,20 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: theme.typography.fontSizes.sm,
     color: theme.colors.textDisabled,
     fontFamily: theme.typography.fontFamilies.regular,
+  },
+  sectionHeader: {
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  sectionHeaderText: {
+    fontSize: theme.typography.fontSizes.sm,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
 
