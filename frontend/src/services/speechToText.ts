@@ -183,6 +183,8 @@ class SpeechToTextService {
       {
         headers: {
           'Authorization': `Bearer ${token}`,
+          // Ensure the axios instance does not send application/json
+          'Content-Type': 'multipart/form-data',
         },
         timeout: 30000, // 30 second timeout for transcription
       }

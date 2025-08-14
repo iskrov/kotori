@@ -68,9 +68,9 @@ if (typeof window !== 'undefined') {
   api.defaults.baseURL = initialApiUrl;
 }
 
-// Interceptor to always enforce HTTPS for the production API.
-// This is a safety net for any case where the baseURL might be http.
-api.interceptors.request.use((config) => {
+// Interceptor to always enforce HTTPS for the production API and add auth headers
+api.interceptors.request.use(
+  async (config) => {
     // If we're on a production domain, ALWAYS force HTTPS
     const hostname = typeof window !== 'undefined' && window.location.hostname;
     if (hostname && (hostname === 'app.kotori.io' || hostname === 'kotori.io' || hostname === 'www.kotori.io' || hostname.includes('run.app'))) {
@@ -93,6 +93,23 @@ api.interceptors.request.use((config) => {
         config.url = config.url.replace(/^https?:\/\/[^\/]+/, '');
       }
     }
+
+    // Add authentication headers
+    try {
+      // Dynamic import to avoid circular dependency
+      const { authService } = await import('./authService');
+      const authHeaders = authService.getAuthHeaders();
+      
+      if (authHeaders.Authorization) {
+        config.headers = {
+          ...config.headers,
+          ...authHeaders,
+        };
+      }
+    } catch (error) {
+      // Auth service not available, continue without auth headers
+      console.warn('[API] Auth service not available:', error);
+    }
     
     return config;
   },
@@ -101,39 +118,39 @@ api.interceptors.request.use((config) => {
   }
 );
 
-// Add request interceptor for authorization headers
-api.interceptors.request.use(
-  async (config) => {
-    try {
-      // Get the access token from storage
-      const token = await AsyncStorage.getItem('access_token');
-      
-      // If token exists, add to headers
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        logger.debug(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
-      } else {
-        logger.debug(`Unauthenticated API Request: ${config.method?.toUpperCase()} ${config.url}`);
+// Response interceptor to handle authentication errors
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // Dynamic import to avoid circular dependency
+        const { authService } = await import('./authService');
+        await authService.handleAuthError();
+        
+        // If auth was refreshed, retry the original request
+        if (authService.isAuthenticated()) {
+          const authHeaders = authService.getAuthHeaders();
+          originalRequest.headers = {
+            ...originalRequest.headers,
+            ...authHeaders,
+          };
+          return api(originalRequest);
+        }
+      } catch (authError) {
+        console.warn('[API] Auth error handling failed:', authError);
       }
-      
-      // If sending FormData, remove the default Content-Type header
-      // to let the browser/axios set the correct multipart/form-data with boundary
-      if (config.data instanceof FormData) {
-        delete config.headers['Content-Type'];
-        logger.debug(`Removed Content-Type header for FormData request to ${config.url}`);
-      }
-      
-      return config;
-    } catch (error) {
-      logger.error('API Interceptor Error', error);
-      return config;
     }
-  },
-  (error) => {
-    logger.error('API Request Error', error);
+
     return Promise.reject(error);
   }
 );
+
+
 
 // Add response interceptor for handling token refresh and errors
 api.interceptors.response.use(
@@ -488,6 +505,7 @@ export const TranscriptionAPI = {
     
     return api.post('/api/speech/transcribe', formData, {
       headers: {
+        // Ensure form submission; base instance default is application/json
         'Content-Type': 'multipart/form-data',
       },
     });

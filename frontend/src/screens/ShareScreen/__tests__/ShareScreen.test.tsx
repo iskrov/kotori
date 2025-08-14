@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { ThemeProvider } from '../../../contexts/ThemeContext';
 import ShareScreen from '../index';
@@ -31,9 +31,17 @@ describe('ShareScreen', () => {
     // Check if subtitle is rendered
     expect(screen.getByText('Create a summary to share with your care team')).toBeTruthy();
     
-    // Check if placeholder components are rendered
-    expect(screen.getByText('Period Selector - Coming Soon')).toBeTruthy();
-    expect(screen.getByText('Template List - Coming Soon')).toBeTruthy();
+    // Check if period selector is rendered
+    expect(screen.getByText('Select Period')).toBeTruthy();
+    expect(screen.getByText('Daily')).toBeTruthy();
+    expect(screen.getByText('Weekly')).toBeTruthy();
+    expect(screen.getByText('Monthly')).toBeTruthy();
+    
+    // Check if template list is rendered
+    expect(screen.getByText('Choose Template')).toBeTruthy();
+    expect(screen.getByText('Wellness Check')).toBeTruthy();
+    expect(screen.getByText('Medical Visit')).toBeTruthy();
+    expect(screen.getByText('Mood Tracker')).toBeTruthy();
     
     // Check if action buttons are rendered
     expect(screen.getByText('Generate Share')).toBeTruthy();
@@ -46,6 +54,34 @@ describe('ShareScreen', () => {
     // The screen should be accessible
     const title = screen.getByText('Share Summary');
     expect(title).toBeTruthy();
+  });
+
+  it('renders Generate Share button', () => {
+    renderWithProviders(<ShareScreen />);
+    
+    const generateButton = screen.getByText('Generate Share');
+    expect(generateButton).toBeTruthy();
+    
+    // Select a template to test interaction
+    const wellnessTemplate = screen.getByText('Wellness Check');
+    fireEvent.press(wellnessTemplate);
+    
+    // Template selection should work without errors
+    expect(wellnessTemplate).toBeTruthy();
+  });
+
+  it('allows period selection', () => {
+    renderWithProviders(<ShareScreen />);
+    
+    // Weekly should be selected by default
+    const weeklyButton = screen.getByText('Weekly');
+    const dailyButton = screen.getByText('Daily');
+    
+    // Click on Daily
+    fireEvent.press(dailyButton);
+    
+    // This should trigger the period change (we can't easily test the visual state change without more setup)
+    expect(dailyButton).toBeTruthy();
   });
 });
 

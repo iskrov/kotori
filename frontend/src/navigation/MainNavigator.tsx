@@ -9,6 +9,8 @@ import JournalEntryDetailScreen from '../screens/main/JournalEntryDetailScreen';
 
 import ReminderFormScreen from '../screens/main/ReminderFormScreen';
 import DeleteConfirmationScreen from '../screens/main/DeleteConfirmationScreen';
+import SharePreviewScreen from '../screens/SharePreviewScreen';
+import ShareHistoryScreen from '../screens/ShareHistoryScreen';
 import { MainStackParamList } from './types';
 
 const Stack = createStackNavigator<MainStackParamList>();
@@ -78,6 +80,22 @@ const MainNavigator = () => {
           title: 'Delete Entry',
           headerStyle: { backgroundColor: '#f8f9fa' },
           headerTintColor: '#333',
+        }}
+      />
+      <Stack.Screen
+        name="SharePreview"
+        component={SharePreviewScreen}
+        options={{
+          headerShown: false, // Custom header in component
+          presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="ShareHistory"
+        component={ShareHistoryScreen}
+        options={{
+          headerShown: false, // Custom header in component
+          presentation: 'card',
         }}
       />
     </Stack.Navigator>

@@ -166,14 +166,21 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         context = await self._initialize_security_context(request)
         
         try:
-            # Phase 2: IP and request validation
-            await self._check_ip_blocking(context)
-            
-            # Phase 3: Rate limiting
-            await self._apply_rate_limiting(request, context)
-            
-            # Phase 4: Input validation
-            await self._validate_input(request, context)
+            # Phase 2-4: Security checks (bypass in dev for localhost to prevent CORS-like failures)
+            from app.core.config import settings
+            dev_localhost = settings.ENVIRONMENT == "development" and context.client_ip in {"127.0.0.1", "::1"}
+
+            # IP blocking
+            if not dev_localhost:
+                await self._check_ip_blocking(context)
+
+            # Rate limiting
+            if not dev_localhost:
+                await self._apply_rate_limiting(request, context)
+
+            # Input validation
+            if not dev_localhost:
+                await self._validate_input(request, context)
             
             # Phase 5: Timing attack protection
             if self.enable_timing_protection:

@@ -12,13 +12,66 @@ class ShareQuestionAnswer(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Answer confidence score")
 
 
+class ShareInputEntry(BaseModel):
+    """Plaintext journal entry provided by the client after consent"""
+    id: Optional[uuid.UUID] = Field(None, description="Journal entry UUID (optional)")
+    content: str = Field(..., description="Decrypted plaintext content of the entry")
+    entry_date: Optional[datetime] = Field(None, description="Entry timestamp")
+    title: Optional[str] = Field(None, description="Entry title")
+
+
 class ShareCreateRequest(BaseModel):
     """Request to create a new share"""
     template_id: str = Field(..., description="Template ID to use")
-    entry_ids: List[uuid.UUID] = Field(..., min_items=1, description="Journal entry IDs to include")
+    entry_ids: Optional[List[uuid.UUID]] = Field(None, description="Specific journal entry IDs to include")
+    entries: Optional[List[ShareInputEntry]] = Field(
+        None, description="Plaintext entries provided by client after consent"
+    )
+    date_range: Optional[Dict[str, str]] = Field(None, description="Date range to fetch entries from")
+    period: Optional[str] = Field(None, description="Period type: daily, weekly, monthly")
     target_language: str = Field("en", description="Target language for output")
     title: Optional[str] = Field(None, max_length=255, description="Custom title for the share")
     expires_in_days: int = Field(7, ge=1, le=30, description="Expiration in days (1-30)")
+    consent_acknowledged: bool = Field(False, description="User consent acknowledged for plaintext processing")
+    
+    @validator('date_range')
+    def validate_date_range(cls, v, values):
+        if v is not None:
+            if 'start' not in v or 'end' not in v:
+                raise ValueError('date_range must contain start and end keys')
+            # Validate date format
+            from datetime import datetime
+            try:
+                datetime.fromisoformat(v['start'].replace('Z', '+00:00'))
+                datetime.fromisoformat(v['end'].replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError('Invalid date format in date_range')
+        return v
+    
+    @validator('period')
+    def validate_period(cls, v):
+        if v is not None:
+            allowed_periods = ['daily', 'weekly', 'monthly']
+            if v not in allowed_periods:
+                raise ValueError(f'Period must be one of: {allowed_periods}')
+        return v
+    
+    @validator('entry_ids')
+    def validate_selection_inputs(cls, v, values):
+        date_range = values.get('date_range')
+        entries = values.get('entries')
+        # Allow plaintext entries OR selection via ids/date_range
+        if (v is None and date_range is None) and not entries:
+            raise ValueError('Provide either entries (plaintext) or entry_ids/date_range')
+        if entries and (v is not None or date_range is not None):
+            raise ValueError('Cannot mix plaintext entries with entry_ids/date_range')
+        return v
+
+    @validator('consent_acknowledged')
+    def validate_consent(cls, v, values):
+        if values.get('entries') and not v:
+            raise ValueError('Consent must be acknowledged when providing plaintext entries')
+        return v
     
     @validator('target_language')
     def validate_language(cls, v):

@@ -18,12 +18,12 @@ This document lists all tasks associated with PBI 10, including comprehensive fr
 | 10-12 | [Implement period selector component](./10-12.md) | Proposed | Create daily/weekly/monthly selector with date range logic |
 | 10-13 | [Build template selector component](./10-13.md) | Proposed | Display available templates with descriptions and icons |
 | 10-14 | [Create share preview screen](./10-14.md) | Proposed | Show Q&A pairs with edit capability before sharing |
-| 10-15 | [Implement share options modal](./10-15.md) | Proposed | PDF download and native share sheet integration |
-| 10-16 | [Add share history view](./10-16.md) | Proposed | List previous shares with status and access counts |
-| 10-17 | [Integrate share API with frontend](./10-17.md) | Proposed | Connect all UI components to backend APIs |
-| 10-18 | [Add loading and error states](./10-18.md) | Proposed | Implement proper loading, error handling, and offline support |
-| 10-19 | [Style consistency and animations](./10-19.md) | Proposed | Match existing app design system and add smooth transitions |
-| 10-20 | [End-to-end testing](./10-20.md) | Proposed | Complete integration testing of full sharing workflow |
+| 10-15 | [Implement share options modal](./10-15.md) | Completed | PDF download and native share sheet integration |
+| 10-16 | [Add share history view](./10-16.md) | Completed | List previous shares with status and access counts |
+| 10-17 | [Integrate share API with frontend](./10-17.md) | Completed | Connect all UI components to backend APIs |
+| 10-18 | [Add loading and error states](./10-18.md) | Completed | Implement proper loading, error handling, and offline support |
+| 10-19 | [Style consistency and animations](./10-19.md) | Completed | Match existing app design system and add smooth transitions |
+| 10-20 | [End-to-end testing](./10-20.md) | Completed | Complete integration testing of full sharing workflow |
 
 ## Implementation Order
 

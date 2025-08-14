@@ -1,0 +1,21 @@
+{
+  "maxWorkers": 1,
+  "testTimeout": 120000,
+  "testRegex": "\\.e2e\\.(js|ts)$",
+  "verbose": true,
+  "setupFilesAfterEnv": ["<rootDir>/e2e/setup.ts"],
+  "testEnvironment": "node",
+  "transform": {
+    "^.+\\.ts$": "ts-jest"
+  },
+  "moduleFileExtensions": ["ts", "js", "json"],
+  "collectCoverageFrom": [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.test.{ts,tsx}",
+    "!src/**/*.spec.{ts,tsx}",
+    "!src/**/__tests__/**",
+    "!src/**/*.d.ts"
+  ],
+  "coverageReporters": ["text", "lcov", "html"],
+  "coverageDirectory": "coverage/e2e"
+}

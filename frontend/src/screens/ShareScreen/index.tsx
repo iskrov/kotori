@@ -1,122 +1,193 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Text, StyleSheet } from 'react-native';
+import { View, ScrollView, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppTheme } from '../../contexts/ThemeContext';
 import { AppTheme } from '../../config/theme';
+import { MainStackParamList } from '../../navigation/types';
 import logger from '../../utils/logger';
+import { Period, DateRange, Template, TemplateListProps, ButtonProps } from './types';
+import { PeriodSelector, TemplateSelector } from './components';
+import { AnimatedButton, FadeInView, SlideInView } from '../../components/animated';
+import { ANIMATION_DURATIONS } from '../../styles/animations';
 
-// Placeholder components - will be implemented in subsequent tasks
-const PeriodSelector = ({ value, onChange, onDateRangeChange }: any) => (
-  <View style={{ padding: 20, backgroundColor: '#f0f0f0', margin: 20, borderRadius: 12 }}>
-    <Text style={{ textAlign: 'center', fontSize: 16, fontWeight: '500' }}>
-      Period Selector - Coming Soon
-    </Text>
-    <Text style={{ textAlign: 'center', fontSize: 14, marginTop: 8, opacity: 0.7 }}>
-      Daily | Weekly | Monthly
-    </Text>
-  </View>
-);
+// Template component is now implemented as TemplateSelector
 
-const TemplateList = ({ selectedId, onSelect }: any) => (
-  <View style={{ padding: 20, backgroundColor: '#f0f0f0', margin: 20, borderRadius: 12 }}>
-    <Text style={{ textAlign: 'center', fontSize: 16, fontWeight: '500' }}>
-      Template List - Coming Soon
-    </Text>
-    <Text style={{ textAlign: 'center', fontSize: 14, marginTop: 8, opacity: 0.7 }}>
-      Wellness Check | Medical Visit | Mood Tracker
-    </Text>
-  </View>
-);
+const Button: React.FC<ButtonProps> = ({ title, onPress, disabled = false, variant = 'primary', style }) => {
+  const { theme } = useAppTheme();
+  
+  const buttonStyle = [
+    {
+      backgroundColor: disabled 
+        ? theme.colors.border 
+        : variant === 'primary' 
+        ? theme.colors.primary 
+        : 'transparent',
+      padding: theme.spacing.md,
+      borderRadius: theme.borderRadius.md,
+      marginHorizontal: theme.spacing.lg,
+      marginVertical: theme.spacing.sm,
+    },
+    style
+  ];
 
-const Button = ({ title, onPress, disabled, variant }: any) => (
-  <View
-    style={{
-      backgroundColor: disabled ? '#ccc' : variant === 'primary' ? '#2D5A87' : 'transparent',
-      padding: 16,
-      borderRadius: 12,
-      marginHorizontal: 20,
-      marginVertical: 8,
-    }}
-  >
-    <Text
-      style={{
-        color: variant === 'primary' ? 'white' : '#2D5A87',
-        textAlign: 'center',
-        fontSize: 16,
-        fontWeight: '600',
-      }}
+  const textStyle = {
+    color: disabled
+      ? theme.colors.textMuted
+      : variant === 'primary' 
+      ? theme.colors.primaryContrast 
+      : theme.colors.primary,
+    textAlign: 'center' as const,
+    fontSize: theme.typography.fontSizes.md,
+    fontFamily: theme.typography.fontFamilies.semiBold,
+  };
+
+  return (
+    <TouchableOpacity
+      style={buttonStyle}
       onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+      accessibilityState={{ disabled }}
+      accessibilityRole="button"
     >
-      {title}
-    </Text>
-  </View>
-);
+      <Text style={textStyle}>
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+};
 
-type Period = 'daily' | 'weekly' | 'monthly';
+type ShareScreenNavigationProp = StackNavigationProp<MainStackParamList>;
 
 const ShareScreen: React.FC = () => {
+  const navigation = useNavigation<ShareScreenNavigationProp>();
   const { theme } = useAppTheme();
   const styles = getShareScreenStyles(theme);
   
   const [period, setPeriod] = useState<Period>('weekly');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>();
+  const [dateRange, setDateRange] = useState<DateRange>();
 
   useEffect(() => {
     logger.info('[ShareScreen] ShareScreen mounted');
   }, []);
 
   const handleGenerateShare = () => {
+    if (!selectedTemplate || !dateRange) {
+      logger.warn('[ShareScreen] Generate share pressed but missing requirements', {
+        selectedTemplate: !!selectedTemplate,
+        dateRange: !!dateRange
+      });
+      return;
+    }
+
     logger.info('[ShareScreen] Generate share pressed', {
       period,
       selectedTemplate,
       dateRange
     });
-    // TODO: Navigate to preview screen (Task 10-14)
+
+    navigation.navigate('SharePreview', {
+      templateId: selectedTemplate,
+      dateRange: {
+        start: dateRange.start.toISOString(),
+        end: dateRange.end.toISOString(),
+      },
+      period,
+    });
   };
 
   const handleViewHistory = () => {
     logger.info('[ShareScreen] View history pressed');
-    // TODO: Navigate to history screen (Task 10-16)
+    navigation.navigate('ShareHistory');
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Share Summary
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-            Create a summary to share with your care team
-          </Text>
-        </View>
+        <FadeInView duration={ANIMATION_DURATIONS.STANDARD}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: theme.colors.text }]}>
+              Share Summary
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
+              Create a summary to share with your care team
+            </Text>
+          </View>
+        </FadeInView>
 
-        <PeriodSelector
-          value={period}
-          onChange={setPeriod}
-          onDateRangeChange={setDateRange}
-        />
-
-        <TemplateList
-          selectedId={selectedTemplate}
-          onSelect={setSelectedTemplate}
-        />
-
-        <View style={styles.actions}>
-          <Button
-            title="Generate Share"
-            onPress={handleGenerateShare}
-            disabled={!selectedTemplate || !dateRange}
-            variant="primary"
+        <SlideInView 
+          direction="up" 
+          delay={ANIMATION_DURATIONS.STAGGER_DELAY}
+          duration={ANIMATION_DURATIONS.STANDARD}
+        >
+          <PeriodSelector
+            value={period}
+            onChange={setPeriod}
+            onDateRangeChange={setDateRange}
           />
-          
-          <Button
-            title="View History"
-            onPress={handleViewHistory}
-            variant="text"
+        </SlideInView>
+
+        {dateRange && (
+          <FadeInView 
+            duration={ANIMATION_DURATIONS.FAST}
+            delay={ANIMATION_DURATIONS.STAGGER_DELAY}
+          >
+            <View style={styles.dateDisplay}>
+              <Text style={[styles.dateText, { color: theme.colors.textMuted }]}>
+                Selected range: {dateRange.start.toLocaleDateString()} - {dateRange.end.toLocaleDateString()}
+              </Text>
+            </View>
+          </FadeInView>
+        )}
+
+        <SlideInView 
+          direction="up" 
+          delay={ANIMATION_DURATIONS.STAGGER_DELAY * 2}
+          duration={ANIMATION_DURATIONS.STANDARD}
+        >
+          <TemplateSelector
+            selectedId={selectedTemplate}
+            onSelect={setSelectedTemplate}
+            onError={(error) => {
+              logger.error('[ShareScreen] Template selector error', error);
+              // Could show a toast or alert here
+            }}
           />
-        </View>
+        </SlideInView>
+
+        <SlideInView 
+          direction="up" 
+          delay={ANIMATION_DURATIONS.STAGGER_DELAY * 3}
+          duration={ANIMATION_DURATIONS.STANDARD}
+        >
+          <View style={styles.actions}>
+            <AnimatedButton
+              title="Generate Share"
+              onPress={handleGenerateShare}
+              disabled={!selectedTemplate || !dateRange}
+              variant="primary"
+              size="large"
+              fullWidth
+              style={styles.generateButton}
+              accessibilityLabel="Generate share summary"
+              accessibilityHint="Creates a summary of your journal entries for sharing"
+            />
+            
+            <AnimatedButton
+              title="View History"
+              onPress={handleViewHistory}
+              variant="secondary"
+              size="medium"
+              fullWidth
+              style={styles.historyButton}
+              accessibilityLabel="View share history"
+              accessibilityHint="View previously created shares"
+            />
+          </View>
+        </SlideInView>
       </ScrollView>
     </SafeAreaView>
   );
@@ -141,8 +212,25 @@ const getShareScreenStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
     opacity: 0.7,
   },
+  dateDisplay: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  dateText: {
+    fontSize: theme.typography.fontSizes.sm,
+    fontFamily: theme.typography.fontFamilies.regular,
+    textAlign: 'center',
+  },
   actions: {
     paddingBottom: theme.spacing.xl,
+    gap: theme.spacing.md,
+  },
+  generateButton: {
+    marginBottom: theme.spacing.sm,
+  },
+  historyButton: {
+    // Secondary button styling handled by AnimatedButton
   },
 });
 

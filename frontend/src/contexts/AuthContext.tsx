@@ -255,7 +255,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // OPAQUE is always available in V1 dual authentication system
       // Check if server is healthy instead
-      const response = await api.get('/api/v1/auth/health');
+      const response = await api.get('/api/v1/auth/health/');
       return response.status >= 200 && response.status < 300;
     } catch (error) {
       logger.warn('OPAQUE support check failed, assuming not supported', error);

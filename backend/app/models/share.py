@@ -73,6 +73,11 @@ class ShareAccess(Base, TimestampMixin):
     user_agent_hash = Column(String(64), nullable=True)  # Hashed for privacy
     referrer = Column(String(255), nullable=True)
     access_type = Column(String(20), nullable=False, default='view')  # view, download, email
+    # Consent audit (plain text never stored; only counts and timeframe)
+    consent_timeframe_start = Column(TIMESTAMP(timezone=True), nullable=True)
+    consent_timeframe_end = Column(TIMESTAMP(timezone=True), nullable=True)
+    consent_entry_count = Column(Integer, nullable=True)
+    consent_acknowledged = Column(Boolean, nullable=True)
     
     # Relationships
     share = relationship("Share", backref="access_logs")

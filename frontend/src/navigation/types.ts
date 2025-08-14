@@ -27,6 +27,18 @@ export type MainTabParamList = {
   Settings: undefined;
 };
 
+// Share Preview screen params
+export type SharePreviewParams = {
+  templateId?: string;
+  dateRange?: { start: string; end: string };
+  period?: 'daily' | 'weekly' | 'monthly';
+  shareId?: string;
+  fromHistory?: boolean;
+  enableReshare?: boolean;
+};
+
+export type ShareHistoryParams = undefined;
+
 // Main Stack Navigator (contains the tab navigator)
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
@@ -36,6 +48,8 @@ export type MainStackParamList = {
   JournalEntryDetail: { entryId: string };
   ReminderForm: { reminderId?: string };
   DeleteConfirmation: { entryId: string };
+  SharePreview: SharePreviewParams;
+  ShareHistory: ShareHistoryParams;
 };
 
 // Auth stack params
