@@ -12,6 +12,52 @@ The Kotori deployment consists of 4 main components:
 
 ## Critical Issues Encountered & Solutions
 
+### 0. Backend Container Startup Failures (August 2025)
+
+**Issue**: Backend deployments consistently failing with container startup errors despite successful image builds.
+
+**Symptoms**:
+```
+ERROR: Required environment variable 'DATABASE_URL' is not set in .env file
+Container called exit(1)
+Default STARTUP TCP probe failed 1 time consecutively for container "kotori-api-1" on port 8001
+```
+
+**Root Cause**: Environment variable mapping mismatch between:
+- Backend code expectations: `DATABASE_URL`, `SECRET_KEY` (uppercase)
+- Google Cloud secrets: `database-url`, `secret-key` (lowercase with hyphens)
+- Deployment configuration: Incorrect secret mapping
+
+**Failed Deployment Command**:
+```bash
+--set-secrets "database-url=database-url:latest,secret-key=secret-key:latest"
+# This creates env vars: database-url, secret-key
+# But backend expects: DATABASE_URL, SECRET_KEY
+```
+
+**Correct Solution**:
+```bash
+--set-secrets "DATABASE_URL=database-url:latest,SECRET_KEY=secret-key:latest,GOOGLE_CLOUD_PROJECT=google-cloud-project:latest,GOOGLE_CLOUD_LOCATION=google-cloud-location:latest,ENCRYPTION_MASTER_SALT=encryption-master-salt:latest"
+```
+
+**Required Secrets List**:
+- `DATABASE_URL` → `database-url:latest`
+- `SECRET_KEY` → `secret-key:latest` 
+- `GOOGLE_CLOUD_PROJECT` → `google-cloud-project:latest`
+- `GOOGLE_CLOUD_LOCATION` → `google-cloud-location:latest`
+- `ENCRYPTION_MASTER_SALT` → `encryption-master-salt:latest`
+
+**Debugging Commands**:
+```bash
+# Check logs for failed revision
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=kotori-api AND resource.labels.revision_name=kotori-api-00032-d9n" --limit=20
+
+# Compare working vs failed configuration
+gcloud run services describe kotori-api --region=us-central1 --format="export" > current-config.yaml
+```
+
+**Key Learning**: Service account changes require reviewing ALL environment variable mappings and ensuring complete secret configuration.
+
 ### 1. Cloud SQL PostgreSQL 17 Configuration Issues
 
 **Issue**: Multiple failed attempts to create PostgreSQL 17 instance with correct tier/edition combinations.
