@@ -12,6 +12,10 @@ This directory contains comprehensive documentation for deploying and managing K
 - **[Deployment Troubleshooting](./DEPLOYMENT_TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide for all deployment issues
 - **[Deployment Lessons Learned](./DEPLOYMENT_LESSONS_LEARNED.md)** - Key lessons and best practices from deployment experiences
 
+### 🗃️ Database Migration Management
+- **[Database Migration Strategy](./DATABASE_MIGRATION_STRATEGY.md)** - Comprehensive migration deployment strategy and safety procedures
+- **[Migration Quick Reference](./MIGRATION_QUICK_REFERENCE.md)** - Quick commands and emergency procedures for migrations
+
 ### 📊 Deployment History
 - **[Sharing Feature Deployment Success](./SHARING_FEATURE_DEPLOYMENT_SUCCESS.md)** - August 14, 2025 - Template-based sharing with AI
 - **[Redeployment Success Summary](./REDEPLOYMENT_SUCCESS_SUMMARY.md)** - Previous successful deployment
@@ -34,14 +38,20 @@ curl https://kotori-api-412014849981.us-central1.run.app/api/health
 
 ### Common Deployment Commands
 ```bash
-# Full deployment
+# Full deployment (includes migrations)
 ./scripts/cloud-deploy.sh
 
 # Frontend only
 ./scripts/cloud-deploy.sh --frontend-only
 
-# Backend only  
+# Backend only (includes migrations)
 ./scripts/cloud-deploy.sh --backend-only
+
+# Migrations only (no app deployment)
+./scripts/cloud-deploy.sh --migrations-only
+
+# Skip migrations (emergency use only)
+./scripts/cloud-deploy.sh --skip-migrations
 
 # Custom tag
 ./scripts/cloud-deploy.sh --tag my-custom-tag

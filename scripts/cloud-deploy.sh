@@ -27,6 +27,7 @@ REGISTRY="us-central1-docker.pkg.dev/kotori-io/kotori-images"
 # Default values
 DEPLOY_FRONTEND=true
 DEPLOY_BACKEND=true
+RUN_MIGRATIONS=true
 TAG="deploy-$(date +%Y%m%d-%H%M%S)"
 
 # Parse command line arguments
@@ -40,6 +41,16 @@ while [[ $# -gt 0 ]]; do
             DEPLOY_FRONTEND=false
             shift
             ;;
+        --skip-migrations)
+            RUN_MIGRATIONS=false
+            shift
+            ;;
+        --migrations-only)
+            DEPLOY_FRONTEND=false
+            DEPLOY_BACKEND=false
+            RUN_MIGRATIONS=true
+            shift
+            ;;
         --tag)
             TAG="$2"
             shift 2
@@ -50,6 +61,8 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --frontend-only    Deploy only the frontend"
             echo "  --backend-only     Deploy only the backend"
+            echo "  --skip-migrations  Skip database migrations (use with caution)"
+            echo "  --migrations-only  Run only database migrations (no app deployment)"
             echo "  --tag TAG          Use custom tag (default: deploy-YYYYMMDD-HHMMSS)"
             echo "  --help, -h         Show this help message"
             exit 0
@@ -172,6 +185,81 @@ deploy_frontend() {
     print_success "Frontend deployed: $FRONTEND_URL"
 }
 
+# Run database migrations
+run_database_migrations() {
+    print_step "Running Database Migrations"
+    
+    cd "$PROJECT_ROOT/backend"
+    
+    # Check if we have migrations to run
+    if ! command -v alembic &> /dev/null; then
+        print_error "Alembic not found. Install with: pip install alembic"
+        exit 1
+    fi
+    
+    # Get database URL from Google Cloud Secret
+    print_step "Retrieving database credentials"
+    export DATABASE_URL=$(gcloud secrets versions access latest --secret="database-url" --project="$PROJECT_ID")
+    
+    if [[ -z "$DATABASE_URL" ]]; then
+        print_error "Failed to retrieve DATABASE_URL from secrets"
+        exit 1
+    fi
+    
+    # Check current migration status
+    print_step "Checking current migration status"
+    CURRENT_REVISION=$(alembic current 2>/dev/null | grep -v "INFO" | head -1 || echo "none")
+    print_step "Current database revision: $CURRENT_REVISION"
+    
+    # Check if migrations are needed
+    HEAD_REVISION=$(alembic heads 2>/dev/null | grep -v "INFO" | head -1)
+    print_step "Target revision: $HEAD_REVISION"
+    
+    if [[ "$CURRENT_REVISION" == "$HEAD_REVISION" ]]; then
+        print_success "Database is already up to date"
+        return 0
+    fi
+    
+    # Create backup before migration
+    print_step "Creating database backup"
+    BACKUP_DESCRIPTION="pre-migration-$(date +%Y%m%d-%H%M%S)"
+    if ! gcloud sql backups create \
+        --instance=kotori-db-instance \
+        --description="$BACKUP_DESCRIPTION" \
+        --project="$PROJECT_ID"; then
+        print_warning "Backup creation failed, but continuing with migration"
+    else
+        print_success "Backup created: $BACKUP_DESCRIPTION"
+    fi
+    
+    # Preview migrations to be applied
+    print_step "Previewing migrations"
+    echo "Migrations to be applied:"
+    alembic upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
+    
+    # Execute migrations
+    print_step "Executing database migrations"
+    if alembic upgrade head; then
+        NEW_REVISION=$(alembic current 2>/dev/null | grep -v "INFO" | head -1)
+        print_success "Database migrations completed successfully"
+        print_success "Database updated to revision: $NEW_REVISION"
+    else
+        print_error "Database migration failed"
+        print_error "Backup available for restore: $BACKUP_DESCRIPTION"
+        print_error "To restore: gcloud sql backups restore BACKUP_ID --restore-instance=kotori-db-instance"
+        exit 1
+    fi
+    
+    # Verify migration success
+    print_step "Verifying migration success"
+    if ! alembic current > /dev/null 2>&1; then
+        print_error "Migration verification failed"
+        exit 1
+    fi
+    
+    print_success "Database migration phase completed"
+}
+
 # Build and deploy backend
 deploy_backend() {
     print_step "Deploying Backend"
@@ -247,6 +335,7 @@ main() {
     echo "  Tag: $TAG"
     echo "  Deploy Frontend: $DEPLOY_FRONTEND"
     echo "  Deploy Backend: $DEPLOY_BACKEND"
+    echo "  Run Migrations: $RUN_MIGRATIONS"
     echo ""
     
     # Confirmation
@@ -259,6 +348,12 @@ main() {
     
     check_prerequisites
     check_git_status
+    
+    # Run database migrations before deploying backend
+    # This ensures schema is updated before new application code runs
+    if [[ "$RUN_MIGRATIONS" == true ]]; then
+        run_database_migrations
+    fi
     
     if [[ "$DEPLOY_FRONTEND" == true ]]; then
         deploy_frontend
