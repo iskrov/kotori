@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../contexts/ThemeContext';
+import { useSettings } from '../../contexts/SettingsContext';
 import { AppTheme } from '../../config/theme';
 import { accessibilityTokens } from '../../styles/theme';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
@@ -16,6 +17,8 @@ import LanguageSelector from '../../components/LanguageSelector';
 import ScreenHeader from '../../components/ScreenHeader';
 import SettingsSection from '../../components/settings/SettingsSection';
 import SafeScrollView from '../../components/SafeScrollView';
+import ConsentModal from '../SharePreviewScreen/components/ConsentModal';
+import encryptedJournalService from '../../services/encryptedJournalService';
 import { ANIMATION_DURATIONS } from '../../styles/animations';
 
 // Template component is now implemented as TemplateSelector
@@ -70,6 +73,7 @@ type ShareScreenNavigationProp = StackNavigationProp<MainStackParamList>;
 const ShareScreen: React.FC = () => {
   const navigation = useNavigation<ShareScreenNavigationProp>();
   const { theme } = useAppTheme();
+  const { settings } = useSettings();
   const styles = getShareScreenStyles(theme);
   
   // Set document title for web browsers
@@ -78,7 +82,12 @@ const ShareScreen: React.FC = () => {
   const [period, setPeriod] = useState<Period>('weekly');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>();
-  const [targetLanguage, setTargetLanguage] = useState<string>('en');
+  const [targetLanguage, setTargetLanguage] = useState<string>(settings.defaultSharingLanguage);
+  
+  // Consent modal state
+  const [showConsent, setShowConsent] = useState(false);
+  const [pendingEntriesCount, setPendingEntriesCount] = useState(0);
+  const [isCheckingEntries, setIsCheckingEntries] = useState(false);
   
   // Scroll to top functionality
   const scrollViewRef = React.useRef<any>(null);
@@ -88,6 +97,11 @@ const ShareScreen: React.FC = () => {
   useEffect(() => {
     logger.info('[ShareScreen] ShareScreen mounted');
   }, []);
+
+  // Update target language when sharing language setting changes
+  useEffect(() => {
+    setTargetLanguage(settings.defaultSharingLanguage);
+  }, [settings.defaultSharingLanguage]);
 
   const handleScroll = (event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y;
@@ -107,7 +121,7 @@ const ShareScreen: React.FC = () => {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
 
-  const handleGenerateShare = () => {
+  const handleGenerateShare = async () => {
     if (!selectedTemplate || !dateRange) {
       logger.warn('[ShareScreen] Generate share pressed but missing requirements', {
         selectedTemplate: !!selectedTemplate,
@@ -122,6 +136,42 @@ const ShareScreen: React.FC = () => {
       dateRange
     });
 
+    try {
+      // First, check how many entries we have for the selected range
+      setIsCheckingEntries(true);
+      const decryptedEntries = await encryptedJournalService.getEntries({
+        start_date: dateRange.start.toISOString(),
+        end_date: dateRange.end.toISOString(),
+        limit: 1000,
+      });
+
+      const validEntries = (decryptedEntries || [])
+        .filter((e: any) => typeof e.content === 'string' && e.content.trim().length > 0);
+
+      if (validEntries.length === 0) {
+        logger.warn('[ShareScreen] No valid entries found for date range');
+        // TODO: Show a message to user that no entries were found
+        return;
+      }
+
+      // Show consent modal with entry count
+      setPendingEntriesCount(validEntries.length);
+      setShowConsent(true);
+      
+    } catch (error) {
+      logger.error('[ShareScreen] Failed to check entries for consent', error);
+      // TODO: Show error message to user
+    } finally {
+      setIsCheckingEntries(false);
+    }
+  };
+
+  const handleConsentConfirm = () => {
+    setShowConsent(false);
+    
+    if (!selectedTemplate || !dateRange) return;
+
+    // Now proceed with navigation after consent is given
     navigation.navigate('SharePreview', {
       templateId: selectedTemplate,
       dateRange: {
@@ -130,7 +180,13 @@ const ShareScreen: React.FC = () => {
       },
       period,
       target_language: targetLanguage,
+      consentGiven: true, // Pass consent status
     });
+  };
+
+  const handleConsentCancel = () => {
+    setShowConsent(false);
+    logger.info('[ShareScreen] User cancelled consent - share generation cancelled');
   };
 
   const handleViewHistory = () => {
@@ -138,8 +194,19 @@ const ShareScreen: React.FC = () => {
     navigation.navigate('ShareHistory');
   };
 
+  const formatDateRange = (dateRange: DateRange) => {
+    return `${dateRange.start.toLocaleDateString()} - ${dateRange.end.toLocaleDateString()}`;
+  };
+
   return (
     <View style={styles.container}>
+      <ConsentModal
+        visible={showConsent}
+        entryCount={pendingEntriesCount}
+        dateRangeLabel={dateRange ? formatDateRange(dateRange) : ''}
+        onCancel={handleConsentCancel}
+        onConfirm={handleConsentConfirm}
+      />
       <ScreenHeader title="Share" />
       <SafeScrollView 
         ref={scrollViewRef}
@@ -202,17 +269,17 @@ const ShareScreen: React.FC = () => {
           icon="play"
         >
           <View style={styles.actions}>
-            <AnimatedButton
-              title="Generate Share"
-              onPress={handleGenerateShare}
-              disabled={!selectedTemplate || !dateRange}
-              variant="primary"
-              size="large"
-              fullWidth
-              style={styles.generateButton}
-              accessibilityLabel="Generate share summary"
-              accessibilityHint="Creates a summary of your journal entries for sharing"
-            />
+                                  <AnimatedButton
+                        title={isCheckingEntries ? "Checking Entries..." : "Generate Share"}
+                        onPress={handleGenerateShare}
+                        disabled={!selectedTemplate || !dateRange || isCheckingEntries}
+                        variant="primary"
+                        size="large"
+                        fullWidth
+                        style={styles.generateButton}
+                        accessibilityLabel="Generate share summary"
+                        accessibilityHint="Creates a summary of your journal entries for sharing"
+                      />
             
             <AnimatedButton
               title="View History"

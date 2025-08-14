@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 import { api } from './api';
 import logger from '../utils/logger';
 
@@ -122,7 +123,7 @@ class ShareService {
   }
 
   /**
-   * Download PDF for a share
+   * Download PDF for a share (platform-aware)
    */
   async downloadPDF(shareId: string, filename?: string): Promise<PDFDownloadResult> {
     try {
@@ -131,42 +132,87 @@ class ShareService {
       const baseUrl = api.defaults.baseURL || 'http://localhost:8001';
       const downloadUrl = `${baseUrl}/api/v1/shares/${shareId}/pdf`;
       const finalFilename = filename || `share-${shareId}-${Date.now()}.pdf`;
-      const fileUri = `${FileSystem.documentDirectory}${finalFilename}`;
 
-      const downloadResult = await FileSystem.downloadAsync(
-        downloadUrl,
-        fileUri,
-        {
-          // Note: FileSystem.downloadAsync doesn't automatically use api instance headers
-          // In a production app, you'd need to get auth headers from storage
-          headers: {
-            'Content-Type': 'application/pdf',
-          },
-        }
-      );
-
-      if (downloadResult.status !== 200) {
-        throw new Error(`Download failed with status ${downloadResult.status}`);
+      if (Platform.OS === 'web') {
+        // Web platform: use fetch and create blob URL
+        return await this._downloadPDFWeb(downloadUrl, finalFilename);
+      } else {
+        // Native platform: use expo-file-system
+        return await this._downloadPDFNative(downloadUrl, finalFilename);
       }
-
-      const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
-      
-      if (!fileInfo.exists) {
-        throw new Error('Downloaded file not found');
-      }
-
-      const result: PDFDownloadResult = {
-        uri: downloadResult.uri,
-        filename: finalFilename,
-        size: fileInfo.size || 0,
-      };
-
-      logger.info('[ShareService] PDF downloaded successfully', result);
-      return result;
     } catch (error) {
       logger.error('[ShareService] Failed to download PDF', error);
       throw new Error('Failed to download PDF. Please check your connection and try again.');
     }
+  }
+
+  /**
+   * Download PDF on web platform using axios and blob
+   */
+  private async _downloadPDFWeb(downloadUrl: string, filename: string): Promise<PDFDownloadResult> {
+    // Extract share ID from the download URL
+    const shareId = downloadUrl.split('/shares/')[1].split('/pdf')[0];
+    
+    // Use our existing API instance which has authentication interceptors
+    const response = await api.get(`/api/v1/shares/${shareId}/pdf`, {
+      responseType: 'blob', // Important: get response as blob
+      headers: {
+        'Accept': 'application/pdf',
+      },
+    });
+
+    const blob = response.data;
+    const blobUrl = URL.createObjectURL(blob);
+
+    const result: PDFDownloadResult = {
+      uri: blobUrl,
+      filename,
+      size: blob.size,
+    };
+
+    logger.info('[ShareService] PDF downloaded successfully (web)', result);
+    return result;
+  }
+
+  /**
+   * Download PDF on native platform using expo-file-system
+   */
+  private async _downloadPDFNative(downloadUrl: string, filename: string): Promise<PDFDownloadResult> {
+    // Get auth headers from authService
+    const { authService } = await import('./authService');
+    const authHeaders = authService.getAuthHeaders();
+
+    const fileUri = `${FileSystem.documentDirectory}${filename}`;
+
+    const downloadResult = await FileSystem.downloadAsync(
+      downloadUrl,
+      fileUri,
+      {
+        headers: {
+          'Content-Type': 'application/pdf',
+          ...authHeaders, // Include authentication headers
+        },
+      }
+    );
+
+    if (downloadResult.status !== 200) {
+      throw new Error(`Download failed with status ${downloadResult.status}`);
+    }
+
+    const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+    
+    if (!fileInfo.exists) {
+      throw new Error('Downloaded file not found');
+    }
+
+    const result: PDFDownloadResult = {
+      uri: downloadResult.uri,
+      filename,
+      size: fileInfo.size || 0,
+    };
+
+    logger.info('[ShareService] PDF downloaded successfully (native)', result);
+    return result;
   }
 
   /**
@@ -246,14 +292,23 @@ class ShareService {
   }
 
   /**
-   * Clean up downloaded files
+   * Clean up downloaded files (platform-aware)
    */
   async cleanupFile(fileUri: string): Promise<void> {
     try {
-      const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(fileUri);
-        logger.info('[ShareService] File cleaned up', { fileUri });
+      if (Platform.OS === 'web') {
+        // On web, revoke blob URL to free memory
+        if (fileUri.startsWith('blob:')) {
+          URL.revokeObjectURL(fileUri);
+          logger.info('[ShareService] Blob URL cleaned up', { fileUri });
+        }
+      } else {
+        // On native, delete file from filesystem
+        const fileInfo = await FileSystem.getInfoAsync(fileUri);
+        if (fileInfo.exists) {
+          await FileSystem.deleteAsync(fileUri);
+          logger.info('[ShareService] File cleaned up', { fileUri });
+        }
       }
     } catch (error) {
       logger.warn('[ShareService] Failed to cleanup file', { fileUri, error });

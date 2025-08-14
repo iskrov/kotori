@@ -36,6 +36,7 @@ export type SharePreviewParams = {
   fromHistory?: boolean;
   enableReshare?: boolean;
   target_language?: string; // desired output language for the report
+  consentGiven?: boolean; // whether user has given consent for data processing
 };
 
 export type ShareHistoryParams = undefined;

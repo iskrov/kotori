@@ -167,11 +167,24 @@ const SettingsScreen: React.FC = () => {
       {/* Language & Transcription Section */}
       <SettingsSection
         title="Language & Transcription"
-        icon="language"
+        subtitle="Default language for voice recording and transcription"
+        icon="mic"
       >
         <LanguageSelector
           selectedLanguage={settings.defaultLanguage}
           onLanguageChange={(value) => updateSetting('defaultLanguage', value)}
+        />
+      </SettingsSection>
+
+      {/* Sharing Language Section */}
+      <SettingsSection
+        title="Sharing & Reports"
+        subtitle="Default language for generated summaries and reports"
+        icon="share"
+      >
+        <LanguageSelector
+          selectedLanguage={settings.defaultSharingLanguage}
+          onLanguageChange={(value) => updateSetting('defaultSharingLanguage', value)}
         />
       </SettingsSection>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../../contexts/ThemeContext';
 import { AppTheme } from '../../../config/theme';
@@ -35,17 +35,39 @@ export const ShareOptions: React.FC<ShareOptionsProps> = ({
       
       const pdfResult = await shareService.downloadPDF(shareId);
       
-      Alert.alert(
-        'PDF Downloaded',
-        `Your summary has been saved as ${pdfResult.filename}`,
-        [
-          { text: 'OK', onPress: onClose },
-          {
-            text: 'Share PDF',
-            onPress: () => handleSharePDF(pdfResult.uri, pdfResult.filename)
-          }
-        ]
-      );
+      if (Platform.OS === 'web') {
+        // On web, trigger browser download
+        const link = document.createElement('a');
+        link.href = pdfResult.uri;
+        link.download = pdfResult.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up blob URL to prevent memory leaks
+        setTimeout(() => {
+          URL.revokeObjectURL(pdfResult.uri);
+        }, 1000);
+        
+        Alert.alert(
+          'PDF Downloaded',
+          `Your summary has been downloaded as ${pdfResult.filename}`,
+          [{ text: 'OK', onPress: onClose }]
+        );
+      } else {
+        // On native, show share options
+        Alert.alert(
+          'PDF Downloaded',
+          `Your summary has been saved as ${pdfResult.filename}`,
+          [
+            { text: 'OK', onPress: onClose },
+            {
+              text: 'Share PDF',
+              onPress: () => handleSharePDF(pdfResult.uri, pdfResult.filename)
+            }
+          ]
+        );
+      }
     } catch (error) {
       logger.error('[ShareOptions] Failed to download PDF', error);
       Alert.alert(

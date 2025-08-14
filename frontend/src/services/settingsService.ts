@@ -6,6 +6,7 @@ import { getDefaultLanguageCode, validateLanguageCode } from '../config/language
 export interface UserSettings {
   // Language & Transcription (FUNCTIONAL)
   defaultLanguage: string; // Can be 'auto' for auto-detect or specific language code
+  defaultSharingLanguage: string; // Default language for generated reports/shares
   
   // Privacy & Security (FUNCTIONAL)
   defaultEntryPrivacy: 'public' | 'hidden';
@@ -32,6 +33,7 @@ export interface UserSettings {
 export const DEFAULT_SETTINGS: UserSettings = {
   // Language & Transcription
   defaultLanguage: getDefaultLanguageCode(), // 'auto' for auto-detect
+  defaultSharingLanguage: 'en', // Default to English for sharing/reports
   
   // Privacy & Security
   defaultEntryPrivacy: 'public',
@@ -293,6 +295,12 @@ class SettingsService {
       case 'defaultLanguage':
         if (typeof value !== 'string' || (!validateLanguageCode(value) && value !== 'auto')) {
           throw new Error(`Invalid language code: ${value}`);
+        }
+        return value as UserSettings[K];
+        
+      case 'defaultSharingLanguage':
+        if (typeof value !== 'string' || !validateLanguageCode(value)) {
+          throw new Error(`Invalid sharing language code: ${value}`);
         }
         return value as UserSettings[K];
         

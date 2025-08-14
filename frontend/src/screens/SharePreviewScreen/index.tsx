@@ -23,7 +23,6 @@ import { SharePreviewSkeleton, ShareGenerationProgress } from '../../components/
 import { ShareErrorBoundary } from '../../components/errors';
 import useRetryableOperation from '../../hooks/useRetryableOperation';
 import logger from '../../utils/logger';
-import ConsentModal from './components/ConsentModal';
 
 type SharePreviewScreenNavigationProp = StackNavigationProp<MainStackParamList, 'SharePreview'>;
 type SharePreviewScreenRouteProp = RouteProp<MainStackParamList, 'SharePreview'>;
@@ -43,8 +42,6 @@ const SharePreviewScreenContent: React.FC = () => {
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState<number | undefined>(undefined);
-  const [showConsent, setShowConsent] = useState(false);
-  const [pendingEntriesCount, setPendingEntriesCount] = useState(0);
 
   useEffect(() => {
     generateShare();
@@ -104,15 +101,16 @@ const SharePreviewScreenContent: React.FC = () => {
             title: e.title || undefined,
           }));
 
-        // Ask for consent, showing how many entries will be processed
-        setPendingEntriesCount(entriesForShare.length);
-        setShowConsent(true);
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => resolve(), 0);
-          // Consent modal will set state; we proceed when user acts (below)
-          // We use a simple promise gate with state in render path
-          clearTimeout(timeout);
-          resolve();
+        // Check if consent was already given in ShareScreen
+        if (!params.consentGiven) {
+          // This should not happen with the new flow, but handle gracefully
+          logger.error('[SharePreviewScreen] No consent given - this should not happen with new flow');
+          setError('Consent required for share generation');
+          return;
+        }
+
+        logger.info('[SharePreviewScreen] Consent already given, proceeding with generation', {
+          entryCount: entriesForShare.length
         });
 
         const shareRequest: ShareRequest = {
@@ -300,13 +298,6 @@ const SharePreviewScreenContent: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ConsentModal
-        visible={showConsent}
-        entryCount={pendingEntriesCount}
-        dateRangeLabel={formatDateRange(params.dateRange)}
-        onCancel={() => { setShowConsent(false); navigation.goBack(); }}
-        onConfirm={() => setShowConsent(false)}
-      />
       <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
