@@ -67,6 +67,5 @@ availableSecrets:
 timeout: '1200s'
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: 'E2_HIGHCPU_8'
   pool:
     name: projects/kotori-io/locations/us-central1/workerPools/private-pool
