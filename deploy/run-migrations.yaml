@@ -39,11 +39,10 @@ steps:
         echo "🔍 Starting migration process..."
         cd /app
         
-        # Ensure dependencies available in runtime container
-        pip install --user -r requirements.txt >/dev/null 2>&1 || true
+        # Ensure dependencies available in runtime container (succeeds or fails build)
         export PATH="/home/kotori/.local/bin:$PATH"
-        
-        echo "Alembic version: $(alembic --version || echo 'not found')"
+        python -m pip install --user --no-cache-dir -r requirements.txt
+        echo "Alembic version: $(alembic --version)"
         
         # Check current migration status
         echo "📊 Current migration status:"
