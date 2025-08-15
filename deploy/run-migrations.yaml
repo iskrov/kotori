@@ -38,31 +38,36 @@ steps:
         set -euo pipefail
         echo "🔍 Starting migration process..."
         cd /app
-        
-        # Ensure dependencies available in runtime container (succeeds or fails build)
+        # Ensure we use the installed user-level tools from the image
+        export HOME=/home/kotori
+        export PYTHONPATH=/app
         export PATH="/home/kotori/.local/bin:$$PATH"
-        python -m pip install --user --no-cache-dir -r requirements.txt
-        echo "Alembic version: $(alembic --version)"
+        AL="/home/kotori/.local/bin/alembic"
+        echo "PATH=$PATH"
+        if [[ ! -x "$AL" ]]; then
+          echo "❌ Alembic not found at $AL"; ls -la /home/kotori/.local/bin || true; which alembic || true; exit 1;
+        fi
+        echo "Alembic version: $($AL --version)"
         
         # Check current migration status
         echo "📊 Current migration status:"
-        alembic current || true
+        $AL current || true
         
         # Show target revision
         echo "🎯 Target revision:"
-        alembic heads
+        $AL heads
         
         # Preview migrations (limited output to avoid issues)
         echo "👀 Migration preview (first 10 operations):"
-        alembic upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
+        $AL upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
         
         # Execute migrations (fail hard on error)
         echo "🚀 Executing database migrations..."
-        alembic upgrade head
+        $AL upgrade head
         
         # Verify success
         echo "✅ Post-migration status:"
-        alembic current
+        $AL current
         
         echo "🎉 Database migrations completed successfully!"
     secretEnv:
