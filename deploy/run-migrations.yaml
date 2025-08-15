@@ -70,11 +70,23 @@ steps:
         echo "🎉 Database migrations completed successfully!"
     secretEnv:
       - 'DATABASE_URL'
+      - 'SECRET_KEY'
+      - 'GOOGLE_CLOUD_PROJECT'
+      - 'GOOGLE_CLOUD_LOCATION'
+      - 'ENCRYPTION_MASTER_SALT'
 
 availableSecrets:
   secretManager:
     - versionName: projects/kotori-io/secrets/database-url/versions/latest
       env: DATABASE_URL
+    - versionName: projects/kotori-io/secrets/secret-key/versions/latest
+      env: SECRET_KEY
+    - versionName: projects/kotori-io/secrets/google-cloud-project/versions/latest
+      env: GOOGLE_CLOUD_PROJECT
+    - versionName: projects/kotori-io/secrets/google-cloud-location/versions/latest
+      env: GOOGLE_CLOUD_LOCATION
+    - versionName: projects/kotori-io/secrets/encryption-master-salt/versions/latest
+      env: ENCRYPTION_MASTER_SALT
 
 # Build configuration
 timeout: '1200s'
