@@ -37,6 +37,6 @@ options:
   logging: CLOUD_LOGGING_ONLY
   pool:
     name: projects/kotori-io/locations/us-central1/workerPools/private-pool
-  substitution_option: 'ALLOW_LOOSE'
+  substitutionOption: 'ALLOW_LOOSE'
 
 
