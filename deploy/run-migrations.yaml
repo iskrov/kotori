@@ -21,7 +21,7 @@ steps:
         BACKUP_DESCRIPTION="pre-migration-$(date +%Y%m%d-%H%M%S)"
         gcloud sql backups create \
           --instance=kotori-db-instance \
-          --description="$BACKUP_DESCRIPTION" \
+          --description="$$BACKUP_DESCRIPTION" \
           --project=kotori-io
         echo "✅ Backup created: $BACKUP_DESCRIPTION"
 
