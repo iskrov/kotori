@@ -28,6 +28,7 @@ REGISTRY="us-central1-docker.pkg.dev/kotori-io/kotori-images"
 DEPLOY_FRONTEND=true
 DEPLOY_BACKEND=true
 RUN_MIGRATIONS=true
+AUTO_CONFIRM=false
 TAG="deploy-$(date +%Y%m%d-%H%M%S)"
 
 # Parse command line arguments
@@ -39,6 +40,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --backend-only)
             DEPLOY_FRONTEND=false
+            shift
+            ;;
+        --yes)
+            AUTO_CONFIRM=true
             shift
             ;;
         --skip-migrations)
@@ -61,6 +66,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --frontend-only    Deploy only the frontend"
             echo "  --backend-only     Deploy only the backend"
+            echo "  --yes              Auto-approve all confirmations (non-interactive)"
             echo "  --skip-migrations  Skip database migrations (use with caution)"
             echo "  --migrations-only  Run only database migrations (no app deployment)"
             echo "  --tag TAG          Use custom tag (default: deploy-YYYYMMDD-HHMMSS)"
@@ -208,10 +214,14 @@ run_database_migrations() {
     
     # Run migrations using Cloud Build
     print_step "Executing migrations via Cloud Build"
+    # Ensure private worker pool name is set
+    PRIVATE_POOL_NAME="projects/$PROJECT_ID/locations/$REGION/workerPools/private-pool"
+
     if gcloud builds submit \
         --config=deploy/run-migrations.yaml \
         --project="$PROJECT_ID" \
         --region="$REGION" \
+        --worker-pool="$PRIVATE_POOL_NAME" \
         .; then
         print_success "Database migrations completed successfully via Cloud Build"
     else
@@ -303,11 +313,15 @@ main() {
     echo ""
     
     # Confirmation
-    read -p "Do you want to proceed with deployment? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_error "Deployment cancelled"
-        exit 1
+    if [[ "$AUTO_CONFIRM" == true ]]; then
+        print_warning "Auto-confirm enabled (--yes). Proceeding without prompt."
+    else
+        read -p "Do you want to proceed with deployment? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_error "Deployment cancelled"
+            exit 1
+        fi
     fi
     
     check_prerequisites
