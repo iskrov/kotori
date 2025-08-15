@@ -144,18 +144,18 @@ const SessionControlPanel: React.FC<SessionControlPanelProps> = ({
    */
   const getSessionStatus = () => {
     if (timerState.isExpired) {
-      return { icon: 'time-outline', color: '#FF3B30', text: 'Expired' };
+      return { icon: 'time-outline', color: theme.colors.error, text: 'Expired' };
     }
     if (session.isLocked) {
-      return { icon: 'lock-closed', color: '#FF9500', text: 'Locked' };
+      return { icon: 'lock-closed', color: theme.colors.warning, text: 'Locked' };
     }
     if (timerState.isCritical) {
-      return { icon: 'warning', color: '#FF9500', text: 'Expiring Soon' };
+      return { icon: 'warning', color: theme.colors.warning, text: 'Expiring Soon' };
     }
     if (timerState.isWarning) {
-      return { icon: 'time', color: '#FFCC00', text: 'Expiring' };
+      return { icon: 'time', color: theme.colors.warning, text: 'Expiring' };
     }
-    return { icon: 'checkmark-circle', color: '#34C759', text: 'Active' };
+    return { icon: 'checkmark-circle', color: theme.colors.success, text: 'Active' };
   };
 
   const sessionStatus = getSessionStatus();
@@ -211,9 +211,9 @@ const SessionControlPanel: React.FC<SessionControlPanelProps> = ({
           disabled={disabled || isLoading || timerState.isExpired}
         >
           {isLoading && loadingOperation === 'extend' ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={theme.colors.primary} />
           ) : (
-            <Ionicons name="time-outline" size={16} color="#007AFF" />
+            <Ionicons name="time-outline" size={16} color={theme.colors.primary} />
           )}
           <Text style={[styles.controlButtonText, styles.extendButtonText]}>
             Extend
@@ -232,12 +232,12 @@ const SessionControlPanel: React.FC<SessionControlPanelProps> = ({
             disabled={disabled || isLoading || timerState.isExpired}
           >
             {isLoading && (loadingOperation === 'lock' || loadingOperation === 'unlock') ? (
-              <ActivityIndicator size="small" color="#FF9500" />
+              <ActivityIndicator size="small" color={theme.colors.warning} />
             ) : (
               <Ionicons 
                 name={session.isLocked ? "lock-open-outline" : "lock-closed-outline"} 
                 size={16} 
-                color="#FF9500" 
+                color={theme.colors.warning} 
               />
             )}
             <Text style={[styles.controlButtonText, styles.lockButtonText]}>
@@ -257,9 +257,9 @@ const SessionControlPanel: React.FC<SessionControlPanelProps> = ({
           disabled={disabled || isLoading}
         >
           {isLoading && loadingOperation === 'deactivate' ? (
-            <ActivityIndicator size="small" color="#FF3B30" />
+            <ActivityIndicator size="small" color={theme.colors.error} />
           ) : (
-            <Ionicons name="power" size={16} color="#FF3B30" />
+            <Ionicons name="power" size={16} color={theme.colors.error} />
           )}
           <Text style={[styles.controlButtonText, styles.deactivateButtonText]}>
             End
@@ -362,16 +362,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     opacity: 0.5,
   },
   extendButton: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#007AFF',
+    backgroundColor: theme.colors.chipBackground,
+    borderColor: theme.colors.primary,
   },
   lockButton: {
     backgroundColor: '#FFF3E0',
-    borderColor: '#FF9500',
+    borderColor: theme.colors.warning,
   },
   deactivateButton: {
-    backgroundColor: '#FFEBEE',
-    borderColor: '#FF3B30',
+    backgroundColor: theme.colors.error + '20',
+    borderColor: theme.colors.error,
   },
   controlButtonText: {
     fontSize: 14,
@@ -379,13 +379,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginLeft: 4,
   },
   extendButtonText: {
-    color: '#007AFF',
+    color: theme.colors.primary,
   },
   lockButtonText: {
-    color: '#FF9500',
+    color: theme.colors.warning,
   },
   deactivateButtonText: {
-    color: '#FF3B30',
+    color: theme.colors.error,
   },
   details: {
     borderTopWidth: 1,

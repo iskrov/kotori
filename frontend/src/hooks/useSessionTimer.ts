@@ -96,10 +96,11 @@ export const useSessionTimer = (): SessionTimerHookReturn => {
    * Get appropriate color for timer state
    */
   const getExpirationColor = useCallback((state: SessionTimerState): string => {
-    if (state.isExpired) return '#FF3B30'; // Red
-    if (state.isCritical) return '#FF9500'; // Orange
-    if (state.isWarning) return '#FFCC00'; // Yellow
-    return '#34C759'; // Green
+    // Map semantic states to theme-consistent tokens
+    if (state.isExpired) return '#F87171'; // align to theme.colors.error
+    if (state.isCritical) return '#FBBF24'; // align to theme.colors.warning
+    if (state.isWarning) return '#FBBF24';
+    return '#34D399'; // align to theme.colors.success
   }, []);
 
   /**

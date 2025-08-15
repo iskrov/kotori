@@ -208,12 +208,12 @@ const styles = StyleSheet.create({
   devTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#856404',
+    color: theme.colors.textMuted,
     marginBottom: 10
   },
   devText: {
     fontSize: 12,
-    color: '#856404',
+    color: theme.colors.textMuted,
     marginBottom: 5,
     fontFamily: 'monospace'
   }

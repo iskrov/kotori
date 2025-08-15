@@ -194,7 +194,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         onRequestClose={handleCloseSelector}
       >
         <SafeAreaView style={styles.modalContainer}>
-          <StatusBar barStyle={theme.colors.text === '#FFFFFF' ? 'light-content' : 'dark-content'} />
+          <StatusBar barStyle={theme.colors.statusBar} />
           
           {/* Header */}
           <View style={styles.modalHeader}>

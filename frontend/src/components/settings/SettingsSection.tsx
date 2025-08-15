@@ -101,6 +101,8 @@ const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
     container: {
       ...componentStyles.card,
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
       marginVertical: theme.spacing.sm,
       marginHorizontal: theme.spacing.md,
       overflow: 'hidden',

@@ -513,7 +513,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: theme.colors.overlay,
     zIndex: 1,
   },
   contentContainer: {

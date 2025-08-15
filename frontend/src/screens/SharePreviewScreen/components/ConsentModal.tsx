@@ -15,7 +15,7 @@ const ConsentModal: React.FC<ConsentModalProps> = ({ visible, onConfirm, onCance
   const styles = StyleSheet.create({
     backdrop: {
       flex: 1,
-      backgroundColor: '#00000088',
+      backgroundColor: theme.colors.overlay,
       justifyContent: 'center',
       alignItems: 'center',
       padding: theme.spacing.lg,

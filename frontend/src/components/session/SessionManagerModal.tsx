@@ -86,7 +86,7 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({
           <Ionicons
             name={isSelected ? 'chevron-up' : 'chevron-down'}
             size={20}
-            color="#8E8E93"
+            color={theme.colors.textMuted}
           />
         </TouchableOpacity>
         
@@ -146,7 +146,7 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({
           onPress={handlePanicMode}
           testID="panic-mode-button"
         >
-          <Ionicons name="warning" size={18} color="#FFFFFF" />
+          <Ionicons name="warning" size={18} color={theme.colors.onPrimary} />
           <Text style={styles.panicButtonText}>Panic</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -154,7 +154,7 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({
           onPress={onClose}
           testID="close-button"
         >
-          <Ionicons name="close" size={24} color="#1C1C1E" />
+          <Ionicons name="close" size={24} color={theme.colors.text} />
         </TouchableOpacity>
       </View>
     </View>
@@ -171,7 +171,7 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="shield-checkmark-outline" size={64} color="#8E8E93" />
+      <Ionicons name="shield-checkmark-outline" size={64} color={theme.colors.textMuted} />
       <Text style={styles.emptyTitle}>No Active Sessions</Text>
       <Text style={styles.emptySubtitle}>
         Use voice phrases to create secure sessions for encrypted journaling
@@ -218,7 +218,7 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.borderLight,
   },
   
   header: {
@@ -227,9 +227,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: theme.colors.border,
   },
   
   headerLeft: {
@@ -239,12 +239,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1C1C1E',
+    color: theme.colors.text,
   },
   
   subtitle: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FF3B30',
+    backgroundColor: theme.colors.error,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   panicButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   
   closeButton: {
@@ -293,11 +293,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: theme.colors.text,
   },
   
   sectionBadge: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -308,16 +308,16 @@ const styles = StyleSheet.create({
   sectionCount: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   
   sessionItem: {
     marginHorizontal: 20,
     marginBottom: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -332,14 +332,14 @@ const styles = StyleSheet.create({
   },
   
   sessionHeaderSelected: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.borderLight,
   },
   
   sessionDetails: {
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
+    borderTopColor: theme.colors.border,
   },
   
   sessionInfo: {
@@ -352,12 +352,12 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#8E8E93',
+    color: theme.colors.textMuted,
   },
   
   infoValue: {
     fontSize: 14,
-    color: '#1C1C1E',
+    color: theme.colors.text,
     flex: 1,
     textAlign: 'right',
   },
@@ -382,14 +382,14 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: theme.colors.text,
     marginTop: 16,
     textAlign: 'center',
   },
   
   emptySubtitle: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: theme.colors.textMuted,
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 22,

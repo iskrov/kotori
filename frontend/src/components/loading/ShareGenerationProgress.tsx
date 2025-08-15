@@ -72,7 +72,7 @@ export const ShareGenerationProgress: React.FC<ShareGenerationProgressProps> = (
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }] }>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.colors.text }]}>
           Generating Your Summary
@@ -130,7 +130,7 @@ export const ShareGenerationProgress: React.FC<ShareGenerationProgressProps> = (
                     size={20}
                     color={
                       isCompleted || isCurrent
-                        ? theme.colors.surface
+                        ? theme.colors.onPrimary
                         : theme.colors.textMuted
                     }
                   />

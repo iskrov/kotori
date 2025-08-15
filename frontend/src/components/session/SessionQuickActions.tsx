@@ -104,11 +104,11 @@ export const SessionQuickActions: React.FC<SessionQuickActionsProps> = ({
   const getIconColor = (action: SessionQuickAction) => {
     switch (action.variant) {
       case 'primary':
-        return '#FFFFFF';
+        return theme.colors.onPrimary;
       case 'danger':
-        return '#FFFFFF';
+        return theme.colors.onPrimary;
       case 'warning':
-        return '#FFFFFF';
+        return theme.colors.onPrimary;
       default:
         return '#007AFF';
     }
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   },
   
   secondaryButton: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: theme.colors.borderLight,
     borderWidth: 1,
     borderColor: '#E5E5EA',
   },
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
   
   warningButton: {
-    backgroundColor: '#FF9500',
+    backgroundColor: theme.colors.warning,
   },
   
   actionText: {
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   },
   
   primaryText: {
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   
   secondaryText: {
@@ -227,10 +227,10 @@ const styles = StyleSheet.create({
   },
   
   dangerText: {
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   
   warningText: {
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
 }); 

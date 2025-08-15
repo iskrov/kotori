@@ -470,6 +470,9 @@ const getStyles = (theme: AppTheme) => {
     },
     calendar: {
       ...componentStyles.card,
+      backgroundColor: theme.colors.card,
+      borderColor: theme.colors.border,
+      shadowColor: theme.colors.shadow,
       paddingHorizontal: theme.spacing.sm,
       paddingVertical: theme.spacing.md,
       margin: theme.spacing.md,

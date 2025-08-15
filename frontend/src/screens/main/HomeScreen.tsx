@@ -411,6 +411,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   greetingCard: {
     ...componentStyles.card,
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
     padding: theme.spacing.lg,
   },
   greetingContent: {
@@ -452,6 +455,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   statCard: {
     ...componentStyles.card,
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
     padding: theme.spacing.md,
     alignItems: 'center',
     flex: 1,
@@ -550,6 +556,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   vibeButton: {
     ...componentStyles.card,
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow,
     padding: theme.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',

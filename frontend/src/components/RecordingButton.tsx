@@ -47,7 +47,7 @@ const RecordingButton: React.FC<RecordingButtonProps> = ({
       <Ionicons
         name={isRecording ? 'stop' : 'mic'}
         size={iconSize}
-        color="#fff"
+        color={isRecording ? theme.colors.onPrimary : theme.colors.onPrimary}
       />
     </TouchableOpacity>
   );
@@ -55,20 +55,20 @@ const RecordingButton: React.FC<RecordingButtonProps> = ({
 
 const styles = StyleSheet.create({
   recordButton: {
-    backgroundColor: '#7D4CDB',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 3,
   },
   recordingActive: {
-    backgroundColor: '#dc3545', // Red when recording
+    backgroundColor: theme.colors.error, // Red when recording
   },
   recordButtonDisabled: {
-    backgroundColor: '#cccccc',
+    backgroundColor: theme.colors.disabled,
   },
 });
 

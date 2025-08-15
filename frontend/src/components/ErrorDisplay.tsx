@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     margin: 10,
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     padding: 12,
     margin: 5,
     borderLeftWidth: 4,
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: {
       width: 0,
       height: 1,

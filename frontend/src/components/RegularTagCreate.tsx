@@ -44,8 +44,8 @@ const RegularTagCreate: React.FC<RegularTagCreateProps> = ({
   // Predefined color options
   const colorOptions = [
     '#007AFF', // Blue
-    '#34C759', // Green
-    '#FF9500', // Orange
+    theme.colors.success, // Green
+    theme.colors.warning, // Orange
     '#FF3B30', // Red
     '#AF52DE', // Purple
     '#FF2D92', // Pink

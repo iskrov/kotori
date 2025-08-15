@@ -24,7 +24,8 @@ import logger from '../../utils/logger';
 import LogViewer from '../../utils/LogViewer';
 import OpaqueAuthButton from '../../components/OpaqueAuthButton';
 import logo from '../../../assets/logo.png';
-import { authStyles, authColors, spacing } from '../../styles/authStyles';
+import { authStyles, authColors, spacing, getAuthStyles } from '../../styles/authStyles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 import { kotoriTypography } from '../../styles/theme';
 
 // Ensure web browser redirect results are handled
@@ -34,6 +35,8 @@ type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const LoginScreen = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const { theme } = useAppTheme();
+  const themed = getAuthStyles(theme);
   const { isLoading: authLoading } = useAuth();
   
   const [email, setEmail] = useState('');
@@ -68,58 +71,58 @@ const LoginScreen = () => {
   };
   
   return (
-    <View style={authStyles.container}>
+    <View style={themed.container}>
       <SafeScrollView 
-        style={authStyles.scrollContainer}
-        contentContainerStyle={authStyles.scrollContent}
+        style={themed.scrollContainer}
+        contentContainerStyle={themed.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Main Card */}
-        <View style={authStyles.card}>
+        <View style={themed.card}>
           {/* Logo and Title */}
-          <View style={authStyles.logoSection}>
+          <View style={themed.logoSection}>
             <Image 
               source={logo} 
-              style={authStyles.logo} 
+              style={themed.logo} 
               resizeMode="contain"
               accessibilityLabel="Kotori logo"
               accessibilityRole="image"
             />
-            <Text style={authStyles.appTitle}>Kotori</Text>
-            <Text style={authStyles.appSubtitle}>Your AI-powered voice journal</Text>
+            <Text style={themed.appTitle}>Kotori</Text>
+            <Text style={themed.appSubtitle}>Your AI-powered voice journal</Text>
         </View>
 
           {/* Form Header */}
-          <View style={authStyles.formHeader}>
-            <Text style={authStyles.formTitle}>Welcome back</Text>
-            <Text style={authStyles.formSubtitle}>Log in to continue your private journal.</Text>
+          <View style={themed.formHeader}>
+            <Text style={themed.formTitle}>Welcome back</Text>
+            <Text style={themed.formSubtitle}>Log in to continue your private journal.</Text>
           </View>
 
           {/* Error Message */}
           {errorMessage && (
-            <View style={authStyles.errorContainer}>
-              <Text style={authStyles.errorText} accessibilityRole="alert">
+            <View style={themed.errorContainer}>
+              <Text style={themed.errorText} accessibilityRole="alert">
                 {errorMessage}
               </Text>
             </View>
           )}
           
           {/* Email Input */}
-          <View style={authStyles.inputContainer}>
+          <View style={themed.inputContainer}>
             <View style={[
-              authStyles.inputWrapper,
-              emailFocused && authStyles.inputWrapperFocused
+              themed.inputWrapper,
+              emailFocused && themed.inputWrapperFocused
             ]}>
               <Ionicons 
                 name="mail-outline" 
                 size={18} 
-                color={authColors.textMuted} 
-                style={authStyles.inputIcon}
+                color={theme.colors.textMuted}
+                style={themed.inputIcon}
                 accessibilityElementsHidden={true}
               />
               <TextInput
-                style={authStyles.input}
+                style={themed.input}
                 placeholder="Email"
                 value={email}
                 onChangeText={setEmail}
@@ -127,7 +130,7 @@ const LoginScreen = () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="email"
-                placeholderTextColor={authColors.textMuted}
+                placeholderTextColor={theme.colors.textMuted}
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
                 accessibilityLabel="Email address"
@@ -137,20 +140,20 @@ const LoginScreen = () => {
           </View>
           
           {/* Password Input */}
-          <View style={authStyles.inputContainer}>
+          <View style={themed.inputContainer}>
             <View style={[
-              authStyles.inputWrapper,
-              passwordFocused && authStyles.inputWrapperFocused
+              themed.inputWrapper,
+              passwordFocused && themed.inputWrapperFocused
             ]}>
               <Ionicons 
                 name="lock-closed-outline" 
                 size={18} 
-                color={authColors.textMuted} 
-                style={authStyles.inputIcon}
+                color={theme.colors.textMuted}
+                style={themed.inputIcon}
                 accessibilityElementsHidden={true}
               />
               <TextInput
-                style={authStyles.input}
+                style={themed.input}
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
@@ -158,7 +161,7 @@ const LoginScreen = () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="password"
-                placeholderTextColor={authColors.textMuted}
+                placeholderTextColor={theme.colors.textMuted}
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
                 accessibilityLabel="Password"
@@ -166,14 +169,14 @@ const LoginScreen = () => {
               />
               <Pressable 
                 onPress={() => setShowPassword(!showPassword)}
-                style={authStyles.eyeIcon}
+                style={themed.eyeIcon}
                 accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                 accessibilityRole="button"
               >
                 <Ionicons 
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
                   size={18} 
-                  color={authColors.textMuted} 
+                  color={theme.colors.textMuted}
                 />
               </Pressable>
             </View>
@@ -192,20 +195,20 @@ const LoginScreen = () => {
               setErrorMessage(error);
             }}
             disabled={!email || !password || isLoading || authLoading}
-            style={authStyles.primaryButton}
+            style={themed.primaryButton}
           />
 
           {/* Divider */}
-          <View style={authStyles.dividerContainer}>
-            <View style={authStyles.dividerLine} />
-            <Text style={authStyles.dividerText}>or</Text>
-            <View style={authStyles.dividerLine} />
+          <View style={themed.dividerContainer}>
+            <View style={themed.dividerLine} />
+            <Text style={themed.dividerText}>or</Text>
+            <View style={themed.dividerLine} />
           </View>
           
           {/* Google Sign In */}
           <Pressable 
             style={({ pressed }) => [
-              authStyles.secondaryButton,
+              themed.secondaryButton,
               pressed && { opacity: 0.8 }
             ]}
             onPress={handleGoogleLogin}
@@ -213,19 +216,19 @@ const LoginScreen = () => {
             accessibilityLabel="Continue with Google"
             accessibilityRole="button"
           >
-            <Ionicons name="logo-google" size={20} color={authColors.googleRed} />
-            <Text style={authStyles.secondaryButtonText}>Continue with Google</Text>
+            <Ionicons name="logo-google" size={20} color={theme.colors.text} />
+            <Text style={themed.secondaryButtonText}>Continue with Google</Text>
           </Pressable>
 
           {/* Footer Link */}
-          <View style={authStyles.footerContainer}>
-            <Text style={authStyles.footerText}>Don't have an account?</Text>
+          <View style={themed.footerContainer}>
+            <Text style={themed.footerText}>Don't have an account?</Text>
             <Pressable 
               onPress={navigateToRegister}
               accessibilityLabel="Create a new account"
               accessibilityRole="link"
             >
-              <Text style={authStyles.footerLink}>Create one</Text>
+              <Text style={themed.footerLink}>Create one</Text>
             </Pressable>
         </View>
         </View>

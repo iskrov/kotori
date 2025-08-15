@@ -54,10 +54,10 @@ export const SessionStatusBadge: React.FC<SessionStatusBadgeProps> = ({
 
   // Get status color
   const getStatusColor = () => {
-    if (!session.isActive) return '#666666';
-    if (isCritical) return '#FF3B30';
-    if (isExpiring) return '#FF9500';
-    return '#34C759';
+    if (!session.isActive) return '#94A3B8'; // textMuted-like
+    if (isCritical) return '#F87171'; // error
+    if (isExpiring) return '#FBBF24'; // warning
+    return '#34D399'; // success
   };
 
   // Get health indicator
@@ -70,10 +70,10 @@ export const SessionStatusBadge: React.FC<SessionStatusBadgeProps> = ({
 
   // Get health color
   const getHealthColor = () => {
-    if (session.healthScore >= 90) return '#34C759';
-    if (session.healthScore >= 70) return '#007AFF';
-    if (session.healthScore >= 50) return '#FF9500';
-    return '#FF3B30';
+    if (session.healthScore >= 90) return '#34D399';
+    if (session.healthScore >= 70) return '#7CD4CF'; // teal light
+    if (session.healthScore >= 50) return '#FBBF24';
+    return '#F87171';
   };
 
   // Render compact variant
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   
   // Compact variant styles
   compactContainer: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 8,
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   tagName: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: '#0E1726',
     flex: 1,
   },
   countdown: {
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
     minWidth: 200,
-    shadowColor: '#000',
+    shadowColor: 'rgba(14,23,38,0.06)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   tagNameDetailed: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: '#0E1726',
     flex: 1,
   },
   securityLevel: {
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   timeLabel: {
     fontSize: 11,
-    color: '#8E8E93',
+    color: '#94A3B8',
     marginTop: 2,
   },
   statusInfo: {
@@ -293,16 +293,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
+    borderTopColor: '#E6ECF1',
   },
   statusText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#1C1C1E',
+    color: '#0E1726',
   },
   deviceInfo: {
     fontSize: 10,
-    color: '#8E8E93',
+    color: '#94A3B8',
   },
   
   // Minimal variant styles

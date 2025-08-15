@@ -272,9 +272,9 @@ const SessionListView: React.FC<SessionListViewProps> = ({
             disabled={isRefreshing || bulkLoading}
           >
             {isRefreshing ? (
-              <ActivityIndicator size="small" color="#007AFF" />
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             ) : (
-              <Ionicons name="refresh" size={16} color="#007AFF" />
+              <Ionicons name="refresh" size={16} color={theme.colors.primary} />
             )}
             <Text style={styles.refreshButtonText}>Refresh</Text>
           </TouchableOpacity>
@@ -285,9 +285,9 @@ const SessionListView: React.FC<SessionListViewProps> = ({
             disabled={bulkLoading || isRefreshing}
           >
             {bulkLoading ? (
-              <ActivityIndicator size="small" color="#FF3B30" />
+              <ActivityIndicator size="small" color={theme.colors.error} />
             ) : (
-              <Ionicons name="power" size={16} color="#FF3B30" />
+              <Ionicons name="power" size={16} color={theme.colors.error} />
             )}
             <Text style={styles.deactivateAllButtonText}>End All</Text>
           </TouchableOpacity>
@@ -357,8 +357,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginRight: 8,
   },
   filterButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   filterButtonText: {
     fontSize: 14,
@@ -366,7 +366,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontWeight: '500',
   },
   filterButtonTextSelected: {
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   bulkControls: {
     flexDirection: 'row',
@@ -377,16 +377,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#E3F2FD',
+    backgroundColor: theme.colors.chipBackground,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: theme.colors.primary,
     flex: 1,
     marginRight: 8,
     justifyContent: 'center',
   },
   refreshButtonText: {
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -395,16 +395,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#FFEBEE',
+    backgroundColor: theme.colors.error + '20',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FF3B30',
+    borderColor: theme.colors.error,
     flex: 1,
     marginLeft: 8,
     justifyContent: 'center',
   },
   deactivateAllButtonText: {
-    color: '#FF3B30',
+    color: theme.colors.error,
     fontWeight: '600',
     marginLeft: 4,
   },

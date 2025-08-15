@@ -338,7 +338,7 @@ export const AudioRecorderUI: React.FC<AudioRecorderUIProps> = ({
           <TouchableOpacity
             style={[
               styles.recordingButton,
-              { backgroundColor: isRecording ? '#E53E3E' : theme.colors.primary }
+              { backgroundColor: isRecording ? theme.colors.error : theme.colors.primary }
             ]}
             onPress={handleMicPress}
             disabled={!permissionGranted}
@@ -539,7 +539,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    backgroundColor: theme.colors.primary + '20',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -550,7 +550,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -569,7 +569,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   // Recording status
   recordingStatusText: {
     fontSize: 16,
-    color: '#E53E3E',
+    color: theme.colors.error,
     fontWeight: '500',
     marginTop: theme.spacing.sm,
     textAlign: 'center',
@@ -595,7 +595,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    backgroundColor: theme.isDarkMode ? theme.colors.gray800 : theme.colors.gray50,
+    // Keep header consistent with card background in both modes for clarity
+    backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.borderLight,
   },
@@ -721,7 +722,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },

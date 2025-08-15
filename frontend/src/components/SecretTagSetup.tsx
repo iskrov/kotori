@@ -398,7 +398,7 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
             <Ionicons 
               name={justCreated.isOpaque ? "shield-checkmark" : "checkmark-circle"} 
               size={64} 
-              color={justCreated.isOpaque ? '#00C851' : (theme.colors.success || '#34C759')} 
+              color={justCreated.isOpaque ? theme.colors.success : theme.colors.success} 
             />
           </View>
           
@@ -443,7 +443,7 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
           {justCreated.isOpaque && (
             <View style={styles.securityNotice}>
               <View style={styles.securityNoticeIcon}>
-                <Ionicons name="warning" size={20} color="#FF9500" />
+                <Ionicons name="warning" size={20} color={theme.colors.warning} />
               </View>
               <Text style={styles.securityNoticeText}>
                 <Text style={styles.securityNoticeTextBold}>Important:</Text> This phrase cannot be recovered if forgotten. 
@@ -487,7 +487,7 @@ const SecretTagSetup: React.FC<SecretTagSetupProps> = ({
             <Ionicons 
               name="shield-checkmark" 
               size={24} 
-              color="#00C851" 
+              color={theme.colors.success} 
             />
             <Text style={styles.securityInfoText}>
               Zero-Knowledge OPAQUE Authentication
@@ -715,7 +715,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   // Warning Section Styles
   warningContainer: {
     backgroundColor: '#FFF3CD',
-    borderColor: '#FFEAA7',
+    borderColor: theme.colors.warningLight,
     borderWidth: 1,
     borderRadius: 8,
     padding: theme.spacing.lg,
@@ -735,14 +735,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   warningText: {
     fontSize: theme.typography.fontSizes.sm,
-    color: '#856404',
+    color: theme.colors.textMuted,
     lineHeight: 20,
     marginBottom: theme.spacing.sm,
     fontFamily: theme.typography.fontFamilies.regular,
   },
   warningTextBold: {
     fontSize: theme.typography.fontSizes.sm,
-    color: '#721C24',
+    color: theme.colors.error,
     lineHeight: 20,
     fontWeight: 'bold',
     marginBottom: theme.spacing.md,
@@ -754,13 +754,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   warningTipTitle: {
     fontSize: theme.typography.fontSizes.sm,
     fontWeight: '600',
-    color: '#856404',
+    color: theme.colors.textMuted,
     marginBottom: theme.spacing.xs,
     fontFamily: theme.typography.fontFamilies.semiBold,
   },
   warningTip: {
     fontSize: theme.typography.fontSizes.sm,
-    color: '#856404',
+    color: theme.colors.textMuted,
     lineHeight: 18,
     fontFamily: theme.typography.fontFamilies.regular,
     flex: 1,
@@ -774,7 +774,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#856404',
+    backgroundColor: theme.colors.textMuted,
     marginTop: 7,
     marginRight: theme.spacing.xs,
   },
@@ -796,7 +796,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   successTitle: {
     fontSize: theme.typography.fontSizes.xxl,
     fontWeight: 'bold',
-    color: theme.colors.success || '#34C759',
+    color: theme.colors.success,
     textAlign: 'center',
     marginBottom: theme.spacing.xl,
     fontFamily: theme.typography.fontFamilies.bold,
@@ -852,12 +852,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   securityNotice: {
     flexDirection: 'row',
-    backgroundColor: '#FFF9E6',
+    backgroundColor: theme.colors.warning + '20',
     padding: theme.spacing.md,
     borderRadius: 8,
     marginTop: theme.spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF9500',
+    borderLeftColor: theme.colors.warning,
   },
   securityNoticeIcon: {
     marginRight: theme.spacing.sm,
@@ -934,13 +934,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     padding: theme.spacing.md,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#00C851',
-    backgroundColor: '#00C851' + '10',
+    borderColor: theme.colors.success,
+    backgroundColor: theme.colors.success + '10',
   },
   securityInfoText: {
     marginLeft: theme.spacing.sm,
     fontSize: theme.typography.fontSizes.md,
-    color: '#00C851',
+    color: theme.colors.success,
     fontFamily: theme.typography.fontFamilies.semiBold,
     fontWeight: '600',
   },
@@ -967,7 +967,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontFamily: theme.typography.fontFamilies.regular,
   },
   inputValid: {
-    borderColor: '#34C759', // Green border for valid input
+    borderColor: theme.colors.success, // Green border for valid input
   },
   inputError: {
     borderColor: theme.colors.error, // Red border for invalid input

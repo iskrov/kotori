@@ -143,6 +143,10 @@ const JournalCard: React.FC<JournalCardProps> = ({ entry, onPress, style }) => {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     ...componentStyles.card,
+    backgroundColor: theme.colors.card,
+    borderColor: theme.colors.border,
+    // ensure shadow color adapts to theme
+    shadowColor: theme.colors.shadow,
     padding: theme.spacing.lg,
     marginVertical: theme.spacing.sm,
     marginHorizontal: theme.spacing.xs,

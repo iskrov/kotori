@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAppTheme } from '../contexts/ThemeContext';
 import { createStackNavigator } from '@react-navigation/stack';
 import MainTabNavigator from './MainTabNavigator';
 import RecordScreen from '../screens/main/RecordScreen';
@@ -16,6 +17,7 @@ import { MainStackParamList } from './types';
 const Stack = createStackNavigator<MainStackParamList>();
 
 const MainNavigator = () => {
+  const { theme } = useAppTheme();
   return (
     <Stack.Navigator
       screenOptions={{
@@ -70,8 +72,8 @@ const MainNavigator = () => {
         options={{
           headerShown: true,
           title: 'Reminder',
-          headerStyle: { backgroundColor: '#f8f9fa' },
-          headerTintColor: '#333',
+          headerStyle: { backgroundColor: theme.colors.card },
+          headerTintColor: theme.colors.text,
         }}
       />
       <Stack.Screen
@@ -81,8 +83,8 @@ const MainNavigator = () => {
           presentation: 'modal',
           headerShown: true,
           title: 'Delete Entry',
-          headerStyle: { backgroundColor: '#f8f9fa' },
-          headerTintColor: '#333',
+          headerStyle: { backgroundColor: theme.colors.card },
+          headerTintColor: theme.colors.text,
         }}
       />
       <Stack.Screen

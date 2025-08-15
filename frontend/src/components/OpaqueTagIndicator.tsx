@@ -31,25 +31,25 @@ const OpaqueTagIndicator: React.FC<OpaqueTagIndicatorProps> = ({
     switch (tag.security_level) {
       case 'enhanced':
         return {
-          color: '#00C851', // Green
+          color: theme.colors.success,
           icon: 'shield-checkmark' as const,
           label: 'Enhanced'
         };
       case 'standard':
         return {
-          color: '#007AFF', // Blue
+          color: theme.colors.primary,
           icon: 'shield' as const,
           label: 'Standard'
         };
       case 'legacy':
         return {
-          color: '#FF9500', // Orange
+          color: theme.colors.warning,
           icon: 'shield-outline' as const,
           label: 'Legacy'
         };
       default:
         return {
-          color: '#8E8E93', // Gray
+          color: theme.colors.textMuted,
           icon: 'shield-outline' as const,
           label: 'Unknown'
         };
@@ -61,19 +61,19 @@ const OpaqueTagIndicator: React.FC<OpaqueTagIndicatorProps> = ({
     switch (tag.auth_method) {
       case 'opaque':
         return {
-          color: '#00C851', // Green
+          color: theme.colors.success,
           icon: 'key' as const,
           label: 'OPAQUE'
         };
       case 'legacy':
         return {
-          color: '#FF9500', // Orange
+          color: theme.colors.warning,
           icon: 'key-outline' as const,
           label: 'Legacy'
         };
       default:
         return {
-          color: '#8E8E93', // Gray
+          color: theme.colors.textMuted,
           icon: 'key-outline' as const,
           label: 'Unknown'
         };
@@ -145,14 +145,14 @@ const OpaqueTagIndicator: React.FC<OpaqueTagIndicatorProps> = ({
       {/* Device Binding Indicator */}
       {tag.device_fingerprint && (
         <View style={styles.indicatorGroup}>
-          <View style={[styles.indicator, { backgroundColor: '#00C851' + '20' }]}>
+          <View style={[styles.indicator, { backgroundColor: theme.colors.success + '20' }]}>
             <Ionicons 
               name="phone-portrait" 
               size={size === 'small' ? 12 : size === 'large' ? 18 : 14}
-              color="#00C851"
+              color={theme.colors.success}
             />
             {size === 'large' && (
-              <Text style={[styles.indicatorText, { color: '#00C851' }]}>
+              <Text style={[styles.indicatorText, { color: theme.colors.success }]}>
                 Device Bound
               </Text>
             )}
@@ -163,14 +163,14 @@ const OpaqueTagIndicator: React.FC<OpaqueTagIndicatorProps> = ({
       {/* Migration Indicator */}
       {tag.migrated_from && (
         <View style={styles.indicatorGroup}>
-          <View style={[styles.indicator, { backgroundColor: '#FF9500' + '20' }]}>
+          <View style={[styles.indicator, { backgroundColor: theme.colors.warning + '20' }]}>
             <Ionicons 
               name="refresh" 
               size={size === 'small' ? 12 : size === 'large' ? 18 : 14}
-              color="#FF9500"
+              color={theme.colors.warning}
             />
             {size === 'large' && (
-              <Text style={[styles.indicatorText, { color: '#FF9500' }]}>
+              <Text style={[styles.indicatorText, { color: theme.colors.warning }]}>
                 Migrated
               </Text>
             )}

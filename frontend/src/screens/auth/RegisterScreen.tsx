@@ -21,7 +21,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import SafeScrollView from '../../components/SafeScrollView';
 import OpaqueAuthButton from '../../components/OpaqueAuthButton';
 import logo from '../../../assets/logo.png';
-import { authStyles, authColors, spacing, typography } from '../../styles/authStyles';
+import { authStyles, authColors, spacing, typography, getAuthStyles } from '../../styles/authStyles';
+import { useAppTheme } from '../../contexts/ThemeContext';
 
 // Ensure web browser redirect results are handled
 WebBrowser.maybeCompleteAuthSession();
@@ -30,6 +31,8 @@ type RegisterScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const RegisterScreen = () => {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
+  const { theme } = useAppTheme();
+  const themed = getAuthStyles(theme);
   const { isLoading: authLoading } = useAuth();
   
   // Debug navigation changes
@@ -81,7 +84,7 @@ const RegisterScreen = () => {
     if (strength <= 2) {
       return { level: 33, text: 'Weak', color: authColors.textMuted };
     } else if (strength <= 3) {
-      return { level: 66, text: 'Moderate', color: '#F59E0B' };
+      return { level: 66, text: 'Moderate', color: authColors.warning };
     } else {
       return { level: 100, text: 'Strong', color: authColors.success };
     }
@@ -97,39 +100,39 @@ const RegisterScreen = () => {
   // Form validation is now handled by OpaqueAuthButton component
   
   return (
-    <View style={authStyles.container}>
+    <View style={themed.container}>
       <SafeScrollView 
-        style={authStyles.scrollContainer}
-        contentContainerStyle={authStyles.scrollContent}
+        style={themed.scrollContainer}
+        contentContainerStyle={themed.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
 
         {/* Main Card */}
-        <View style={authStyles.card}>
+        <View style={themed.card}>
           {/* Logo and Title */}
-          <View style={authStyles.logoSection}>
+          <View style={themed.logoSection}>
             <Image 
               source={logo} 
-              style={authStyles.logo} 
+              style={themed.logo} 
               resizeMode="contain"
               accessibilityLabel="Kotori logo"
               accessibilityRole="image"
             />
-            <Text style={authStyles.appTitle}>Kotori</Text>
-            <Text style={authStyles.appSubtitle}>Your AI-powered voice journal</Text>
+            <Text style={themed.appTitle}>Kotori</Text>
+            <Text style={themed.appSubtitle}>Your AI-powered voice journal</Text>
           </View>
 
           {/* Form Header */}
-          <View style={authStyles.formHeader}>
-            <Text style={authStyles.formTitle}>Create your account</Text>
-            <Text style={authStyles.formSubtitle}>Start a private, voice-first journal.</Text>
+          <View style={themed.formHeader}>
+            <Text style={themed.formTitle}>Create your account</Text>
+            <Text style={themed.formSubtitle}>Start a private, voice-first journal.</Text>
           </View>
 
           {/* Error Message */}
           {errorMessage && (
-            <View style={authStyles.errorContainer}>
-              <Text style={authStyles.errorText} accessibilityRole="alert">
+            <View style={themed.errorContainer}>
+              <Text style={themed.errorText} accessibilityRole="alert">
                 {errorMessage}
               </Text>
             </View>
@@ -137,8 +140,8 @@ const RegisterScreen = () => {
           
           {/* Success Message */}
           {successMessage && (
-            <View style={authStyles.successContainer}>
-              <Text style={authStyles.successText}>
+            <View style={themed.successContainer}>
+              <Text style={themed.successText}>
                 {successMessage}
               </Text>
               <Pressable 
@@ -147,26 +150,26 @@ const RegisterScreen = () => {
                 accessibilityLabel="Sign in now"
                 accessibilityRole="link"
               >
-                <Text style={authStyles.footerLink}>Sign in now →</Text>
+                <Text style={themed.footerLink}>Sign in now →</Text>
               </Pressable>
             </View>
           )}
           
           {/* Name Input */}
-          <View style={authStyles.inputContainer}>
+          <View style={themed.inputContainer}>
             <View style={[
-              authStyles.inputWrapper,
-              nameFocused && authStyles.inputWrapperFocused
+              themed.inputWrapper,
+              nameFocused && themed.inputWrapperFocused
             ]}>
               <Ionicons 
                 name="person-outline" 
                 size={18} 
                 color={authColors.textMuted} 
-                style={authStyles.inputIcon}
+                style={themed.inputIcon}
                 accessibilityElementsHidden={true}
               />
               <TextInput
-                style={authStyles.input}
+                style={themed.input}
                 placeholder="Name"
                 value={name}
                 onChangeText={setName}
@@ -183,20 +186,20 @@ const RegisterScreen = () => {
           </View>
           
           {/* Email Input */}
-          <View style={authStyles.inputContainer}>
+          <View style={themed.inputContainer}>
             <View style={[
-              authStyles.inputWrapper,
-              emailFocused && authStyles.inputWrapperFocused
+              themed.inputWrapper,
+              emailFocused && themed.inputWrapperFocused
             ]}>
               <Ionicons 
                 name="mail-outline" 
                 size={18} 
                 color={authColors.textMuted} 
-                style={authStyles.inputIcon}
+                style={themed.inputIcon}
                 accessibilityElementsHidden={true}
               />
               <TextInput
-                style={authStyles.input}
+                style={themed.input}
                 placeholder="Email"
                 value={email}
                 onChangeText={setEmail}
@@ -214,20 +217,20 @@ const RegisterScreen = () => {
           </View>
           
           {/* Password Input */}
-          <View style={authStyles.inputContainer}>
+          <View style={themed.inputContainer}>
             <View style={[
-              authStyles.inputWrapper,
-              passwordFocused && authStyles.inputWrapperFocused
+              themed.inputWrapper,
+              passwordFocused && themed.inputWrapperFocused
             ]}>
               <Ionicons 
                 name="lock-closed-outline" 
                 size={18} 
                 color={authColors.textMuted} 
-                style={authStyles.inputIcon}
+                style={themed.inputIcon}
                 accessibilityElementsHidden={true}
               />
               <TextInput
-                style={authStyles.input}
+                style={themed.input}
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
@@ -243,7 +246,7 @@ const RegisterScreen = () => {
               />
               <Pressable 
                 onPress={() => setShowPassword(!showPassword)}
-                style={authStyles.eyeIcon}
+                style={themed.eyeIcon}
                 accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                 accessibilityRole="button"
               >
@@ -257,11 +260,11 @@ const RegisterScreen = () => {
             
             {/* Password Strength Meter */}
             {password.length > 0 && (
-              <View style={authStyles.passwordStrengthContainer}>
-                <View style={authStyles.passwordStrengthBar}>
+              <View style={themed.passwordStrengthContainer}>
+                <View style={themed.passwordStrengthBar}>
                   <View 
                     style={[
-                      authStyles.passwordStrengthFill,
+                      themed.passwordStrengthFill,
                       { 
                         width: `${passwordStrength.level}%`,
                         backgroundColor: passwordStrength.color 
@@ -270,7 +273,7 @@ const RegisterScreen = () => {
                   />
                 </View>
                 <Text style={[
-                  authStyles.passwordStrengthText,
+                  themed.passwordStrengthText,
                   { color: passwordStrength.color }
                 ]}>
                   {passwordStrength.text}
@@ -280,20 +283,20 @@ const RegisterScreen = () => {
           </View>
           
           {/* Confirm Password Input */}
-          <View style={authStyles.inputContainer}>
+          <View style={themed.inputContainer}>
             <View style={[
-              authStyles.inputWrapper,
-              confirmPasswordFocused && authStyles.inputWrapperFocused
+              themed.inputWrapper,
+              confirmPasswordFocused && themed.inputWrapperFocused
             ]}>
               <Ionicons 
                 name="lock-closed-outline" 
                 size={18} 
                 color={authColors.textMuted} 
-                style={authStyles.inputIcon}
+                style={themed.inputIcon}
                 accessibilityElementsHidden={true}
               />
               <TextInput
-                style={authStyles.input}
+                style={themed.input}
                 placeholder="Confirm Password"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -309,17 +312,17 @@ const RegisterScreen = () => {
               />
             </View>
             {confirmPassword.length > 0 && password !== confirmPassword && (
-              <Text style={authStyles.errorText}>Passwords do not match</Text>
+              <Text style={themed.errorText}>Passwords do not match</Text>
             )}
           </View>
           
           {/* Terms and Privacy Notice */}
-          <View style={authStyles.termsContainer}>
-            <Text style={authStyles.termsText}>
+          <View style={themed.termsContainer}>
+            <Text style={themed.termsText}>
               By continuing, you agree to our{' '}
-              <Text style={authStyles.termsLink}>Terms</Text>
+              <Text style={themed.termsLink}>Terms</Text>
               {' '}and{' '}
-              <Text style={authStyles.termsLink}>Privacy Policy</Text>.
+              <Text style={themed.termsLink}>Privacy Policy</Text>.
             </Text>
           </View>
           
@@ -343,20 +346,20 @@ const RegisterScreen = () => {
               setErrorMessage(error);
             }}
             disabled={isLoading || authLoading || !!successMessage}
-            style={authStyles.primaryButton}
+            style={themed.primaryButton}
           />
           
           {/* Divider */}
-          <View style={authStyles.dividerContainer}>
-            <View style={authStyles.dividerLine} />
-            <Text style={authStyles.dividerText}>or</Text>
-            <View style={authStyles.dividerLine} />
+          <View style={themed.dividerContainer}>
+            <View style={themed.dividerLine} />
+            <Text style={themed.dividerText}>or</Text>
+            <View style={themed.dividerLine} />
           </View>
           
           {/* Google Sign Up */}
           <Pressable 
             style={({ pressed }) => [
-              authStyles.secondaryButton,
+              themed.secondaryButton,
               pressed && { opacity: 0.8 }
             ]}
             onPress={handleGoogleRegister}
@@ -365,18 +368,18 @@ const RegisterScreen = () => {
             accessibilityRole="button"
           >
             <Ionicons name="logo-google" size={20} color={authColors.googleRed} />
-            <Text style={authStyles.secondaryButtonText}>Continue with Google</Text>
+            <Text style={themed.secondaryButtonText}>Continue with Google</Text>
           </Pressable>
           
           {/* Footer Link */}
-          <View style={authStyles.footerContainer}>
-            <Text style={authStyles.footerText}>Already have an account?</Text>
+          <View style={themed.footerContainer}>
+            <Text style={themed.footerText}>Already have an account?</Text>
             <Pressable 
               onPress={navigateToLogin}
               accessibilityLabel="Sign in to existing account"
               accessibilityRole="link"
             >
-              <Text style={authStyles.footerLink}>Sign in</Text>
+              <Text style={themed.footerLink}>Sign in</Text>
             </Pressable>
           </View>
         </View>

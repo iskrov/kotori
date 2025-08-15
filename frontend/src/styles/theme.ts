@@ -62,6 +62,7 @@ export const kotoriColors = {
   // Other semantic colors
   white: '#FFFFFF',
   black: '#000000',
+  primaryContrast: '#FFFFFF',
   shadow: 'rgba(14, 23, 38, 0.06)', // Soft shadow color
   overlay: 'rgba(0, 0, 0, 0.5)',
   disabled: '#E6ECF1',
@@ -147,6 +148,7 @@ export const kotoriDarkColors = {
   // Other colors for dark mode
   white: '#FFFFFF',
   black: '#000000',
+  primaryContrast: '#0F172A',
   shadow: 'rgba(0, 0, 0, 0.3)',
   overlay: 'rgba(0, 0, 0, 0.7)',
   disabled: '#475569',

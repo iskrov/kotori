@@ -160,7 +160,7 @@ const getPeriodSelectorStyles = (theme: AppTheme) => StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: {
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,

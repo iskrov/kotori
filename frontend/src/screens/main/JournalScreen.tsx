@@ -424,6 +424,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   searchBar: {
     ...componentStyles.input,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.sm,
@@ -446,7 +448,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   tagChip: {
-    ...componentStyles.chip,
+    backgroundColor: theme.colors.chipBackground,
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
     marginRight: theme.spacing.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -454,6 +459,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   tagChipSelected: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: theme.isDarkMode ? 0.2 : 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tagText: {
     fontSize: theme.typography.fontSizes.sm,
