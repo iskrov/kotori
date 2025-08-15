@@ -17,13 +17,17 @@ steps:
     args:
       - '-c'
       - |
+        set -euo pipefail
         echo "🔄 Creating database backup before migration..."
         BACKUP_DESCRIPTION="pre-migration-$$(date +%Y%m%d-%H%M%S)"
-        gcloud sql backups create \
-          --instance=kotori-db-instance \
+        if gcloud sql backups create \
+          --instance=kotori-db \
           --description="$$BACKUP_DESCRIPTION" \
-          --project=kotori-io
-        echo "✅ Backup created: $$BACKUP_DESCRIPTION"
+          --project=kotori-io; then
+          echo "✅ Backup created: $$BACKUP_DESCRIPTION"
+        else
+          echo "⚠️  Backup creation failed; continuing with migration as per policy"
+        fi
 
   # Run database migrations using the backend container
   - name: 'us-central1-docker.pkg.dev/kotori-io/kotori-images/kotori-api:migration-${SHORT_SHA}'
@@ -31,12 +35,19 @@ steps:
     args:
       - '-c'
       - |
+        set -euo pipefail
         echo "🔍 Starting migration process..."
         cd /app
         
+        # Ensure dependencies available in runtime container
+        pip install --user -r requirements.txt >/dev/null 2>&1 || true
+        export PATH="/home/kotori/.local/bin:$PATH"
+        
+        echo "Alembic version: $(alembic --version || echo 'not found')"
+        
         # Check current migration status
         echo "📊 Current migration status:"
-        alembic current || echo "No current revision found"
+        alembic current || true
         
         # Show target revision
         echo "🎯 Target revision:"
@@ -44,9 +55,9 @@ steps:
         
         # Preview migrations (limited output to avoid issues)
         echo "👀 Migration preview (first 10 operations):"
-        timeout 30s alembic upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || echo "Preview completed or timed out"
+        alembic upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
         
-        # Execute migrations
+        # Execute migrations (fail hard on error)
         echo "🚀 Executing database migrations..."
         alembic upgrade head
         
