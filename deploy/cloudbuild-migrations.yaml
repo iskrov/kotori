@@ -35,8 +35,10 @@ steps:
         cd backend
         pip install -r requirements.txt
         
-        # Get database URL from secrets
-        export DATABASE_URL="postgresql://kotori_user:$$DATABASE_PASSWORD@$$DATABASE_HOST:5432/kotori_prod"
+        # DATABASE_URL injected from Secret Manager
+        if [[ -z "$DATABASE_URL" ]]; then
+          echo "DATABASE_URL not set" && exit 1
+        fi
         
         # Check current migration status
         echo "Current migration status:"
@@ -60,8 +62,7 @@ steps:
         
         echo "Migrations completed successfully!"
     secretEnv:
-      - 'DATABASE_PASSWORD'
-      - 'DATABASE_HOST'
+      - 'DATABASE_URL'
 
 # Define secrets
 availableSecrets:
@@ -74,3 +75,5 @@ timeout: '1200s'
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: 'E2_HIGHCPU_8'
+  pool:
+    name: projects/kotori-io/locations/us-central1/workerPools/private-pool

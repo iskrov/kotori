@@ -55,25 +55,18 @@ steps:
         alembic current
         
         echo "🎉 Database migrations completed successfully!"
-    env:
-      # Environment variables will be set from secrets
-      - 'DATABASE_URL=${_DATABASE_URL}'
-      - 'SECRET_KEY=${_SECRET_KEY}'
-      - 'GOOGLE_CLOUD_PROJECT=${_GOOGLE_CLOUD_PROJECT}'
-      - 'GOOGLE_CLOUD_LOCATION=${_GOOGLE_CLOUD_LOCATION}'
-      - 'ENCRYPTION_MASTER_SALT=${_ENCRYPTION_MASTER_SALT}'
+    secretEnv:
+      - 'DATABASE_URL'
 
-# Substitutions for secrets (will be provided by deployment script)
-substitutions:
-  _DATABASE_URL: ''
-  _SECRET_KEY: ''
-  _GOOGLE_CLOUD_PROJECT: ''
-  _GOOGLE_CLOUD_LOCATION: ''
-  _ENCRYPTION_MASTER_SALT: ''
+availableSecrets:
+  secretManager:
+    - versionName: projects/kotori-io/secrets/database-url/versions/latest
+      env: DATABASE_URL
 
 # Build configuration
 timeout: '1200s'
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: 'E2_HIGHCPU_8'
-  substitution_option: 'ALLOW_LOOSE'
+  pool:
+    name: projects/kotori-io/locations/us-central1/workerPools/private-pool
