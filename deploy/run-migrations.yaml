@@ -41,7 +41,6 @@ steps:
         # Ensure we use the installed user-level tools from the image
         export HOME=/home/kotori
         export PYTHONPATH=/app
-        export PATH="/home/kotori/.local/bin:$$PATH"
         AL="/home/kotori/.local/bin/alembic"
         echo "PATH=$PATH"
         if [[ ! -x "$AL" ]]; then
