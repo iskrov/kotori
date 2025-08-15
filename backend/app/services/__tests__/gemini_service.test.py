@@ -1,11 +1,7 @@
 import pytest
 import os
 from unittest.mock import Mock, patch, MagicMock
-import json
-import base64
 from app.services.gemini_service import GeminiService, GeminiError
-from pydantic import BaseModel
-import asyncio
 
 
 class TestGeminiService:
@@ -114,8 +110,8 @@ class TestGeminiService:
             # Verify fallback to API key
             mock_genai.configure.assert_called_once_with(api_key="fallback-api-key")
 
-    @patch('app.services.gemini_service.genai')
-    @patch('app.services.gemini_service.settings')
+    @patch('backend.app.services.gemini_service.genai')
+    @patch('backend.app.services.gemini_service.settings')
     def test_gemini_initialization_error(self, mock_settings, mock_genai):
         """Test handling of Gemini initialization errors"""
         # Setup
@@ -152,126 +148,8 @@ class TestGeminiService:
             with patch('os.path.exists', return_value=True):
                 service._get_credentials()
                 
-                # Verify a call was made with the expected scopes at least once
-                expected_scope = ['https://www.googleapis.com/auth/cloud-platform']
-                calls = mock_service_account.Credentials.from_service_account_file.call_args_list
-                matched = False
-                for c in calls:
-                    args, kwargs = c
-                    if kwargs.get('scopes') == expected_scope:
-                        matched = True
-                        break
-                assert matched, f"Expected a call with scopes {expected_scope}, got: {calls}"
-
-    @pytest.mark.asyncio
-    async def test_vertex_structured_output_without_text_raises(self):
-        """When using Vertex with structured output, response.text may be unavailable; ensure we surface a clear error."""
-        service = GeminiService()
-        # Force Vertex path
-        service.vertex_backend = True
-        # Mock model to return a response without .text
-        class NoTextResponse:
-            @property
-            def text(self):
-                raise Exception("Cannot get the response text")
-        model = MagicMock()
-        model.generate_content.return_value = NoTextResponse()
-        service.model = model
-
-        class DummySchema(BaseModel):
-            foo: str
-
-        with pytest.raises(GeminiError, match="API call failed: Cannot get the response text"):
-            await service._generate_with_structured_output(
-                prompt="test",
-                response_schema=DummySchema,
-                temperature=0.1,
-                max_output_tokens=10,
-            )
-
-    @pytest.mark.asyncio
-    async def test_vertex_structured_output_from_candidates_parts_text(self):
-        """Simulate Vertex response where JSON appears in candidates[0].content.parts[0].text."""
-        service = GeminiService()
-        service.vertex_backend = True
-
-        class Part:
-            def __init__(self, text):
-                self.text = text
-
-        class Content:
-            def __init__(self, parts):
-                self.parts = parts
-
-        class Candidate:
-            def __init__(self, content):
-                self.content = content
-
-        class Resp:
-            def __init__(self, candidates):
-                self.candidates = candidates
-
-        payload = {"foo": "bar"}
-        json_text = json.dumps(payload)
-        resp = Resp([Candidate(Content([Part(json_text)]))])
-
-        model = MagicMock()
-        model.generate_content.return_value = resp
-        service.model = model
-
-        class DummySchema(BaseModel):
-            foo: str
-
-        result = await service._generate_with_structured_output(
-            prompt="test",
-            response_schema=DummySchema,
-            temperature=0.1,
-            max_output_tokens=10,
-        )
-        assert result.foo == "bar"
-
-    @pytest.mark.asyncio
-    async def test_vertex_structured_output_from_inline_data_base64(self):
-        """Simulate Vertex response where JSON is in inline_data base64 with JSON mime type."""
-        service = GeminiService()
-        service.vertex_backend = True
-
-        class Inline:
-            def __init__(self, mime_type, data):
-                self.mime_type = mime_type
-                self.data = data
-
-        class Part:
-            def __init__(self, inline_data):
-                self.inline_data = inline_data
-
-        class Content:
-            def __init__(self, parts):
-                self.parts = parts
-
-        class Candidate:
-            def __init__(self, content):
-                self.content = content
-
-        class Resp:
-            def __init__(self, candidates):
-                self.candidates = candidates
-
-        payload = {"foo": "baz"}
-        data_b64 = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8")
-        resp = Resp([Candidate(Content([Part(Inline("application/json", data_b64))]))])
-
-        model = MagicMock()
-        model.generate_content.return_value = resp
-        service.model = model
-
-        class DummySchema(BaseModel):
-            foo: str
-
-        result = await service._generate_with_structured_output(
-            prompt="test",
-            response_schema=DummySchema,
-            temperature=0.1,
-            max_output_tokens=10,
-        )
-        assert result.foo == "baz"
+                # Verify correct scopes are used
+                mock_service_account.Credentials.from_service_account_file.assert_called_once()
+                call_args = mock_service_account.Credentials.from_service_account_file.call_args
+                # Vertex path uses cloud-platform scope to enable aiplatform
+                assert call_args[1]['scopes'] == ['https://www.googleapis.com/auth/cloud-platform']

@@ -2,6 +2,7 @@ import logging
 import json
 import hashlib
 import os
+import base64
 from typing import List, Dict, Optional, Any
 from functools import lru_cache
 import asyncio
@@ -305,8 +306,9 @@ class GeminiService:
                     )
                 )
             
-            # Parse the structured response
-            response_data = json.loads(response.text)
+            # Parse the structured response (robust across SDKs and backends)
+            structured_text = self._extract_structured_json_text(response)
+            response_data = json.loads(structured_text)
             return response_schema(**response_data)
 
         except json.JSONDecodeError as e:
@@ -315,6 +317,99 @@ class GeminiService:
         except Exception as e:
             logger.error(f"Gemini API call failed: {e}")
             raise GeminiError(f"API call failed: {e}")
+
+    def _extract_structured_json_text(self, response: Any) -> str:
+        """Extract JSON text from a Gemini/Vertex response regardless of backend shape.
+
+        Tries, in order:
+        1) response.text
+        2) candidates[*].content.parts[*].text
+        3) candidates[*].content.parts[*].inline_data (base64 JSON)
+        4) Fallback: scan response.to_dict() for a JSON-looking string
+        """
+        # 1) response.text
+        try:
+            if hasattr(response, "text"):
+                txt = response.text  # may raise in some SDKs
+                if isinstance(txt, str) and txt.strip():
+                    return txt
+        except Exception:
+            # Continue to alternative extraction paths
+            pass
+
+        # Helper to safely get attribute or dict key
+        def get(obj: Any, name: str, default: Any = None) -> Any:
+            if obj is None:
+                return default
+            if isinstance(obj, dict):
+                return obj.get(name, default)
+            return getattr(obj, name, default)
+
+        # 2) candidates -> content -> parts -> text
+        try:
+            candidates = get(response, "candidates") or []
+            for cand in candidates:
+                content = get(cand, "content")
+                parts = get(content, "parts") or []
+                for part in parts:
+                    txt = get(part, "text")
+                    if isinstance(txt, str) and txt.strip():
+                        # Ensure this looks like JSON
+                        s = txt.strip()
+                        if s.startswith("{") or s.startswith("["):
+                            return s
+        except Exception:
+            pass
+
+        # 3) candidates -> content -> parts -> inline_data (base64 JSON)
+        try:
+            candidates = get(response, "candidates") or []
+            for cand in candidates:
+                content = get(cand, "content")
+                parts = get(content, "parts") or []
+                for part in parts:
+                    inline = get(part, "inline_data")
+                    if inline:
+                        mime = get(inline, "mime_type")
+                        data_b64 = get(inline, "data")
+                        if data_b64 and isinstance(data_b64, str):
+                            try:
+                                raw = base64.b64decode(data_b64)
+                                s = raw.decode("utf-8", errors="ignore").strip()
+                                if (mime and "json" in str(mime)) or s.startswith("{") or s.startswith("["):
+                                    return s
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+
+        # 4) Fallback: scan to_dict for JSON-looking strings
+        try:
+            to_dict = getattr(response, "to_dict", None)
+            if callable(to_dict):
+                d = to_dict()
+                stack = [d]
+                while stack:
+                    cur = stack.pop()
+                    if isinstance(cur, dict):
+                        for v in cur.values():
+                            stack.append(v)
+                    elif isinstance(cur, list):
+                        stack.extend(cur)
+                    elif isinstance(cur, str):
+                        s = cur.strip()
+                        if s.startswith("{") or s.startswith("["):
+                            # Verify it's valid JSON
+                            try:
+                                json.loads(s)
+                                return s
+                            except Exception:
+                                continue
+        except Exception:
+            pass
+
+        # Nothing worked
+        raise GeminiError("API call failed: Cannot get the response text")
 
     def _inline_definitions(self, schema: Dict[str, Any], defs: Dict[str, Any]) -> Dict[str, Any]:
         """
