@@ -210,8 +210,8 @@ run_database_migrations() {
     print_step "Executing migrations via Cloud Build"
     if gcloud builds submit \
         --config=deploy/run-migrations.yaml \
-        --substitutions="_DATABASE_URL=$DATABASE_URL,_SECRET_KEY=$SECRET_KEY,_GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT,_GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION,_ENCRYPTION_MASTER_SALT=$ENCRYPTION_MASTER_SALT" \
         --project="$PROJECT_ID" \
+        --region="$REGION" \
         .; then
         print_success "Database migrations completed successfully via Cloud Build"
     else
