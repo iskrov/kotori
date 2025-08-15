@@ -217,7 +217,7 @@ run_database_migrations() {
     # Ensure private worker pool name is set
     PRIVATE_POOL_NAME="projects/$PROJECT_ID/locations/$REGION/workerPools/private-pool"
 
-    if gcloud builds submit \
+    if gcloud beta builds submit \
         --config=deploy/run-migrations.yaml \
         --project="$PROJECT_ID" \
         --region="$REGION" \
