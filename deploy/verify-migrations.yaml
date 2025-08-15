@@ -1,0 +1,33 @@
+# Cloud Build configuration to verify current Alembic revision
+# Uses Private Worker Pool and Secret Manager (DATABASE_URL)
+
+steps:
+  - name: 'python:3.12-slim'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        cd backend
+        pip install -r requirements.txt
+        
+        if [[ -z "$$DATABASE_URL" ]]; then
+          echo "DATABASE_URL not set" && exit 1
+        fi
+        
+        echo "📊 Printing current Alembic revision..."
+        echo "Using DB: $$DATABASE_URL"
+        alembic current || true
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/kotori-io/secrets/database-url/versions/latest
+      env: 'DATABASE_URL'
+
+timeout: '600s'
+options:
+  logging: CLOUD_LOGGING_ONLY
+  pool:
+    name: projects/kotori-io/locations/us-central1/workerPools/private-pool
+
+
