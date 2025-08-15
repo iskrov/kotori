@@ -42,31 +42,32 @@ steps:
         export HOME=/home/kotori
         export PYTHONPATH=/app
         AL="/home/kotori/.local/bin/alembic"
-        echo "PATH=$PATH"
+        echo "PATH=$$PATH"
         if [[ ! -x "$AL" ]]; then
           echo "❌ Alembic not found at $AL"; ls -la /home/kotori/.local/bin || true; which alembic || true; exit 1;
         fi
-        echo "Alembic version: $($AL --version)"
+        echo "Alembic version:"
+        "$$AL" --version || true
         
         # Check current migration status
         echo "📊 Current migration status:"
-        $AL current || true
+        "$$AL" current || true
         
         # Show target revision
         echo "🎯 Target revision:"
-        $AL heads
+        "$$AL" heads
         
         # Preview migrations (limited output to avoid issues)
         echo "👀 Migration preview (first 10 operations):"
-        $AL upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
+        "$$AL" upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
         
         # Execute migrations (fail hard on error)
         echo "🚀 Executing database migrations..."
-        $AL upgrade head
+        "$$AL" upgrade head
         
         # Verify success
         echo "✅ Post-migration status:"
-        $AL current
+        "$$AL" current
         
         echo "🎉 Database migrations completed successfully!"
     secretEnv:
