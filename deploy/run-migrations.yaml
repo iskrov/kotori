@@ -40,7 +40,7 @@ steps:
         cd /app
         
         # Ensure dependencies available in runtime container (succeeds or fails build)
-        export PATH="/home/kotori/.local/bin:$PATH"
+        export PATH="/home/kotori/.local/bin:$$PATH"
         python -m pip install --user --no-cache-dir -r requirements.txt
         echo "Alembic version: $(alembic --version)"
         
