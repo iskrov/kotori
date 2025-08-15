@@ -20,6 +20,7 @@
 | 15 | Admin | As a maintainer, I want the backend to use the Cloud SQL socket and a socket-DSN migration job so the database remains private-only. | Proposed | Cloud Run service bound to the Cloud SQL instance via `--set-cloudsql-instances`; secrets include a socket-form DSN for Alembic; migration job succeeds without public IP or TCP host; docs updated. |
 | 16 | Admin | As a maintainer, I want API network posture reviewed (public vs. internal behind HTTPS LB) and hardened. | Proposed | Decision documented; if internal, set up HTTPS LB + serverless NEG (and access for frontend); if public, ensure WAF/CSP/HSTS/CORS; verification documented. |
 | 17 | User | As a user, I want an optional elevated bottom navigation bar (with floating mic) that keeps the default calm UI but allows a subtle 3D look when desired. | Proposed | Calm stays default; add theme/setting `navStyle` calm/elevated; elevated bar uses subtle depth (soft shadow/elevation, rounded pill, optional gentle gradient) and center mic with static shadow; respects OS Reduce Motion (forces calm, no animation); large tap targets (≥48 px), predictable behavior, AA contrast; works on web/iOS/Android incl. safe areas and keyboard avoidance. |
+| 18 | User | As a user, I want to create and manage my own custom sharing templates in addition to the system-provided ones. | Proposed | System templates remain available to all users; users can create personal templates; users can copy/customize system templates; template management UI distinguishes between "System Templates" and "My Templates"; backward compatibility maintained for existing shares; personal templates are private to each user; template creation follows same validation as system templates. |
 
 ## History
 
@@ -49,3 +50,4 @@
 | 2025-08-12 03:00:00 | 9 | create_pbi | Fix encryption/decryption for journal entries to show content properly | ai-agent |
 | 2025-08-12 05:20:00 | 17 | create_pbi | Optional elevated bottom navigation (calm default), accessibility-aware, cross-platform | ai-agent |
 | 2025-01-27 14:30:00 | 10 | create_pbi | Template-based sharing feature with Gemini-powered translation and PDF/email export | ai-agent |
+| 2025-01-28 10:15:00 | 18 | create_pbi | User-specific custom sharing templates with hybrid global/personal architecture | ai-agent |

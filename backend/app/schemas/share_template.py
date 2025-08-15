@@ -72,6 +72,7 @@ class ShareTemplateUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = Field(None)
     category: Optional[str] = Field(None, max_length=50)
+    version: Optional[str] = Field(None, max_length=20)
     questions: Optional[List[TemplateQuestion]] = Field(None, min_items=1)
     is_active: Optional[bool] = Field(None)
     

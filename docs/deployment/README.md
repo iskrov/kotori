@@ -4,26 +4,13 @@ This directory contains comprehensive documentation for deploying and managing K
 
 ## 📚 Documentation Index
 
-### 🚀 Deployment Guides
-- **[Deployment Script](../../scripts/cloud-deploy.sh)** - Automated deployment script for frontend and backend
-- **[Production Environment](../../deploy/production-env.yaml)** - Environment variables configuration
+### 🚀 Core Deployment Docs
+- **[Deployment Script](../../scripts/cloud-deploy.sh)** – Automated deployment (frontend/backend) and DB migrations
+- **[Database Migration Strategy](./DATABASE_MIGRATION_STRATEGY.md)** – Cloud Build Private Pool migrations, backups, IAM
+- **[Deployment Troubleshooting](./DEPLOYMENT_TROUBLESHOOTING.md)** – Common issues and fixes
 
-### 🔧 Troubleshooting & Issues
-- **[Deployment Troubleshooting](./DEPLOYMENT_TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide for all deployment issues
-- **[Deployment Lessons Learned](./DEPLOYMENT_LESSONS_LEARNED.md)** - Key lessons and best practices from deployment experiences
-
-### 🗃️ Database Migration Management
-- **[Database Migration Strategy](./DATABASE_MIGRATION_STRATEGY.md)** - Comprehensive migration deployment strategy and safety procedures
-- **[Migration Quick Reference](./MIGRATION_QUICK_REFERENCE.md)** - Quick commands and emergency procedures for migrations
-
-### 📊 Deployment History
-- **[Sharing Feature Deployment Success](./SHARING_FEATURE_DEPLOYMENT_SUCCESS.md)** - August 14, 2025 - Template-based sharing with AI
-- **[Redeployment Success Summary](./REDEPLOYMENT_SUCCESS_SUMMARY.md)** - Previous successful deployment
-- **[Deployment Success Summary](./DEPLOYMENT_SUCCESS_SUMMARY.md)** - Initial deployment documentation
-
-### 🎯 Feature-Specific Deployments
-- **[Speech Production Readiness](./SPEECH_PRODUCTION_READINESS.md)** - Speech-to-text feature deployment
-- **[Mixed Content Fix Summary](./MIXED_CONTENT_FIX_SUMMARY.md)** - HTTPS/security fixes
+### 🔎 Config Reference
+- **[Production Environment](../../deploy/production-env.yaml)** – Cloud Run env vars
 
 ## 🔍 Quick Reference
 
@@ -85,18 +72,11 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 gcloud logging read "resource.type=cloud_run_revision AND resource.labels.revision_name=REVISION_NAME" --limit=20
 ```
 
-## 🎯 Latest Deployment (August 14, 2025)
+## 🎯 Current Process Snapshot
 
-**Status**: ✅ **SUCCESSFUL**
-- **Frontend**: `kotori-app-00022-ffv` 
-- **Backend**: `kotori-api-00033-ngj`
-- **Features**: Complete sharing functionality with AI-powered summaries
-
-**Key Fix**: Environment variable mapping corrected
-```bash
-# Fixed secret mapping
---set-secrets "DATABASE_URL=database-url:latest,SECRET_KEY=secret-key:latest,..."
-```
+- Migrations: Cloud Build Private Pool via `deploy/run-migrations.yaml` (triggered by `scripts/cloud-deploy.sh`)
+- Backend/Frontend: Deployed to Cloud Run via the same script
+- Secrets: Injected from Secret Manager using `--set-secrets` and `availableSecrets` in Cloud Build
 
 ## 🔗 Related Resources
 
@@ -115,5 +95,4 @@ For deployment issues:
 
 ---
 
-*Last Updated: August 14, 2025*  
-*Latest Successful Deployment: Sharing Feature with AI-powered summaries*
+*Last Updated: August 15, 2025*

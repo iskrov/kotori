@@ -4,6 +4,8 @@
 
 This document defines the safe deployment strategy for database migrations in Kotori's production environment. The strategy prioritizes **data safety**, **zero-downtime deployment**, and **rollback capability**.
 
+Winning approach: Execute Alembic migrations from Google Cloud Build using a Private Worker Pool with VPC access to Cloud SQL (private IP), inject secrets from Secret Manager, and create an automatic pre-migration backup. Trigger this via the deployment script or run independently with `./scripts/cloud-deploy.sh --migrations-only --yes`.
+
 ## 🔍 Current Migration System Analysis
 
 ### Technology Stack
@@ -49,10 +51,10 @@ cat migration_preview.sql
 #### 1.2 Production Database Backup
 ```bash
 # Create point-in-time backup before migration
-gcloud sql backups create --instance=kotori-db-instance --description="Pre-migration backup $(date +%Y%m%d-%H%M%S)"
+gcloud sql backups create --instance=kotori-db --description="Pre-migration backup $(date +%Y%m%d-%H%M%S)"
 
 # Verify backup exists
-gcloud sql backups list --instance=kotori-db-instance --limit=5
+gcloud sql backups list --instance=kotori-db --limit=5
 ```
 
 #### 1.3 Migration Impact Assessment
@@ -63,45 +65,30 @@ gcloud sql backups list --instance=kotori-db-instance --limit=5
 
 ### Phase 2: Safe Migration Deployment
 
-#### 2.1 Migration Execution Strategy
+#### 2.1 Winning Strategy: Cloud Build Private Pool Runner
 
-**Option A: Zero-Downtime (Recommended)**
-```bash
-# Run migrations before deploying new application code
-# This allows old code to continue running during migration
-alembic upgrade head
-```
+Migrations are executed inside Google Cloud Build using a Private Worker Pool to reach Cloud SQL over private IP. Secrets are injected from Secret Manager; a pre-migration Cloud SQL backup is created automatically.
 
-**Option B: Maintenance Window**
-```bash
-# For migrations requiring application downtime
-# 1. Stop application traffic
-# 2. Run migrations
-# 3. Deploy new application code
-# 4. Resume traffic
-```
-
-#### 2.2 Migration Command Integration
-
-Add to deployment script **before** application deployment:
+Run it anytime with:
 
 ```bash
-# In cloud-deploy.sh - Backend deployment section
-print_step "Running Database Migrations"
-
-# Set up migration environment
-export DATABASE_URL=$(gcloud secrets versions access latest --secret="database-url")
-
-# Run migrations with proper error handling
-cd "$PROJECT_ROOT/backend"
-if ! alembic upgrade head; then
-    print_error "Database migration failed"
-    print_warning "Manual intervention required"
-    exit 1
-fi
-
-print_success "Database migrations completed"
+./scripts/cloud-deploy.sh --migrations-only --yes
 ```
+
+What this does under the hood:
+
+- Builds the backend image and tags it for the migration run: `us-central1-docker.pkg.dev/kotori-io/kotori-images/kotori-api:migration-${SHORT_SHA}`
+- Creates a Cloud SQL backup on instance `kotori-db` with a timestamped description
+- Runs Alembic from inside the backend image at `/home/kotori/.local/bin/alembic upgrade head`
+- Injects secrets via Cloud Build `availableSecrets` → `secretEnv`:
+  - `DATABASE_URL` ← Secret `database-url`
+  - `SECRET_KEY` ← Secret `secret-key`
+  - `GOOGLE_CLOUD_PROJECT` ← Secret `google-cloud-project`
+  - `GOOGLE_CLOUD_LOCATION` ← Secret `google-cloud-location`
+  - `ENCRYPTION_MASTER_SALT` ← Secret `encryption-master-salt`
+- Runs entirely within the Private Worker Pool `projects/kotori-io/locations/us-central1/workerPools/private-pool`
+
+Config reference: see `deploy/run-migrations.yaml` and `scripts/cloud-deploy.sh`.
 
 ### Phase 3: Post-Migration Validation
 
@@ -159,13 +146,13 @@ alembic current
 ```bash
 # Restore from backup (LAST RESORT)
 gcloud sql backups restore BACKUP_ID \
-    --restore-instance=kotori-db-instance \
-    --backup-instance=kotori-db-instance
+    --restore-instance=kotori-db \
+    --backup-instance=kotori-db
 ```
 
-## 🔧 Integration with Deployment Script
+## 🔧 Integration with Deployment Script and Cloud Build
 
-### Modified Deployment Flow
+### Deployment Flow (with Cloud Build migrations)
 
 ```mermaid
 graph TD
@@ -175,7 +162,7 @@ graph TD
     D --> E[Run Migration Safety Check]
     E --> F{Migrations Safe?}
     F -->|No| G[Abort Deployment]
-    F -->|Yes| H[Run Database Migrations]
+    F -->|Yes| H[Submit Cloud Build (Private Pool) to Run Alembic]
     H --> I{Migrations Success?}
     I -->|No| J[Rollback & Exit]
     I -->|Yes| K[Build & Deploy Backend]
@@ -184,44 +171,22 @@ graph TD
     M --> N[Deployment Complete]
 ```
 
-### Migration Step Implementation
+### Migration Runner Implementation (as built)
+
+Key files and behavior:
+
+- `scripts/cloud-deploy.sh` submits a Cloud Build using the Private Pool:
 
 ```bash
-# Add to cloud-deploy.sh
-run_database_migrations() {
-    print_step "Database Migration Phase"
-    
-    cd "$PROJECT_ROOT/backend"
-    
-    # Create backup
-    BACKUP_DESCRIPTION="pre-migration-$(date +%Y%m%d-%H%M%S)"
-    gcloud sql backups create \
-        --instance=kotori-db-instance \
-        --description="$BACKUP_DESCRIPTION"
-    
-    # Check current migration status
-    CURRENT_REVISION=$(alembic current 2>/dev/null | grep -v "INFO" || echo "none")
-    print_step "Current database revision: $CURRENT_REVISION"
-    
-    # Generate migration preview
-    alembic upgrade head --sql > /tmp/migration_preview.sql
-    
-    # Show what will be executed
-    echo "Migrations to be applied:"
-    alembic upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT)" | head -10
-    
-    # Execute migrations
-    if alembic upgrade head; then
-        print_success "Database migrations completed successfully"
-        NEW_REVISION=$(alembic current | grep -v "INFO")
-        print_success "Database updated to revision: $NEW_REVISION"
-    else
-        print_error "Database migration failed"
-        print_error "Backup available: $BACKUP_DESCRIPTION"
-        exit 1
-    fi
-}
+gcloud beta builds submit \
+  --config=deploy/run-migrations.yaml \
+  --project="$PROJECT_ID" \
+  --region="$REGION" \
+  --worker-pool="$PRIVATE_POOL_NAME" \
+  .
 ```
+
+- `deploy/run-migrations.yaml` builds the backend image, creates a Cloud SQL backup on `kotori-db`, then runs Alembic inside the image. Secrets are injected via `availableSecrets` → `secretEnv` and the build runs on the Private Pool.
 
 ## 📋 Migration Deployment Checklist
 
@@ -300,5 +265,51 @@ A migration deployment is considered successful when:
 
 ---
 
-*Last Updated: August 14, 2025*  
+*Last Updated: August 15, 2025*  
 *Current Production Revision: 7c39d7b141c7*
+
+---
+
+## 🧰 Troubleshooting: What didn’t work and how we fixed it
+
+- Wrong Secret Names in Cloud Run deploy
+  - Symptom: Backend container failed to start; envs not resolved
+  - Cause: Used uppercase names in `--set-secrets`; actual Secret Manager names are lowercase, hyphenated
+  - Fix: Use `--set-secrets "DATABASE_URL=database-url:latest,SECRET_KEY=secret-key:latest,GOOGLE_CLOUD_PROJECT=google-cloud-project:latest,GOOGLE_CLOUD_LOCATION=google-cloud-location:latest,ENCRYPTION_MASTER_SALT=encryption-master-salt:latest"`
+
+- Running Alembic locally from a developer machine
+  - Symptom: `psycopg2.OperationalError: connection ... refused`
+  - Cause: No network path to Cloud SQL Private IP from local shell
+  - Fix: Run migrations inside GCP using Cloud Build Private Pools
+
+- Cloud Build substitutions misuse (`INVALID_ARGUMENT` for `BACKUP_DESCRIPTION`, `PATH`)
+  - Symptom: Errors like `key ... is not a valid built-in substitution`
+  - Cause: Attempted to define ad-hoc substitutions or export PATH in YAML that Cloud Build treated as substitutions
+  - Fix: Use shell expansion with `$$` inside the step; avoid `${...}`-style variables that Cloud Build parses; use absolute paths for tools
+
+- Missing `--region` with Private Pool
+  - Symptom: `--region flag required when workerpool resource includes region substitution`
+  - Fix: Add `--region "$REGION"` to the submit command
+
+- Disallowed `machineType` with Private Pools
+  - Symptom: `machine_type option is disallowed for builds with a Worker Pool`
+  - Fix: Remove `machineType` from Cloud Build `options`
+
+- Secret Manager PermissionDenied in Cloud Build
+  - Symptom: `Permission 'secretmanager.versions.access' denied`
+  - Fix: Grant `roles/secretmanager.secretAccessor` to the Cloud Build SA and service agent; also grant `roles/cloudsql.client`
+
+- Trying to `pip install` in runtime build step
+  - Symptom: `ModuleNotFoundError: No module named 'alembic'` / permission errors
+  - Fix: Use the prebuilt backend image that already contains Alembic; set `HOME` and `PYTHONPATH`; invoke Alembic via absolute path `/home/kotori/.local/bin/alembic`
+
+- Migration failed due to non-existent indexes/tables
+  - Symptom: `psycopg2.errors.UndefinedObject: index "..." does not exist`
+  - Cause: Production schema diverged from autogenerate assumptions
+  - Fix: Make migration idempotent (e.g., `if_exists=True`), or remove unconditional drops; verify with SQL preview
+
+- Connectivity to Cloud SQL over private IP
+  - Requirement: Private Worker Pool must be attached to the VPC/subnet with routes/firewalls to Cloud SQL Private IP
+  - Fix: Ensure pool network config is correct; grant `roles/cloudsql.client`
+
+Note: If Cloud Build shows transient `recvmsg: Connection reset by peer` but the build `STATUS` is `SUCCESS`, verify the final step outcomes in Cloud Logs before retrying.

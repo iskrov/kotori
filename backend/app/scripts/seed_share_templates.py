@@ -13,7 +13,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy.orm import Session
 from app.dependencies import get_db
 from app.services.share_template_service import share_template_service
-from app.services.share_template_seed_data import SEED_TEMPLATES
+try:
+    # Prefer updated templates if available
+    from app.services.share_template_seed_data_v2 import SEED_TEMPLATES
+except Exception:  # pragma: no cover
+    from app.services.share_template_seed_data import SEED_TEMPLATES
 from app.schemas.share_template import ShareTemplateCreate
 import logging
 
@@ -21,8 +25,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def seed_templates():
-    """Seed the database with default share templates"""
+def seed_templates(reset: bool = False):
+    """
+    Seed the database with default share templates.
+    If reset=True, remove existing shares and templates before seeding (dev-only safe).
+    """
     
     # Get database session
     db_gen = get_db()
@@ -31,6 +38,13 @@ def seed_templates():
     try:
         created_count = 0
         skipped_count = 0
+
+        if reset:
+            # Remove all shares (dev environment convenience)
+            db.execute("DELETE FROM shares")
+            # Remove all existing templates to avoid conflicts
+            db.execute("DELETE FROM share_templates")
+            db.commit()
         
         for template_data in SEED_TEMPLATES:
             template_id = template_data['template_id']
