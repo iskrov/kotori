@@ -18,12 +18,12 @@ steps:
       - '-c'
       - |
         echo "🔄 Creating database backup before migration..."
-        BACKUP_DESCRIPTION="pre-migration-$(date +%Y%m%d-%H%M%S)"
+        BACKUP_DESCRIPTION="pre-migration-$$(date +%Y%m%d-%H%M%S)"
         gcloud sql backups create \
           --instance=kotori-db-instance \
           --description="$$BACKUP_DESCRIPTION" \
           --project=kotori-io
-        echo "✅ Backup created: $BACKUP_DESCRIPTION"
+        echo "✅ Backup created: $$BACKUP_DESCRIPTION"
 
   # Run database migrations using the backend container
   - name: 'us-central1-docker.pkg.dev/kotori-io/kotori-images/kotori-api:migration-${SHORT_SHA}'
