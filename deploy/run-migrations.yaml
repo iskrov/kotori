@@ -41,33 +41,31 @@ steps:
         # Ensure we use the installed user-level tools from the image
         export HOME=/home/kotori
         export PYTHONPATH=/app
-        AL="/home/kotori/.local/bin/alembic"
-        echo "PATH=$$PATH"
-        if [[ ! -x "$AL" ]]; then
-          echo "❌ Alembic not found at $AL"; ls -la /home/kotori/.local/bin || true; which alembic || true; exit 1;
+        if [[ ! -x "/home/kotori/.local/bin/alembic" ]]; then
+          echo "❌ Alembic not found at /home/kotori/.local/bin/alembic"; ls -la /home/kotori/.local/bin || true; which alembic || true; exit 1;
         fi
         echo "Alembic version:"
-        "$$AL" --version || true
+        /home/kotori/.local/bin/alembic --version || true
         
         # Check current migration status
         echo "📊 Current migration status:"
-        "$$AL" current || true
+        /home/kotori/.local/bin/alembic current || true
         
         # Show target revision
         echo "🎯 Target revision:"
-        "$$AL" heads
+        /home/kotori/.local/bin/alembic heads
         
         # Preview migrations (limited output to avoid issues)
         echo "👀 Migration preview (first 10 operations):"
-        "$$AL" upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
+        /home/kotori/.local/bin/alembic upgrade head --sql | grep -E "(CREATE|ALTER|DROP|INSERT|UPDATE)" | head -10 || true
         
         # Execute migrations (fail hard on error)
         echo "🚀 Executing database migrations..."
-        "$$AL" upgrade head
+        /home/kotori/.local/bin/alembic upgrade head
         
         # Verify success
         echo "✅ Post-migration status:"
-        "$$AL" current
+        /home/kotori/.local/bin/alembic current
         
         echo "🎉 Database migrations completed successfully!"
     secretEnv:
