@@ -40,7 +40,7 @@ steps:
         cd /app
         # Ensure we use the installed user-level tools from the image
         export HOME=/home/kotori
-        export PYTHONPATH=/app
+        export PYTHONPATH=/home/kotori/.local/lib/python3.11/site-packages:/app
         if [[ ! -x "/home/kotori/.local/bin/alembic" ]]; then
           echo "❌ Alembic not found at /home/kotori/.local/bin/alembic"; ls -la /home/kotori/.local/bin || true; which alembic || true; exit 1;
         fi
