@@ -59,40 +59,47 @@ const LoginScreen = () => {
     }
   }, [email, password]);
   
-  // Google auth request (only created if env vars present)
+  // Google auth configuration
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const googleEnabled = Boolean(webClientId || iosClientId || androidClientId);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: webClientId,
-    webClientId,
-    iosClientId,
-    androidClientId,
-    responseType: 'id_token',
-    scopes: ['openid', 'email', 'profile'],
-  });
+  // Render-only subcomponent so the Google hook is only used when enabled
+  const GoogleSignInSection: React.FC = () => {
+    const [request, response, promptAsync] = Google.useAuthRequest({
+      expoClientId: webClientId,
+      webClientId,
+      iosClientId,
+      androidClientId,
+      responseType: 'id_token',
+      scopes: ['openid', 'email', 'profile'],
+    });
 
-  useEffect(() => {
-    const handle = async () => {
-      if (response?.type === 'success' && response.params?.id_token && googleEnabled && googleLoginWithIdToken) {
-        try {
-          await googleLoginWithIdToken(response.params.id_token);
-        } catch (e: any) {
-          setErrorMessage(e?.message || 'Google authentication failed');
+    useEffect(() => {
+      const handle = async () => {
+        if (response?.type === 'success' && response.params?.id_token && googleLoginWithIdToken) {
+          try {
+            await googleLoginWithIdToken(response.params.id_token);
+          } catch (e: any) {
+            setErrorMessage(e?.message || 'Google authentication failed');
+          }
         }
-      }
-    };
-    handle();
-  }, [response]);
+      };
+      handle();
+    }, [response]);
 
-  const handleGoogleLogin = async () => {
-    if (!googleEnabled) {
-      setErrorMessage('Google login is not configured.');
-      return;
-    }
-    await promptAsync();
+    return (
+      <TouchableOpacity
+        onPress={() => promptAsync()}
+        style={[themed.secondaryButton, { marginTop: 12 }]}
+        disabled={!request}
+        accessibilityRole="button"
+        accessibilityLabel="Sign in with Google"
+      >
+        <Text style={themed.secondaryButtonText}>Sign in with Google</Text>
+      </TouchableOpacity>
+    );
   };
   
   const navigateToRegister = () => {
@@ -232,17 +239,7 @@ const LoginScreen = () => {
           />
 
           {/* Optional Google Sign-In */}
-          {googleEnabled && (
-            <TouchableOpacity
-              onPress={handleGoogleLogin}
-              style={[themed.secondaryButton, { marginTop: 12 }]}
-              disabled={!request}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in with Google"
-            >
-              <Text style={themed.secondaryButtonText}>Sign in with Google</Text>
-            </TouchableOpacity>
-          )}
+          {googleEnabled && googleLoginWithIdToken && <GoogleSignInSection />}
 
           {/* Divider */}
           <View style={themed.dividerContainer}>
