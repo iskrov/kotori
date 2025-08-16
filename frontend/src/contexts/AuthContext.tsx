@@ -6,6 +6,7 @@ import { User } from '../types';
 import logger from '../utils/logger';
 import { opaqueAuth, OpaqueSessionResult, OpaqueLoginResult } from '../services/opaqueAuth';
 import { opaqueKeyManager } from '../services/opaqueKeyManager';
+import { authManager } from '../services/authManager';
 
 // OPAQUE-only Authentication Context
 interface AuthContextType {
@@ -294,6 +295,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     }
   };
+
+  // Register logout callback with authManager for API interceptor
+  useEffect(() => {
+    authManager.setLogoutCallback(logout);
+    
+    // Cleanup on unmount
+    return () => {
+      authManager.clearLogoutCallback();
+    };
+  }, [logout]);
 
   const value = {
     isAuthenticated,

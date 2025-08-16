@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { JournalEntryCreate, JournalEntryUpdate, User, Tag } from '../types';
 import logger from '../utils/logger';
+import { authManager } from './authManager';
 
 const getApiUrl = (): string => {
   const hostname = typeof window !== 'undefined' && window.location.hostname;
@@ -210,7 +211,7 @@ api.interceptors.response.use(
         if (!refreshToken && accessToken) {
           // OPAQUE authentication - no refresh tokens available
           logger.warn('OPAQUE authentication detected (no refresh token). User needs to re-authenticate.');
-          await logout();
+          await authManager.logout('OPAQUE session expired');
           return Promise.reject({
             message: 'Session expired. Please login again.',
             status: 401
@@ -220,7 +221,7 @@ api.interceptors.response.use(
         if (!refreshToken) {
           // No refresh token available, logout user
           logger.warn('No refresh token available, logging out user');
-          await logout();
+          await authManager.logout('No refresh token available');
           return Promise.reject({
             message: 'Session expired. No refresh token. Please login again.',
             status: 401
@@ -268,7 +269,7 @@ api.interceptors.response.use(
           status: refreshError.response?.status,
           data: refreshError.response?.data 
         });
-        await logout();
+        await authManager.logout('Token refresh failed');
         return Promise.reject({
           message: 'Session expired. Token refresh failed. Please login again.',
           status: 401,
@@ -324,24 +325,7 @@ api.interceptors.response.use(
   }
 );
 
-// Helper function to handle user logout
-const logout = async () => {
-  try {
-    logger.info('Performing API logout');
-    // Clear tokens from storage
-    await AsyncStorage.removeItem('access_token');
-    await AsyncStorage.removeItem('refresh_token');
-    await AsyncStorage.removeItem('user');
-    
-    // Clear authorization header
-    delete api.defaults.headers.common.Authorization;
-    
-    // You might want to trigger navigation to login screen or auth context update
-    // This would typically be done via an auth context
-  } catch (error) {
-    logger.error('Logout Error', error);
-  }
-};
+// Note: Logout is now handled by authManager which integrates with AuthContext
 
 // API endpoint functions
 

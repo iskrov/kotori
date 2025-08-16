@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { encryptedJournalService } from '../services/encryptedJournalService';
 import { JournalEntry } from '../types';
 import logger from '../utils/logger';
+import { handleAuthError } from '../services/sessionErrorHandler';
 
 export interface JournalData {
   id: string | null;
@@ -134,6 +135,13 @@ const useJournalEntry = (data: JournalData, options?: UseJournalEntryOptions): J
       if (isMounted.current && !isNavigatingRef.current) {
         const error = err instanceof Error ? err : new Error('Error saving journal entry');
         logger.error('performSave: Error saving journal entry', error);
+        
+        // Handle authentication/session errors specially for critical operations
+        handleAuthError(error, { 
+          operation: 'saving your journal entry',
+          showAlert: true 
+        });
+        
         setError(error);
         if (onSaveError) {
           onSaveError(error);
