@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import logger from '../utils/logger';
 import { opaqueKeyManager } from './opaqueKeyManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface EncryptionResult {
   encryptedContent: string;  // Base64 encoded encrypted data
@@ -32,6 +33,8 @@ class ClientEncryptionService {
   private static readonly SALT_LENGTH = 32; // 256 bits
   private static readonly DEFAULT_ITERATIONS = 100000;
   private static readonly MASTER_INFO = 'UserMasterKey';
+  private static readonly GOOGLE_SALT_KEY_PREFIX = 'google_key_';
+  private static readonly APP_SECRET_ENV_KEY = 'EXPO_PUBLIC_APP_SECRET';
   
   // Secure storage keys
   private static readonly USER_SALT_KEY = 'user_encryption_salt';
@@ -158,28 +161,88 @@ class ClientEncryptionService {
    * Lives only in memory; never persisted
    */
   private async getUserMasterKey(): Promise<CryptoKey> {
-    if (!opaqueKeyManager.isInitialized()) {
-      throw new Error('OPAQUE key manager not initialized');
+    // Prefer OPAQUE export key if initialized
+    if (opaqueKeyManager.isInitialized()) {
+      const exportKey = opaqueKeyManager.getExportKey();
+      const ikm = await crypto.subtle.importKey('raw', exportKey, 'HKDF', false, ['deriveKey']);
+      const masterKey = await crypto.subtle.deriveKey(
+        {
+          name: 'HKDF',
+          hash: 'SHA-256',
+          salt: new Uint8Array(32),
+          info: new TextEncoder().encode(ClientEncryptionService.MASTER_INFO),
+        },
+        ikm,
+        {
+          name: ClientEncryptionService.ALGORITHM,
+          length: ClientEncryptionService.KEY_LENGTH,
+        },
+        false,
+        ['encrypt', 'decrypt', 'wrapKey', 'unwrapKey']
+      );
+      return masterKey;
     }
-    const exportKey = opaqueKeyManager.getExportKey();
-    // Import raw export key for HKDF
-    const ikm = await crypto.subtle.importKey('raw', exportKey, 'HKDF', false, ['deriveKey']);
+
+    // Fallback: derive master key for Google-authenticated users
+    // Read user and potential google_id from storage
+    const storedUser = await AsyncStorage.getItem('user');
+    if (!storedUser) {
+      throw new Error('No user data available for key derivation');
+    }
+    let googleId: string | null = null;
+    try {
+      const user = JSON.parse(storedUser);
+      googleId = user?.google_id ?? null;
+    } catch {
+      googleId = null;
+    }
+
+    if (!googleId) {
+      throw new Error('OPAQUE keys not initialized and user is not Google-authenticated');
+    }
+
+    // Derive deterministic key from googleId + app secret + per-user salt
+    const appSecret = (process.env as any)?.[ClientEncryptionService.APP_SECRET_ENV_KEY] || '';
+    const password = `${googleId}:${appSecret}`;
+
+    // Load or create a per-user salt
+    const saltKey = `${ClientEncryptionService.GOOGLE_SALT_KEY_PREFIX}${googleId}`;
+    let saltBase64 = await AsyncStorage.getItem(saltKey);
+    let salt: Uint8Array;
+    if (saltBase64) {
+      const binary = atob(saltBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      salt = bytes;
+    } else {
+      salt = crypto.getRandomValues(new Uint8Array(ClientEncryptionService.SALT_LENGTH));
+      const b64 = btoa(String.fromCharCode(...Array.from(salt)));
+      await AsyncStorage.setItem(saltKey, b64);
+    }
+
+    // Derive PBKDF2 key and expand to AES-GCM usable key
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+
     const masterKey = await crypto.subtle.deriveKey(
       {
-        name: 'HKDF',
-        hash: 'SHA-256',
-        // Use zero salt by default; exportKey already high entropy; info distinguishes use
-        salt: new Uint8Array(32),
-        info: new TextEncoder().encode(ClientEncryptionService.MASTER_INFO),
+        name: 'PBKDF2',
+        salt,
+        iterations: ClientEncryptionService.DEFAULT_ITERATIONS,
+        hash: 'SHA-256'
       },
-      ikm,
-      {
-        name: ClientEncryptionService.ALGORITHM,
-        length: ClientEncryptionService.KEY_LENGTH,
-      },
+      keyMaterial,
+      { name: ClientEncryptionService.ALGORITHM, length: ClientEncryptionService.KEY_LENGTH },
       false,
       ['encrypt', 'decrypt', 'wrapKey', 'unwrapKey']
     );
+
     return masterKey;
   }
 

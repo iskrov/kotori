@@ -38,6 +38,7 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
+  google_id?: string | null;
   is_active?: boolean;
   is_superuser?: boolean;
   avatar_url?: string | null;
