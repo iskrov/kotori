@@ -145,7 +145,7 @@ class UserInDBBase(UserBase):
 
 # Additional properties to return via API
 class User(UserInDBBase):
-    pass
+    google_id: str | None = None
 
 
 # Additional properties stored in DB but not returned by API
