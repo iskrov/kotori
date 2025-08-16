@@ -93,12 +93,23 @@ class GeminiService:
             location = settings.GOOGLE_CLOUD_LOCATION
             credentials = self._get_credentials()
 
-            if VERTEX_AVAILABLE and project_id and location and credentials:
+            if VERTEX_AVAILABLE and project_id and location:
                 try:
-                    vertexai.init(project=project_id, location=location, credentials=credentials)
+                    # Use explicit credentials if provided; otherwise rely on ADC (Cloud Run SA)
+                    if credentials:
+                        vertexai.init(project=project_id, location=location, credentials=credentials)
+                        auth_mode = "service_account_file"
+                    else:
+                        vertexai.init(project=project_id, location=location)
+                        auth_mode = "adc_service_account"
                     self.model = VertexGenerativeModel('gemini-2.5-flash')
                     self.vertex_backend = True
-                    logger.info("Vertex AI initialized with gemini-2.5-flash model (project=%s, location=%s)", project_id, location)
+                    logger.info(
+                        "Vertex AI initialized with gemini-2.5-flash model (project=%s, location=%s, auth=%s)",
+                        project_id,
+                        location,
+                        auth_mode,
+                    )
                     return
                 except Exception as e:
                     logger.warning(f"Vertex AI initialization failed, falling back to direct Gemini API: {e}")
