@@ -59,10 +59,11 @@ const LoginScreen = () => {
     }
   }, [email, password]);
   
-  // Google auth configuration
-  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-  const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  // Google auth configuration via Expo constants (preferred)
+  const extra: any = Constants?.expoConfig?.extra || {};
+  const webClientId = extra.googleWebClientId || process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const iosClientId = extra.googleIosClientId || process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const androidClientId = extra.googleAndroidClientId || process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const googleEnabled = Boolean(webClientId || iosClientId || androidClientId);
 
   // Render-only subcomponent so the Google hook is only used when enabled
