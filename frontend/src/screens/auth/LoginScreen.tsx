@@ -241,27 +241,14 @@ const LoginScreen = () => {
           {/* Optional Google Sign-In */}
           {googleEnabled && googleLoginWithIdToken && <GoogleSignInSection />}
 
-          {/* Divider */}
-          <View style={themed.dividerContainer}>
-            <View style={themed.dividerLine} />
-            <Text style={themed.dividerText}>or</Text>
-            <View style={themed.dividerLine} />
-          </View>
-          
-          {/* Google Sign In */}
-          <Pressable 
-            style={({ pressed }) => [
-              themed.secondaryButton,
-              pressed && { opacity: 0.8 }
-            ]}
-            onPress={handleGoogleLogin}
-            disabled={isLoading || authLoading}
-            accessibilityLabel="Continue with Google"
-            accessibilityRole="button"
-          >
-            <Ionicons name="logo-google" size={20} color={theme.colors.text} />
-            <Text style={themed.secondaryButtonText}>Continue with Google</Text>
-          </Pressable>
+          {/* Divider only when Google sign-in is available */}
+          {googleEnabled && googleLoginWithIdToken && (
+            <View style={themed.dividerContainer}>
+              <View style={themed.dividerLine} />
+              <Text style={themed.dividerText}>or</Text>
+              <View style={themed.dividerLine} />
+            </View>
+          )}
 
           {/* Footer Link */}
           <View style={themed.footerContainer}>
