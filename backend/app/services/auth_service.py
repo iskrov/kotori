@@ -48,11 +48,19 @@ class AuthService:
                 logger.error("GOOGLE_CLIENT_ID not configured")
                 return None
                 
-            # Verify the Google ID token
+            # Verify the Google ID token; allow multiple client IDs (web/ios/android)
+            audience_candidates = [cid for cid in [
+                getattr(settings, 'GOOGLE_CLIENT_ID', None),
+                getattr(settings, 'GOOGLE_WEB_CLIENT_ID', None),
+                getattr(settings, 'GOOGLE_IOS_CLIENT_ID', None),
+                getattr(settings, 'GOOGLE_ANDROID_CLIENT_ID', None)
+            ] if cid]
+
+            verify_audience = audience_candidates[0] if audience_candidates else None
             idinfo = id_token.verify_oauth2_token(
-                token, 
-                requests.Request(), 
-                settings.GOOGLE_CLIENT_ID
+                token,
+                requests.Request(),
+                verify_audience,
             )
             
             # Validate issuer

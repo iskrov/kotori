@@ -17,6 +17,7 @@ import { RootStackParamList, MainStackParamList } from '../../navigation/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
+import * as Google from 'expo-auth-session/providers/google';
 
 import { useAuth } from '../../contexts/AuthContext';
 import SafeScrollView from '../../components/SafeScrollView';
@@ -37,7 +38,7 @@ const LoginScreen = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { theme } = useAppTheme();
   const themed = getAuthStyles(theme);
-  const { isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading, googleLoginWithIdToken } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,8 +59,40 @@ const LoginScreen = () => {
     }
   }, [email, password]);
   
+  // Google auth request (only created if env vars present)
+  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const googleEnabled = Boolean(webClientId || iosClientId || androidClientId);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    expoClientId: webClientId,
+    webClientId,
+    iosClientId,
+    androidClientId,
+    responseType: 'id_token',
+    scopes: ['openid', 'email', 'profile'],
+  });
+
+  useEffect(() => {
+    const handle = async () => {
+      if (response?.type === 'success' && response.params?.id_token && googleEnabled && googleLoginWithIdToken) {
+        try {
+          await googleLoginWithIdToken(response.params.id_token);
+        } catch (e: any) {
+          setErrorMessage(e?.message || 'Google authentication failed');
+        }
+      }
+    };
+    handle();
+  }, [response]);
+
   const handleGoogleLogin = async () => {
-    setErrorMessage('Google login is not available with secure authentication. Please use email and password.');
+    if (!googleEnabled) {
+      setErrorMessage('Google login is not configured.');
+      return;
+    }
+    await promptAsync();
   };
   
   const navigateToRegister = () => {
@@ -197,6 +230,19 @@ const LoginScreen = () => {
             disabled={!email || !password || isLoading || authLoading}
             style={themed.primaryButton}
           />
+
+          {/* Optional Google Sign-In */}
+          {googleEnabled && (
+            <TouchableOpacity
+              onPress={handleGoogleLogin}
+              style={[themed.secondaryButton, { marginTop: 12 }]}
+              disabled={!request}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in with Google"
+            >
+              <Text style={themed.secondaryButtonText}>Sign in with Google</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Divider */}
           <View style={themed.dividerContainer}>

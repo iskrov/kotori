@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     # Google OAuth settings - REQUIRED for Google Sign-In
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: Optional[str] = os.getenv("GOOGLE_CLIENT_SECRET")
+    GOOGLE_WEB_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_WEB_CLIENT_ID")
+    GOOGLE_IOS_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_IOS_CLIENT_ID")
+    GOOGLE_ANDROID_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_ANDROID_CLIENT_ID")
     
     # Gemini API settings - REQUIRED for sharing features
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")

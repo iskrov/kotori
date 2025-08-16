@@ -6,6 +6,10 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL || "https:
 const googleCloudProjectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const googleSpeechApiKey = process.env.GOOGLE_SPEECH_API_KEY;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID;
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || process.env.GOOGLE_IOS_CLIENT_ID;
+const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || process.env.GOOGLE_ANDROID_CLIENT_ID;
+const appSecret = process.env.EXPO_PUBLIC_APP_SECRET || '';
 
 // Only warn if explicitly required (frontend does not call Google STT directly)
 const requireFrontendSpeechCreds = process.env.REQUIRE_FRONTEND_SPEECH_CREDS === 'true';
@@ -63,6 +67,10 @@ export default {
       
       // Google Cloud configuration (set by admin for all users)
       googleClientId,
+      googleWebClientId,
+      googleIosClientId,
+      googleAndroidClientId,
+      appSecret,
       googleCloudProjectId,
       googleSpeechApiKey,
       

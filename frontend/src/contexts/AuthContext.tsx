@@ -19,6 +19,7 @@ interface AuthContextType {
   opaqueLogin: (email: string, password: string) => Promise<void>;
   opaqueRegister: (name: string, email: string, password: string) => Promise<void>;
   hasOpaqueSupport: () => Promise<boolean>;
+  googleLoginWithIdToken?: (idToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -250,6 +251,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Optional: Google login with ID token (non-disruptive; only used if wired in UI)
+  const googleLoginWithIdToken = async (idToken: string) => {
+    try {
+      setIsLoading(true);
+      logger.info('Google login attempt with ID token');
+      const response = await api.post('/api/v1/auth/google', { token: idToken });
+
+      const { access_token, refresh_token, user: userData } = response.data;
+      if (!access_token || !userData) {
+        throw new Error('Invalid Google login response');
+      }
+
+      // Set auth header and persist tokens
+      api.defaults.headers.common.Authorization = `Bearer ${access_token}`;
+      await AsyncStorage.setItem('access_token', access_token);
+      if (refresh_token) {
+        await AsyncStorage.setItem('refresh_token', refresh_token);
+      }
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+
+      setUser(userData);
+      setIsAuthenticated(true);
+      logger.info('Google login successful', { userId: userData.id });
+    } catch (error: any) {
+      logger.error('Google login failed', { message: error.message, response: error.response?.data });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Check if OPAQUE is supported and available
   const hasOpaqueSupport = async (): Promise<boolean> => {
     try {
@@ -273,6 +305,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     opaqueLogin,
     opaqueRegister,
     hasOpaqueSupport,
+    googleLoginWithIdToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
