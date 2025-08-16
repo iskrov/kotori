@@ -28,6 +28,7 @@ import logger from '../../utils/logger';
 import SafeScrollView from '../../components/SafeScrollView';
 import { SettingsSkeleton } from '../../components/SkeletonLoader';
 import ScreenHeader from '../../components/ScreenHeader';
+import ConfirmationModal from '../../components/ConfirmationModal';
 import LanguageSelector from '../../components/LanguageSelector';
 
 // Settings components
@@ -53,6 +54,7 @@ const SettingsScreen: React.FC = () => {
   // Set document title for web browsers
   useDocumentTitle('Settings');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   
   // Scroll to top functionality
   const scrollViewRef = React.useRef<any>(null);
@@ -93,20 +95,25 @@ const SettingsScreen: React.FC = () => {
   //   subtitle: lang.region ? `${lang.region}` : undefined,
   // }));
 
-  const handleSignOut = async () => {
-    // For web platform, use window.confirm instead of Alert.alert
-    const confirmed = window.confirm('Are you sure you want to sign out?');
-    
-    if (confirmed) {
-      try {
-        logger.info('[SettingsScreen] User confirmed sign out');
-        await logout();
-        logger.info('[SettingsScreen] User signed out successfully');
-      } catch (error) {
-        logger.error('[SettingsScreen] Error during sign out:', error);
-        window.alert('Failed to sign out. Please try again.');
-      }
+  const handleSignOut = () => {
+    setShowSignOutModal(true);
+  };
+
+  const confirmSignOut = async () => {
+    setShowSignOutModal(false);
+    try {
+      logger.info('[SettingsScreen] User confirmed sign out');
+      await logout();
+      logger.info('[SettingsScreen] User signed out successfully');
+    } catch (error) {
+      logger.error('[SettingsScreen] Error during sign out:', error);
+      // You could show an error modal here instead of window.alert
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
     }
+  };
+
+  const cancelSignOut = () => {
+    setShowSignOutModal(false);
   };
 
   // Handle pull-to-refresh
@@ -378,6 +385,18 @@ const SettingsScreen: React.FC = () => {
         <Ionicons name="chevron-up" size={24} color={theme.colors.white} />
       </TouchableOpacity>
     </Animated.View>
+
+    {/* Sign Out Confirmation Modal */}
+    <ConfirmationModal
+      visible={showSignOutModal}
+      title="Sign Out"
+      message="Are you sure you want to sign out of your account?"
+      confirmText="Sign Out"
+      cancelText="Cancel"
+      icon="log-out"
+      onConfirm={confirmSignOut}
+      onCancel={cancelSignOut}
+    />
   </View>
   );
 };
