@@ -7,6 +7,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import logger from '../utils/logger';
 import { opaqueKeyManager } from './opaqueKeyManager';
 
@@ -191,8 +192,10 @@ class ClientEncryptionService {
     let googleId: string | null = null;
     try {
       const user = JSON.parse(storedUser);
+      logger.info(`User data for encryption: id=${user?.id}, email=${user?.email}, google_id=${user?.google_id}`);
       googleId = user?.google_id ?? null;
-    } catch {
+    } catch (error) {
+      logger.error('Failed to parse stored user data:', error);
       googleId = null;
     }
 
@@ -201,8 +204,11 @@ class ClientEncryptionService {
     }
 
     // Derive deterministic key from googleId + app secret + per-user salt
-    const appSecret = (process.env as any)?.[ClientEncryptionService.APP_SECRET_ENV_KEY] || '';
+    const extra: any = Constants?.expoConfig?.extra || {};
+    const appSecret = extra.appSecret || (process.env as any)?.[ClientEncryptionService.APP_SECRET_ENV_KEY] || '';
     const password = `${googleId}:${appSecret}`;
+    
+    logger.info(`Google user encryption: googleId=${googleId?.substring(0, 8)}..., hasAppSecret=${Boolean(appSecret)}`);
 
     // Load or create a per-user salt
     const saltKey = `${ClientEncryptionService.GOOGLE_SALT_KEY_PREFIX}${googleId}`;
