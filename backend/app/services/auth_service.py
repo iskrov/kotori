@@ -6,6 +6,8 @@ from typing import Any
 from jose import JWTError
 from jose import jwt
 from sqlalchemy.orm import Session
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
 from ..core.config import settings
 from ..core.security import create_access_token
@@ -37,28 +39,78 @@ class AuthService:
 
     def authenticate_google(self, db: Session, *, token: str) -> User | None:
         """
-        Authenticate a user with a Google token.
-        If user doesn't exist yet, create a new one.
+        Authenticate a user with a Google ID token.
+        Verifies the token with Google and creates/updates user.
         """
-        # Simplified for testing
-        if token == "test_google_token":
-            test_user = (
-                db.query(User).filter(User.email == "google_user@example.com").first()
+        try:
+            # Check if we have Google client ID configured
+            if not settings.GOOGLE_CLIENT_ID:
+                logger.error("GOOGLE_CLIENT_ID not configured")
+                return None
+                
+            # Verify the Google ID token
+            idinfo = id_token.verify_oauth2_token(
+                token, 
+                requests.Request(), 
+                settings.GOOGLE_CLIENT_ID
             )
-            if not test_user:
-                test_user = User(
-                    email="google_user@example.com",
-                    full_name="Google User",
-                    google_id="google123",
+            
+            # Validate issuer
+            if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+                logger.error("Invalid Google token issuer: %s", idinfo.get('iss'))
+                return None
+                
+            # Extract user info
+            google_id = idinfo['sub']
+            email = idinfo['email']
+            name = idinfo.get('name', '')
+            
+            logger.info(f"Google auth successful for email: {email}")
+            
+            # Find or create user
+            user = db.query(User).filter(User.google_id == google_id).first()
+            
+            if not user:
+                # Check if user exists with same email but different auth method
+                existing_user = db.query(User).filter(User.email == email).first()
+                if existing_user and existing_user.opaque_envelope is not None:
+                    # User has OPAQUE account - don't allow Google auth
+                    logger.warning(f"User {email} has OPAQUE account, cannot use Google auth")
+                    return None
+                
+                # Create new Google user
+                user = User(
+                    email=email,
+                    full_name=name,
+                    google_id=google_id,
                     is_active=True,
                     created_at=datetime.now(timezone.utc),
                     updated_at=datetime.now(timezone.utc),
+                    # Google users don't have OPAQUE envelope
+                    opaque_envelope=None
                 )
-                db.add(test_user)
+                db.add(user)
                 db.commit()
-                db.refresh(test_user)
-            return test_user
-        return None
+                db.refresh(user)
+                
+                logger.info(f"Created new Google user: {email}")
+            else:
+                # Update existing user info
+                user.full_name = name
+                user.email = email
+                user.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                
+                logger.info(f"Updated existing Google user: {email}")
+            
+            return user
+            
+        except ValueError as e:
+            logger.error(f"Invalid Google token: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Google authentication error: {e}", exc_info=True)
+            return None
 
     def refresh_token(
         self, db: Session, *, refresh_token: str

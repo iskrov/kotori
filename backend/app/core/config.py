@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_PROJECT: str = get_required_env("GOOGLE_CLOUD_PROJECT")
     GOOGLE_CLOUD_LOCATION: str = get_required_env("GOOGLE_CLOUD_LOCATION")
     
+    # Google OAuth settings - REQUIRED for Google Sign-In
+    GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
+    GOOGLE_CLIENT_SECRET: Optional[str] = os.getenv("GOOGLE_CLIENT_SECRET")
+    
     # Gemini API settings - REQUIRED for sharing features
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
 
