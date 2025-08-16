@@ -71,6 +71,11 @@ class GeminiInvalidResponseError(GeminiError):
     pass
 
 
+class GeminiMaxTokensError(GeminiError):
+    """Generation stopped due to max tokens limit"""
+    pass
+
+
 class GeminiService:
     """Service for Gemini API integration with structured output"""
 
@@ -183,29 +188,40 @@ class GeminiService:
             if total_chars > 15000:
                 summary_text = await self._summarize_entries(entries=entries, target_language=target_language)
 
-            # Create structured prompt for Q&A generation
-            prompt = self._create_qa_generation_prompt(entries, template, target_language, summary_override=summary_text)
+            # Try full template generation first
+            try:
+                response = await self._generate_full_template_summary(
+                    entries=entries,
+                    template=template,
+                    target_language=target_language,
+                    summary_override=summary_text
+                )
+                
+                # Confidence-aware escalation to Pro for weak answers
+                improved_response = await self._maybe_escalate_low_confidence(
+                    original=response,
+                    entries=entries,
+                    template=template,
+                    target_language=target_language,
+                    summary_override=summary_text
+                )
 
-            # Generate content with structured output (Flash default)
-            response = await self._generate_with_structured_output(
-                prompt=prompt,
-                response_schema=ShareSummaryResponse,
-                temperature=0.4,
-                max_output_tokens=2000,
-                model_name_override=None
-            )
-
-            # Confidence-aware escalation to Pro for weak answers
-            improved_response = await self._maybe_escalate_low_confidence(
-                original=response,
-                entries=entries,
-                template=template,
-                target_language=target_language,
-                summary_override=summary_text
-            )
-
-            logger.info(f"Generated share summary with {len(improved_response.answers)} Q&A pairs (escalation applied={improved_response is not response})")
-            return improved_response
+                logger.info(f"Generated share summary with {len(improved_response.answers)} Q&A pairs (escalation applied={improved_response is not response})")
+                return improved_response
+                
+            except GeminiMaxTokensError as token_error:
+                logger.warning(f"Full template generation hit token limit, falling back to batching: {token_error}")
+                
+                # Fallback: Generate in batches to avoid token limits
+                response = await self._generate_batched_template_summary(
+                    entries=entries,
+                    template=template,
+                    target_language=target_language,
+                    summary_override=summary_text
+                )
+                
+                logger.info(f"Generated share summary using batching with {len(response.answers)} Q&A pairs")
+                return response
 
         except Exception as e:
             logger.error(f"Failed to generate share summary: {e}")
@@ -305,6 +321,9 @@ class GeminiService:
                         max_output_tokens=max_output_tokens,
                     )
                 )
+            
+            # Check for token limit issues before parsing
+            self._check_finish_reason_and_log_usage(response)
             
             # Parse the structured response (robust across SDKs and backends)
             structured_text = self._extract_structured_json_text(response)
@@ -410,6 +429,150 @@ class GeminiService:
 
         # Nothing worked
         raise GeminiError("API call failed: Cannot get the response text")
+
+    def _check_finish_reason_and_log_usage(self, response: Any) -> None:
+        """Check response finish_reason and log usage metadata for debugging."""
+        try:
+            # Helper to safely get attribute or dict key
+            def get(obj: Any, name: str, default: Any = None) -> Any:
+                if obj is None:
+                    return default
+                if isinstance(obj, dict):
+                    return obj.get(name, default)
+                return getattr(obj, name, default)
+
+            # Extract usage metadata if available
+            usage_metadata = get(response, "usage_metadata")
+            if usage_metadata:
+                prompt_tokens = get(usage_metadata, "prompt_token_count", 0)
+                completion_tokens = get(usage_metadata, "candidates_token_count", 0)
+                total_tokens = get(usage_metadata, "total_token_count", 0)
+                logger.info(f"Gemini usage: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}")
+            
+            # Check candidates for finish_reason
+            candidates = get(response, "candidates") or []
+            for i, candidate in enumerate(candidates):
+                finish_reason = get(candidate, "finish_reason")
+                if finish_reason:
+                    logger.info(f"Gemini candidate {i} finish_reason: {finish_reason}")
+                    
+                    # Check for specific problematic finish reasons
+                    if str(finish_reason).upper() in ["MAX_TOKENS", "LENGTH"]:
+                        raise GeminiMaxTokensError(f"Generation stopped due to token limit (finish_reason: {finish_reason})")
+                    elif str(finish_reason).upper() in ["SAFETY", "RECITATION"]:
+                        logger.warning(f"Generation blocked by safety filters (finish_reason: {finish_reason})")
+                        raise GeminiError(f"Generation blocked by safety filters (finish_reason: {finish_reason})")
+
+        except GeminiMaxTokensError:
+            raise  # Re-raise token limit errors
+        except GeminiError:
+            raise  # Re-raise other Gemini errors
+        except Exception as e:
+            # Don't fail the whole request if we can't parse metadata
+            logger.debug(f"Could not parse response metadata: {e}")
+            pass
+
+    async def _generate_full_template_summary(
+        self,
+        entries: List[Dict[str, Any]],
+        template: Dict[str, Any],
+        target_language: str,
+        summary_override: Optional[str] = None
+    ) -> ShareSummaryResponse:
+        """Generate summary for all template questions in a single call."""
+        # Create structured prompt for Q&A generation
+        prompt = self._create_qa_generation_prompt(entries, template, target_language, summary_override=summary_override)
+
+        # Generate content with structured output (Flash default)
+        response = await self._generate_with_structured_output(
+            prompt=prompt,
+            response_schema=ShareSummaryResponse,
+            temperature=0.4,
+            max_output_tokens=8192,  # Increased from 2000 to prevent JSON truncation
+            model_name_override=None
+        )
+        
+        return response
+
+    async def _generate_batched_template_summary(
+        self,
+        entries: List[Dict[str, Any]],
+        template: Dict[str, Any],
+        target_language: str,
+        summary_override: Optional[str] = None
+    ) -> ShareSummaryResponse:
+        """Generate summary by batching questions to avoid token limits."""
+        questions = template.get('questions', [])
+        if not questions:
+            # Return empty response if no questions
+            return ShareSummaryResponse(
+                answers=[],
+                source_language='en',
+                target_language=target_language,
+                entry_count=len(entries),
+                processing_notes="No questions in template"
+            )
+        
+        # Split questions into batches of 3-4 questions each
+        BATCH_SIZE = 3
+        question_batches = [questions[i:i + BATCH_SIZE] for i in range(0, len(questions), BATCH_SIZE)]
+        
+        all_answers = []
+        batch_count = len(question_batches)
+        
+        logger.info(f"Processing {len(questions)} questions in {batch_count} batches of up to {BATCH_SIZE} questions each")
+        
+        for batch_idx, question_batch in enumerate(question_batches):
+            logger.info(f"Processing batch {batch_idx + 1}/{batch_count} with {len(question_batch)} questions")
+            
+            # Create a mini-template for this batch
+            batch_template = {
+                'template_id': template.get('template_id'),
+                'name': template.get('name'),
+                'version': template.get('version'),
+                'questions': question_batch
+            }
+            
+            try:
+                # Generate for this batch
+                batch_response = await self._generate_full_template_summary(
+                    entries=entries,
+                    template=batch_template,
+                    target_language=target_language,
+                    summary_override=summary_override
+                )
+                
+                # Collect answers from this batch
+                all_answers.extend(batch_response.answers)
+                
+            except Exception as e:
+                logger.error(f"Failed to process batch {batch_idx + 1}: {e}")
+                
+                # Create fallback answers for this batch
+                for question in question_batch:
+                    q_raw = question.get('text')
+                    if isinstance(q_raw, dict):
+                        q_text = q_raw.get(target_language) or q_raw.get('en') or 'No question text'
+                    else:
+                        q_text = q_raw or 'No question text'
+                    
+                    fallback_answer = QuestionAnswer(
+                        question_id=question.get('id', 'unknown'),
+                        question_text=q_text,
+                        answer=f"Unable to generate answer due to processing error: {str(e)[:100]}",
+                        confidence=0.0,
+                        source_entries=None
+                    )
+                    all_answers.append(fallback_answer)
+        
+        # Combine all batch results into final response
+        return ShareSummaryResponse(
+            answers=all_answers,
+            source_language='en',  # Default, could be improved with detection
+            target_language=target_language,
+            entry_count=len(entries),
+            processing_notes=f"Generated using batching ({batch_count} batches)"
+        )
 
     def _inline_definitions(self, schema: Dict[str, Any], defs: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -534,7 +697,7 @@ QUESTIONS TO ANSWER:
 INSTRUCTIONS:
 1. Read the journal entries carefully
 2. For each question, find relevant information from the entries
-3. Generate a concise, helpful answer (100-300 words) based on the entries
+3. Generate a concise, helpful answer (50-100 words) based on the entries
 4. If no relevant information exists for a question, respond with "No information available in the selected entries"
 5. Provide a confidence score (0.0-1.0) for each answer based on how well the entries address the question
 6. Translate all questions and answers to {target_language} if different from the source language
@@ -625,7 +788,7 @@ IMPORTANT:
                     prompt=single_prompt,
                     response_schema=SingleAnswerResponse,
                     temperature=0.3,
-                    max_output_tokens=800,
+                    max_output_tokens=2048,  # Increased from 800 for Pro model
                     model_name_override='gemini-2.5-pro'
                 )
                 refined_answers[qa.question_id] = QuestionAnswer(
@@ -681,7 +844,7 @@ QUESTION:
 - {question_id}: {question_text}
 
 INSTRUCTIONS:
-1. Provide a concise answer (up to 200 words) in {target_language}.
+1. Provide a concise answer (up to 100 words) in {target_language}.
 2. If there is insufficient information, answer "Unknown" and set confidence near 0.0.
 3. Return valid JSON ONLY that matches the expected schema.
 """

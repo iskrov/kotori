@@ -275,3 +275,72 @@ class TestGeminiService:
             max_output_tokens=10,
         )
         assert result.foo == "baz"
+
+    @pytest.mark.asyncio
+    async def test_max_tokens_triggers_batching_fallback(self):
+        """Test that MAX_TOKENS finish_reason triggers batching fallback in generate_share_summary."""
+        service = GeminiService()
+        service.vertex_backend = True
+
+        # Mock a response that indicates MAX_TOKENS
+        class MaxTokensCandidate:
+            def __init__(self):
+                self.finish_reason = "MAX_TOKENS"
+
+        class MaxTokensResponse:
+            def __init__(self):
+                self.candidates = [MaxTokensCandidate()]
+                self.usage_metadata = None
+
+        # Mock the _generate_full_template_summary to fail with MAX_TOKENS first, then succeed on batches
+        call_count = 0
+        
+        async def mock_generate_full(entries, template, target_language, summary_override=None):
+            nonlocal call_count
+            call_count += 1
+            
+            if call_count == 1:
+                # First call (full template) fails with MAX_TOKENS
+                response = MaxTokensResponse()
+                service._check_finish_reason_and_log_usage(response)
+                # This should raise GeminiMaxTokensError
+                return None
+            else:
+                # Subsequent calls (batches) succeed
+                from app.services.gemini_service import ShareSummaryResponse, QuestionAnswer
+                return ShareSummaryResponse(
+                    answers=[
+                        QuestionAnswer(
+                            question_id=f"q{call_count}",
+                            question_text="Test question",
+                            answer="Test answer",
+                            confidence=0.8
+                        )
+                    ],
+                    source_language="en",
+                    target_language=target_language,
+                    entry_count=len(entries),
+                    processing_notes="Batch test"
+                )
+
+        service._generate_full_template_summary = mock_generate_full
+
+        # Create test data
+        entries = [{"content": "test entry", "entry_date": "2024-01-01"}]
+        template = {
+            "template_id": "test-template",
+            "questions": [
+                {"id": "q1", "text": {"en": "Question 1"}},
+                {"id": "q2", "text": {"en": "Question 2"}},
+                {"id": "q3", "text": {"en": "Question 3"}},
+                {"id": "q4", "text": {"en": "Question 4"}},  # 4 questions to trigger batching
+            ]
+        }
+
+        # This should trigger the batching fallback
+        result = await service.generate_share_summary(entries, template, "en")
+        
+        # Should have succeeded with batching
+        assert result is not None
+        assert "batching" in result.processing_notes.lower()
+        assert len(result.answers) > 0  # Should have some answers from batches
