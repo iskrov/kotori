@@ -46,6 +46,8 @@ Default STARTUP TCP probe failed 1 time consecutively for container "kotori-api-
 - `GOOGLE_CLOUD_PROJECT` → `google-cloud-project:latest`
 - `GOOGLE_CLOUD_LOCATION` → `google-cloud-location:latest`
 - `ENCRYPTION_MASTER_SALT` → `encryption-master-salt:latest`
+- `GOOGLE_CLIENT_ID` → `google-client-id:latest`
+- `GOOGLE_WEB_CLIENT_ID` → `google-web-client-id:latest`
 
 **Debugging Commands**:
 ```bash
@@ -57,6 +59,58 @@ gcloud run services describe kotori-api --region=us-central1 --format="export" >
 ```
 
 **Key Learning**: Service account changes require reviewing ALL environment variable mappings and ensuring complete secret configuration.
+
+### 9. Google OAuth Authentication Failures (August 2025)
+
+**Issue**: Google OAuth authentication failing with "Invalid Google authentication credentials or user not found" and "GOOGLE_CLIENT_ID not configured" errors.
+
+**Symptoms**:
+```
+2025-08-17 17:21:48,587 - app.services.auth_service - ERROR - GOOGLE_CLIENT_ID not configured
+API Error: Invalid Google authentication credentials or user not found (401)
+```
+
+**Root Cause**: Google OAuth secrets were missing from Secret Manager and Cloud Run deployment configuration after service account cleanup.
+
+**Missing Configuration**:
+- `GOOGLE_CLIENT_ID` - Required for Google ID token verification
+- `GOOGLE_WEB_CLIENT_ID` - Additional OAuth client ID support
+- Frontend OAuth credentials during build process
+
+**Solution Steps**:
+1. **Add OAuth secrets to Secret Manager**:
+```bash
+echo "412014849981-rclmqdhuma894ebulfcaldttfv2g7qjt.apps.googleusercontent.com" | gcloud secrets create google-client-id --data-file=- --project=kotori-io
+echo "412014849981-rclmqdhuma894ebulfcaldttfv2g7qjt.apps.googleusercontent.com" | gcloud secrets create google-web-client-id --data-file=- --project=kotori-io
+echo "znUYlvycgAuE6MJ7y17dP54XOzgRUnrxACNyOdk0HYx9" | gcloud secrets create expo-public-app-secret --data-file=- --project=kotori-io
+```
+
+2. **Update backend deployment with OAuth secrets**:
+```bash
+gcloud run deploy kotori-api \
+  --region=us-central1 \
+  --project=kotori-io \
+  --image=IMAGE_URL \
+  --update-secrets="DATABASE_URL=database-url:latest,SECRET_KEY=secret-key:latest,GOOGLE_CLOUD_PROJECT=google-cloud-project:latest,GOOGLE_CLOUD_LOCATION=google-cloud-location:latest,ENCRYPTION_MASTER_SALT=encryption-master-salt:latest,GOOGLE_CLIENT_ID=google-client-id:latest,GOOGLE_WEB_CLIENT_ID=google-web-client-id:latest" \
+  --service-account=kotori-api@kotori-io.iam.gserviceaccount.com \
+  --clear-volumes \
+  --clear-volume-mounts
+```
+
+3. **Deploy frontend with OAuth credentials as build-time variables**:
+```bash
+cd frontend && \
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=412014849981-rclmqdhuma894ebulfcaldttfv2g7qjt.apps.googleusercontent.com \
+EXPO_PUBLIC_APP_SECRET=znUYlvycgAuE6MJ7y17dP54XOzgRUnrxACNyOdk0HYx9 \
+npx expo export:web && \
+gcloud builds submit --tag IMAGE_URL && \
+gcloud run deploy kotori-app --image IMAGE_URL --region us-central1 --project kotori-io
+```
+
+**Key Learning**: 
+- Google OAuth authentication is separate from Google Cloud service accounts
+- OAuth credentials must be available to both backend (runtime secrets) and frontend (build-time environment variables)
+- The `--clear-volumes` and `--clear-volume-mounts` flags are essential when removing old secret mounts
 
 ### 1. Cloud SQL PostgreSQL 17 Configuration Issues
 

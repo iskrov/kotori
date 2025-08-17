@@ -229,7 +229,7 @@ The `setup.sh` script handles the initial database service startup. If you need 
 
 **Note:** While the frontend previously interacted directly with the Google API using an API key stored in its `.env`, this has been **refactored for security and best practices**. The backend now handles all communication with the Google Cloud Speech-to-Text API.
 
-1. Ensure the backend `.env` file (`backend/.env`) contains the necessary `GOOGLE_SPEECH_API_KEY` or is configured to use `GOOGLE_APPLICATION_CREDENTIALS` (Service Account Key recommended for production).
+1. Ensure the backend `.env` file (`backend/.env`) contains the necessary `GOOGLE_SPEECH_API_KEY` or is configured to use Application Default Credentials (ADC) for production.
 2. The backend service (`backend/app/services/speech_service.py`) uses these credentials to interact with the API.
 3. The frontend (`frontend/src/services/speechToText.ts`) calls the backend endpoint (`/api/speech/transcribe`) to request transcription.
 4. You **no longer need** to configure `GOOGLE_SPEECH_API_KEY` or `GOOGLE_CLOUD_PROJECT_ID` directly in the frontend's `.env` file for transcription purposes.
@@ -279,6 +279,57 @@ kotori/      # Workspace Root (Git Repository Root)
 │   └── stop_db.sh
 └── README.md            # This file (Main Project README)
 ```
+
+## 🚀 Production Deployment
+
+Kotori is deployed on Google Cloud Platform using Cloud Run for both frontend and backend.
+
+### Prerequisites
+- Google Cloud CLI configured with `kotori-io` project
+- Required secrets in Google Cloud Secret Manager
+- Docker images built and pushed to Artifact Registry
+
+### Quick Deployment Commands
+
+**Full Deployment:**
+```bash
+./scripts/cloud-deploy.sh
+```
+
+**Backend Only:**
+```bash
+./scripts/cloud-deploy.sh --backend-only
+```
+
+**Frontend Only:**
+```bash
+./scripts/cloud-deploy.sh --frontend-only
+```
+
+### Required Secrets in Secret Manager
+
+The deployment requires these secrets to be configured in Google Cloud Secret Manager:
+
+**Core Application Secrets:**
+- `database-url` → Database connection string
+- `secret-key` → JWT signing key
+- `encryption-master-salt` → Encryption salt
+- `google-cloud-project` → GCP project ID
+- `google-cloud-location` → GCP region
+
+**Google OAuth Secrets (for authentication):**
+- `google-client-id` → Google OAuth client ID
+- `google-web-client-id` → Google web client ID
+
+**Frontend Build Secrets:**
+- `expo-public-app-secret` → Frontend app secret
+- `expo-public-google-web-client-id` → Frontend OAuth client ID
+
+### Production URLs
+- **Backend API:** https://kotori-api-412014849981.us-central1.run.app
+- **Frontend App:** https://kotori-app-412014849981.us-central1.run.app
+
+For detailed deployment troubleshooting, see [docs/deployment/DEPLOYMENT_TROUBLESHOOTING.md](docs/deployment/DEPLOYMENT_TROUBLESHOOTING.md).
 
 ## Contributing
 
