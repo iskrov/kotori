@@ -77,6 +77,7 @@ export const authStyles = StyleSheet.create({
   // Form header
   formHeader: {
     marginBottom: spacing.xl,
+    alignItems: 'center',
   },
   formTitle: {
     fontSize: kotoriTypography.fontSizes.xxl,
@@ -84,12 +85,14 @@ export const authStyles = StyleSheet.create({
     fontWeight: '600',
     color: authColors.textHeading,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   formSubtitle: {
     fontSize: kotoriTypography.fontSizes.md,
     fontFamily: kotoriTypography.fontFamilies.regular,
     fontWeight: '400',
     color: authColors.textBody,
+    textAlign: 'center',
   },
   
   // Input styles
@@ -340,6 +343,7 @@ export const getAuthStyles = (theme: AppTheme) =>
     },
     formHeader: {
       marginBottom: theme.spacing.xl,
+      alignItems: 'center',
     },
     formTitle: {
       fontSize: theme.typography.fontSizes.xxl,
@@ -347,12 +351,14 @@ export const getAuthStyles = (theme: AppTheme) =>
       fontWeight: '600',
       color: theme.colors.text,
       marginBottom: theme.spacing.xs,
+      textAlign: 'center',
     },
     formSubtitle: {
       fontSize: theme.typography.fontSizes.md,
       fontFamily: theme.typography.fontFamilies.regular,
       fontWeight: '400',
       color: theme.colors.textSecondary,
+      textAlign: 'center',
     },
     inputContainer: {
       marginBottom: theme.spacing.md,
