@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 
 import { useAuth } from '../../contexts/AuthContext';
 import SafeScrollView from '../../components/SafeScrollView';
@@ -68,6 +69,8 @@ const LoginScreen = () => {
 
   // Render-only subcomponent so the Google hook is only used when enabled
   const GoogleSignInSection: React.FC = () => {
+    // For web, ensure redirectUri matches our deployed origin exactly
+    const redirectUri = makeRedirectUri({ useProxy: false });
     const [request, response, promptAsync] = Google.useAuthRequest({
       expoClientId: webClientId,
       webClientId,
@@ -75,6 +78,7 @@ const LoginScreen = () => {
       androidClientId,
       responseType: 'id_token',
       scopes: ['openid', 'email', 'profile'],
+      redirectUri,
     });
 
     useEffect(() => {
