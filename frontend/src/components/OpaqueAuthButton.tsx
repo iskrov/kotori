@@ -41,24 +41,66 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [opaqueSupported, setOpaqueSupported] = useState<boolean | null>(null);
   const [checkingSupport, setCheckingSupport] = useState(true);
+  const [supportMessage, setSupportMessage] = useState<string>('Checking Server...');
 
-  // Check OPAQUE support on component mount
+  // Check OPAQUE support on component mount with 3-attempt retry and progressive messages
   useEffect(() => {
-    const checkSupport = async () => {
+    let isCancelled = false;
+
+    const attemptMessages = ['Checking Server...', 'Please wait...', 'Trying again...'];
+    const attemptDelaysMs = [0, 1200, 2500];
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const checkSupportWithRetry = async () => {
       try {
         setCheckingSupport(true);
-        const supported = await hasOpaqueSupport();
-        setOpaqueSupported(supported);
-        logger.info('Authentication service check completed', { supported });
-      } catch (error) {
-        logger.error('Failed to check authentication service', error);
-        setOpaqueSupported(false);
-      } finally {
-        setCheckingSupport(false);
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          if (isCancelled) return;
+
+          // Update UI message for this attempt
+          setSupportMessage(attemptMessages[attempt]);
+
+          // Optional stagger between attempts (skip delay before first attempt)
+          if (attemptDelaysMs[attempt] > 0) {
+            await sleep(attemptDelaysMs[attempt]);
+            if (isCancelled) return;
+          }
+
+          try {
+            const supported = await hasOpaqueSupport();
+            if (isCancelled) return;
+            if (supported) {
+              setOpaqueSupported(true);
+              setCheckingSupport(false);
+              logger.info('Authentication service check completed', { supported });
+              return;
+            }
+          } catch (error) {
+            // Log and continue to next attempt
+            logger.warn('OPAQUE support attempt failed', { attempt: attempt + 1, error });
+          }
+        }
+
+        // All attempts failed
+        if (!isCancelled) {
+          setOpaqueSupported(false);
+          setCheckingSupport(false);
+          logger.warn('OPAQUE support check failed after retries, assuming not supported');
+        }
+      } catch (outerError) {
+        if (!isCancelled) {
+          logger.error('Failed to check authentication service', outerError);
+          setOpaqueSupported(false);
+          setCheckingSupport(false);
+        }
       }
     };
 
-    checkSupport();
+    checkSupportWithRetry();
+    return () => {
+      isCancelled = true;
+    };
   }, [hasOpaqueSupport]);
 
   const handleAuth = async () => {
@@ -170,7 +212,7 @@ const OpaqueAuthButton: React.FC<OpaqueAuthButtonProps> = ({
     return (
       <View style={[styles.button, styles.checkingButton, style]}>
         <ActivityIndicator size="small" color={theme.colors.white} />
-        <Text style={styles.buttonText}>Checking Server...</Text>
+        <Text style={styles.buttonText}>{supportMessage}</Text>
       </View>
     );
   }
