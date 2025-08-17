@@ -258,7 +258,7 @@ deploy_backend() {
         --cpu 1 \
         --max-instances 10 \
         --env-vars-file "../deploy/production-env.yaml" \
-        --update-secrets "DATABASE_URL=database-url:latest,SECRET_KEY=secret-key:latest,GOOGLE_CLOUD_PROJECT=google-cloud-project:latest,GOOGLE_CLOUD_LOCATION=google-cloud-location:latest,ENCRYPTION_MASTER_SALT=encryption-master-salt:latest,/etc/secrets/google-application-credentials.json=google-application-credentials:latest" \
+        --update-secrets "DATABASE_URL=database-url:latest,SECRET_KEY=secret-key:latest,GOOGLE_CLOUD_PROJECT=google-cloud-project:latest,GOOGLE_CLOUD_LOCATION=google-cloud-location:latest,ENCRYPTION_MASTER_SALT=encryption-master-salt:latest" \
         --project "$PROJECT_ID"
     
     BACKEND_URL=$(gcloud run services describe "$BACKEND_SERVICE" --region="$REGION" --format="value(status.url)")

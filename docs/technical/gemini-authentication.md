@@ -6,44 +6,53 @@ This document describes the authentication methods available for Google's Gemini
 
 The Gemini service (`backend/app/services/gemini_service.py`) supports two authentication methods:
 
-1. **Service Account Credentials** (Recommended for production)
+1. **Application Default Credentials (ADC)** (Production - recommended)
 2. **API Key** (Fallback method)
 
-The service automatically tries service account authentication first, then falls back to API key if unavailable.
+The service automatically uses ADC when available, then falls back to API key if needed.
 
 ## Authentication Methods
 
-### 1. Service Account Authentication (Recommended)
+### 1. Application Default Credentials (ADC) - Production
 
-Service account authentication is more secure and recommended for production environments.
+**Recommended for Cloud Run production deployments.** The application automatically uses the Cloud Run service account without requiring explicit credentials.
 
 #### Setup
 
-1. **Create Service Account** in Google Cloud Console:
-   - Go to IAM & Admin > Service Accounts
-   - Create a new service account
-   - Grant the "Generative Language User" role
-   - Download the JSON key file
+1. **Service Account**: `kotori-api@kotori-io.iam.gserviceaccount.com`
+2. **Required Permissions**: `roles/aiplatform.user`
+3. **No Configuration Needed**: Cloud Run automatically provides credentials
+
+#### Benefits
+- ✅ Most secure - no credential files to manage
+- ✅ Automatic credential rotation
+- ✅ No secrets to store or rotate
+- ✅ Built-in to Google Cloud services
+
+### 2. Service Account File (Development)
+
+For local development, you can use a service account key file.
+
+#### Setup
+
+1. **Download Service Account Key**:
+   ```bash
+   gcloud iam service-accounts keys create ./local-dev-key.json \
+     --iam-account=kotori-api@kotori-io.iam.gserviceaccount.com
+   ```
 
 2. **Configure Environment**:
    ```bash
-   # In your .env file
-   GOOGLE_APPLICATION_CREDENTIALS=../.keys/kotori-gemini-keys.json
+   # In your .env file (development only)
+   GOOGLE_APPLICATION_CREDENTIALS=./local-dev-key.json
    ```
 
-3. **File Structure**:
-   ```
-   kotori/
-   ├── .keys/
-   │   └── kotori-gemini-keys.json    # Service account key file
-   ├── backend/
-   └── frontend/
-   ```
+⚠️ **Important**: Delete the key file after development to maintain security.
 
 #### Benefits
-- ✅ More secure than API keys
-- ✅ Better for production environments
-- ✅ Supports fine-grained IAM permissions
+- ✅ Enables local development and testing
+- ✅ Same permissions as production service account
+- ✅ No need for separate API keys
 - ✅ Can be rotated without code changes
 - ✅ Audit trail in Google Cloud Console
 
@@ -74,9 +83,10 @@ API key authentication is simpler but less secure.
 
 The Gemini service tries authentication methods in this order:
 
-1. **Service Account** (`GOOGLE_APPLICATION_CREDENTIALS`)
-2. **API Key** (`GEMINI_API_KEY`)
-3. **Disabled** (Neither configured)
+1. **Application Default Credentials** (Cloud Run service account)
+2. **Service Account File** (`GOOGLE_APPLICATION_CREDENTIALS`)
+3. **API Key** (`GEMINI_API_KEY`)
+4. **Disabled** (None configured)
 
 ## Implementation Details
 
@@ -85,21 +95,32 @@ The Gemini service tries authentication methods in this order:
 ```python
 class GeminiService:
     def initialize_client(self):
-        # Try service account first
-        credentials = self._get_credentials()
-        if credentials:
-            genai.configure(credentials=credentials)
-        elif settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-        else:
-            # Service disabled
-            return
+        # Try Application Default Credentials first (Cloud Run)
+        try:
+            # ADC automatically used when available
+            genai.configure()
+            self.model = genai.GenerativeModel('gemini-2.5-flash')
+        except Exception:
+            # Fallback to explicit credentials or API key
+            credentials = self._get_credentials()
+            if credentials:
+                genai.configure(credentials=credentials)
+            elif settings.GEMINI_API_KEY:
+                genai.configure(api_key=settings.GEMINI_API_KEY)
+            else:
+                # Service disabled
+                return
 ```
 
-### Service Account Scopes
+### Service Account Permissions
 
-The service account requires the following OAuth 2.0 scope:
-- `https://www.googleapis.com/auth/generative-language`
+The `kotori-api@kotori-io.iam.gserviceaccount.com` service account has these IAM roles:
+- `roles/aiplatform.user` - Vertex AI Gemini model access
+- `roles/speech.client` - Speech-to-Text API access  
+- `roles/cloudsql.client` - Database connectivity
+- `roles/secretmanager.secretAccessor` - Configuration access
+- `roles/logging.logWriter` - Application logging
+- `roles/monitoring.metricWriter` - Metrics collection
 
 ### Error Handling
 
@@ -137,14 +158,19 @@ The Gemini service is actively used for:
 
 The service provides detailed logging for troubleshooting:
 
+**Production (ADC)**:
 ```
-INFO: Gemini client initialized with service account credentials
-INFO: Service account credentials loaded successfully for Gemini
+INFO: Vertex AI initialized successfully with Application Default Credentials
 INFO: Gemini client initialized successfully with gemini-2.5-flash model
 ```
 
-Or for fallback:
+**Development (Service Account File)**:
+```
+INFO: Gemini client initialized with service account credentials
+INFO: Service account credentials loaded successfully for Gemini
+```
 
+**Fallback (API Key)**:
 ```
 DEBUG: GOOGLE_APPLICATION_CREDENTIALS not set, will try API key authentication
 INFO: Gemini client initialized with API key
@@ -203,13 +229,19 @@ curl -H "Authorization: Bearer $GEMINI_API_KEY" \
 
 ### Environment Variables
 
+**Production (Cloud Run - No configuration needed)**:
 ```bash
-# Before (API Key)
-GEMINI_API_KEY=your-api-key-here
-
-# After (Service Account)
-GOOGLE_APPLICATION_CREDENTIALS=../.keys/kotori-gemini-keys.json
-# GEMINI_API_KEY=your-api-key-here  # Keep as fallback if desired
+# No environment variables required
+# Cloud Run automatically provides Application Default Credentials
 ```
 
-The service will automatically use the service account when available, providing a seamless transition.
+**Development (Local)**:
+```bash
+# Option 1: Service Account File
+GOOGLE_APPLICATION_CREDENTIALS=./local-dev-key.json
+
+# Option 2: API Key (fallback)
+GEMINI_API_KEY=your-api-key-here
+```
+
+The service automatically detects the available authentication method.

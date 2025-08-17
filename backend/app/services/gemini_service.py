@@ -687,12 +687,21 @@ class GeminiService:
         # Prepare questions
         questions_text = ""
         for question in template.get('questions', []):
-            q_raw = question.get('text')
-            if isinstance(q_raw, dict):
-                q_text = q_raw.get(target_language) or q_raw.get('en') or 'No question text'
+            # Handle both string questions and object questions with text property
+            if isinstance(question, str):
+                q_text = question
             else:
-                q_text = q_raw or 'No question text'
-            questions_text += f"- {question.get('id')}: {q_text}\n"
+                q_raw = question.get('text')
+                if isinstance(q_raw, dict):
+                    q_text = q_raw.get(target_language) or q_raw.get('en') or 'No question text'
+                else:
+                    q_text = q_raw or 'No question text'
+            # Handle question ID for both string and object questions
+            if isinstance(question, str):
+                questions_text += f"- {q_text}\n"
+            else:
+                q_id = question.get('id', 'Q')
+                questions_text += f"- {q_id}: {q_text}\n"
 
         prompt = f"""
 You are a helpful AI assistant that creates structured summaries for healthcare and wellness sharing.
