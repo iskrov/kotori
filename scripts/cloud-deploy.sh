@@ -325,9 +325,19 @@ main() {
     check_prerequisites
     check_git_status
     
+    # Determine if migrations should run based on flags
+    SHOULD_RUN_MIGRATIONS=false
+    # Case 1: User explicitly requested --migrations-only
+    if [[ "$DEPLOY_FRONTEND" == false && "$DEPLOY_BACKEND" == false && "$RUN_MIGRATIONS" == true ]]; then
+        SHOULD_RUN_MIGRATIONS=true
+    # Case 2: User is deploying the backend and hasn't skipped migrations
+    elif [[ "$DEPLOY_BACKEND" == true && "$RUN_MIGRATIONS" == true ]]; then
+        SHOULD_RUN_MIGRATIONS=true
+    fi
+
     # Run database migrations before deploying backend
     # This ensures schema is updated before new application code runs
-    if [[ "$RUN_MIGRATIONS" == true ]]; then
+    if [[ "$SHOULD_RUN_MIGRATIONS" == true ]]; then
         run_database_migrations
     fi
     
