@@ -163,15 +163,13 @@ deploy_frontend() {
     
     cd "$PROJECT_ROOT/frontend"
     
-    # Build the web app
-    print_step "Building Frontend Web App"
-    npx expo export:web
-    print_success "Frontend build completed"
+    # Build Docker image using Cloud Build and the dedicated cloudbuild.yaml
+    # This securely injects secrets during the build process
+    print_step "Building Frontend Docker Image via Cloud Build"
+    FRONTEND_IMAGE="us-central1-docker.pkg.dev/$PROJECT_ID/kotori-images/kotori-app:$TAG"
     
-    # Build Docker image
-    print_step "Building Frontend Docker Image"
-    FRONTEND_IMAGE="$REGISTRY/kotori-app:$TAG"
-    gcloud builds submit --tag "$FRONTEND_IMAGE"
+    gcloud builds submit --config=cloudbuild.yaml --substitutions=_TAG_NAME="$TAG" .
+    
     print_success "Frontend image built: $FRONTEND_IMAGE"
     
     # Deploy to Cloud Run
